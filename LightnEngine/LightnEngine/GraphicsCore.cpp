@@ -483,9 +483,9 @@ void GraphicsCore::onRender() {
 	//デスクリプタヒープをセット
 	ID3D12DescriptorHeap* ppHeap[] = { _cbvSrvHeap.Get() };
 	commandList->SetDescriptorHeaps(1, ppHeap);
-	commandList->SetGraphicsRootDescriptorTable(0, _cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 
 	//デスクリプタヒープにセットした定数バッファをセット
+	commandList->SetGraphicsRootDescriptorTable(0, _cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
 	commandList->SetGraphicsRootDescriptorTable(1, _currentFrameResource->_sceneCbvHandle);
 
 	commandList->RSSetViewports(1, &_viewPort);
@@ -512,7 +512,7 @@ void GraphicsCore::onRender() {
 	//描画用リソースバリアを展開
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	////コマンドキューにコマンドリストを渡して実行
+	//コマンドキューにコマンドリストを渡して実行
 	_commandContext->executeCommandList(commandListSet);
 	_commandContext->discardCommandListSet(commandListSet);
 
@@ -544,7 +544,6 @@ void GraphicsCore::onDestroy() {
 
 	_vertexBuffer = nullptr;
 	_indexBuffer = nullptr;
-
 	_texture = nullptr;
 }
 
@@ -556,6 +555,6 @@ void GraphicsCore::moveToNextFrame() {
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = _frameResources[_frameIndex];
 
-	auto fenceValue = commandQueue->incrementFence();
+	const UINT64 fenceValue = commandQueue->incrementFence();
 	_frameResources[_frameIndex]->_fenceValue = fenceValue;
 }
