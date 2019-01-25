@@ -20,8 +20,8 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{857EAE99-3423-426D-949B-E91B09500DD8}</ProjectGuid>
-    <RootNamespace>LightnEngine</RootNamespace>
+    <ProjectGuid>{95FEEB51-23C0-452B-B4D1-94427AC29C87}</ProjectGuid>
+    <RootNamespace>BitTest</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -85,9 +85,6 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
-    <Link>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -115,39 +112,10 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CommandAllocatorPool.cpp" />
-    <ClCompile Include="CommandContext.cpp" />
-    <ClCompile Include="CommandListPool.cpp" />
-    <ClCompile Include="CommandQueue.cpp" />
-    <ClCompile Include="DescriptorHeap.cpp" />
-    <ClCompile Include="FrameResource.cpp" />
-    <ClCompile Include="GraphicsCore.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="Win32Application.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="shaders.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="CommandAllocatorPool.h" />
-    <ClInclude Include="CommandContext.h" />
-    <ClInclude Include="CommandListPool.h" />
-    <ClInclude Include="CommandQueue.h" />
-    <ClInclude Include="D3D12Helper.h" />
-    <ClInclude Include="D3D12Util.h" />
-    <ClInclude Include="DescriptorHeap.h" />
-    <ClInclude Include="FrameResource.h" />
-    <ClInclude Include="GpuResource.h" />
-    <ClInclude Include="GraphicsCore.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="Utility.h" />
-    <ClInclude Include="Win32Application.h" />
+    <ClCompile Include="maincpp.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

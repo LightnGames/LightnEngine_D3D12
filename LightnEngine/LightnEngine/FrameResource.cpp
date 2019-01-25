@@ -18,10 +18,6 @@ _pipelineState(pPso){
 	{
 		D3D12_HEAP_PROPERTIES heapProperties = {};
 		heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-		heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProperties.CreationNodeMask = 0;
-		heapProperties.VisibleNodeMask = 0;
 
 		D3D12_RESOURCE_DESC resourceDesc = {};
 		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
