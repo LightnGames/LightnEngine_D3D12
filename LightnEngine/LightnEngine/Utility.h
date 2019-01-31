@@ -18,3 +18,20 @@ struct NonCopyable {
 	NonCopyable(const NonCopyable&) = delete;
 	NonCopyable& operator=(const NonCopyable&) = delete;
 };
+
+template <typename T>
+class Singleton :private NonCopyable {
+public:
+	Singleton() {
+		//assert(!_singleton);
+		_singleton = static_cast<T*>(this);
+	}
+
+	static T& instance() {
+		return *_singleton;
+	}
+
+protected:
+
+	static T* _singleton;
+};

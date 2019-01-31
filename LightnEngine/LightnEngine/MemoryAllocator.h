@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <bitset>
 #include <vector>
@@ -11,7 +13,6 @@ using ulong = unsigned long;
 using ulong2 = unsigned long long;
 using int32 = int;
 
-constexpr uint32 BLOCK_DATA_SIZE = 32;
 constexpr uint32 SIZE_ARRAY_SCALE = 32;
 
 //#define DEBUG_ARRAY
@@ -112,20 +113,10 @@ struct Block {
 
 constexpr uint32 BLOCK_AND_HEADER_SIZE = sizeof(Block) + sizeof(uint32);
 
-//basePtrを開始としたブロックのローカルポインタを返す
-inline constexpr ulong2 blockLocalIndex(void* blockPtr, void* basePtr) {
-	ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(basePtr);
-	return localPtr / BLOCK_AND_HEADER_SIZE;
-}
-
-//basePtrを開始としたデータ本体のローカルポインタを返す
-inline constexpr ulong2 dataLocalIndex(void* blockPtr, void* basePtr) {
-	ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(basePtr);
-	return localPtr / BLOCK_DATA_SIZE;
-}
-
 class BitFlagAllocator {
 public:
+	BitFlagAllocator(uint32 blockDataSize) :BLOCK_DATA_SIZE(blockDataSize) {}
+
 	~BitFlagAllocator() {
 		shutdown();
 	}
@@ -173,7 +164,7 @@ public:
 
 		//同じサイズのブロックだった場合
 		if (currentBlock->size == blockNum) {
-			return dataPtr + blockLocalIndex(currentBlock, blockPtr) * BLOCK_DATA_SIZE;
+			return dataPtr + blockLocalIndex(currentBlock) * BLOCK_DATA_SIZE;
 		}
 
 		//ブロックを要求サイズに分割して返却
@@ -189,12 +180,12 @@ public:
 		debugAddActiveList(newBlock);
 
 		//ブロックインデックスからデータポインタを算出して返す
-		return dataPtr + blockLocalIndex(newBlock, blockPtr) * BLOCK_DATA_SIZE;
+		return dataPtr + blockLocalIndex(newBlock) * BLOCK_DATA_SIZE;
 	}
 
 	void releaseMemory(void* ptr) {
 		//データポインタのローカルオフセットを計算してブロックポインタを求める
-		ulong2 blockIndex = dataLocalIndex(ptr, dataPtr);
+		ulong2 blockIndex = dataLocalIndex(ptr);
 		Block* block = (Block*)(blockPtr + blockIndex * BLOCK_AND_HEADER_SIZE);
 
 		//前後左右のブロックポインタ
@@ -242,7 +233,7 @@ public:
 #ifdef DEBUG_ARRAY
 	void debugAddActiveList(Block* block) {
 		activeList.push_back(block);
-		}
+	}
 
 	void debugRemoveActiveList(Block* block) {
 		activeList.remove(block);
@@ -281,6 +272,23 @@ public:
 		}
 	}
 
+	//データポインタからブロックヘッダーを取得する
+	inline Block* getBlockFromDataPtr(void* dataPtr) {
+		return (Block*)(blockPtr + dataLocalIndex(dataPtr) * BLOCK_AND_HEADER_SIZE);
+	}
+
+	//basePtrを開始としたデータ本体のローカルポインタを返す
+	inline constexpr ulong2 dataLocalIndex(void* blockPtr) {
+		ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(dataPtr);
+		return localPtr / BLOCK_DATA_SIZE;
+	}
+
+	//basePtrを開始としたブロックのローカルポインタを返す
+	inline constexpr ulong2 blockLocalIndex(void* blockPtr) {
+		ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(this->blockPtr);
+		return localPtr / BLOCK_AND_HEADER_SIZE;
+	}
+
 	template<typename T>
 	T* allocateMemory() {
 		T* ptr = (T*)divideMemory((sizeof(T) + (BLOCK_DATA_SIZE - 1)) / BLOCK_DATA_SIZE);
@@ -288,6 +296,7 @@ public:
 		return ptr;
 	}
 
+	const uint32 BLOCK_DATA_SIZE;
 	byte* dataPtr;
 	byte* blockPtr;
 	uint32 allocateBlockSize;
@@ -295,100 +304,7 @@ public:
 	std::vector<Block*> freeList;
 	uint32 freeListFlags;
 
+#ifdef DEBUG_ARRAY
 	std::list<Block*> activeList;
-	};
-
-struct TestStruct {
-	int num[8] = { 0, 1, 2, 3, 4, 5, 6, 7};
-	void print() {
-		//std::cout << "TestStruct" << std::endl;
-		DEBUG_PRINT("TestStruct" << num[0] << "," << num[1] << "," << num[2] << "," << num[3] << "," << num[4] << "," << num[5] << "," << num[6] << "," << num[7]);
-		//std::cout << std::endl;
-	}
+#endif
 };
-
-#include<chrono>
-void Benchmark() {
-
-	constexpr uint32 size = 2000000;
-	std::vector<TestStruct*> ptrs(size);
-	//Windows New
-	std::chrono::system_clock::time_point start, end;
-	start = std::chrono::system_clock::now();
-
-	for (int i = 0; i < ptrs.size(); ++i) {
-		ptrs[i] = new TestStruct();
-	}
-
-	for (int i = 0; i < ptrs.size(); ++i) {
-		delete ptrs[i];
-	}
-
-	end = std::chrono::system_clock::now();
-
-	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	std::cout << "Windows New:" << elapsed << "ms" << std::endl;
-	ptrs.clear();
-	ptrs.resize(size);
-
-	BitFlagAllocator allocator;
-	allocator.init(ptrs.size());
-	start = std::chrono::system_clock::now();
-
-	for (int i = 0; i < ptrs.size(); ++i) {
-		ptrs[i] = allocator.allocateMemory<TestStruct>();
-	}
-
-	for (int i = 0; i < ptrs.size(); ++i) {
-		allocator.releaseMemory(ptrs[i]);
-	}
-
-	end = std::chrono::system_clock::now();
-	elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	std::cout << "Alloctor New:" << elapsed << "ms" << std::endl;
-}
-
-void main() {
-
-	int num = 54;
-
-	//std::cout << num << std::endl;
-	//std::cout << std::bitset<8>(num) << std::endl;
-
-	int msb = higherBit(num);
-	//std::cout << msb << std::endl;
-	//std::cout << std::bitset<8>(msb) << std::endl;
-	//std::cout << "fast log " << fastLog2(msb) << std::endl;
-
-	int lsb = lowerBit(num);
-	//std::cout << lsb << std::endl;
-	//std::cout << std::bitset<8>(lsb) << std::endl;
-
-	//=========================================================================
-	//Allocator allocator;
-	//allocator.init(128);
-
-	//int* ptr1 = allocator.allocateMemory<int>();
-	//int* ptr2 = allocator.allocateMemory<int>();
-	//TestStruct* s = allocator.allocateMemory<TestStruct>();
-	//allocator.releaseMemory(ptr1);
-	//allocator.releaseMemory(ptr2);
-	//int* ptr3 = allocator.allocateMemory<int>();
-
-	////*ptr1 = 1;
-	////*ptr2 = 2;
-	//*ptr3 = 3;
-
-	////DEBUG_PRINT(*ptr1);
-	////DEBUG_PRINT(*ptr2);
-	//DEBUG_PRINT(*ptr3);
-
-	//allocator.releaseMemory(ptr3);
-
-	//s->print();
-	//allocator.releaseMemory(s);
-
-	Benchmark();
-
-	system("pause");
-}

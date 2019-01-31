@@ -9,6 +9,7 @@
 #include "FrameResource.h"
 #include "CommandQueue.h"
 #include "CommandContext.h"
+#include "DescriptorHeap.h"
 
 GraphicsCore::GraphicsCore() {
 	_width = 1280;
@@ -53,6 +54,10 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//デバイス生成
 	throwIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device)));
 
+	//デスクリプタヒープマネージャー
+	_descriptorHeapManager = new DescriptorHeapManager();
+	_descriptorHeapManager->create(_device.Get());
+
 	//コマンドキュー生成
 	_commandContext = new CommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	_commandContext->create(_device.Get());
@@ -77,35 +82,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//ビューポート初期化
 	_viewPort = { 0.0f, 0.0f, static_cast<float>(_width), static_cast<float>(_height) };
 	_scissorRect = { 0, 0, static_cast<LONG>(_width), static_cast<LONG>(_height) };
-
-	//デスクリプタヒープ生成
-	{
-		//メインレンダーターゲットのデスクリプタヒープを生成
-		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = FrameCount;
-		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		throwIfFailed(_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&_rtvHeap)));
-		NAME_D3D12_OBJECT(_rtvHeap);
-
-		_rtvDescriptorSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-		//デプスバッファのデスクリプタヒープ
-		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		dsvHeapDesc.NumDescriptors = 1;
-		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		throwIfFailed(_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&_dsvHeap)));
-		NAME_D3D12_OBJECT(_dsvHeap);
-
-		//テクスチャのSRVとCBVのデスクリプタヒープ
-		D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-		heapDesc.NumDescriptors = 1 + FrameCount;//テクスチャ１枚＋定数バッファ１個ｘフレーム数
-		heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		throwIfFailed(_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_cbvSrvHeap)));
-		NAME_D3D12_OBJECT(_cbvSrvHeap);
-	}
 
 	//デプスバッファ生成
 	{
@@ -152,11 +128,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 			IID_PPV_ARGS(&_depthStencil));
 		NAME_D3D12_OBJECT(_depthStencil);
 
-		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-		dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-		_device->CreateDepthStencilView(_depthStencil.Get(), &dsvDesc, _dsvHeap->GetCPUDescriptorHandleForHeapStart()); 
+		_descriptorHeapManager->createDepthStencilView(_depthStencil.GetAddressOf(), &_dsv, 1);
 	}
 
 	//ルートシグネチャのサポートバージョンをチェック
@@ -446,14 +418,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 		//テクスチャのシェーダーリソースビューを生成
-		D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = {};
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		descriptorHandle = _cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
-		_device->CreateShaderResourceView(_texture.Get(), &srvDesc, descriptorHandle);
+		_descriptorHeapManager->createShaderResourceView(_texture.GetAddressOf(), &_textureSrv, 1);
 
 		//GPUにコマンドを発行するのでいったんクローズ
 		//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
@@ -463,7 +428,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
-		_frameResources[i] = new FrameResource(_device.Get(), _swapChain.Get(), _pipelineState.Get(), _rtvHeap.Get(), _cbvSrvHeap.Get(), i);
+		_frameResources[i] = new FrameResource(_device.Get(), _swapChain.Get(), i);
 	}
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
@@ -481,12 +446,12 @@ void GraphicsCore::onRender() {
 	commandList->SetGraphicsRootSignature(_rootSignature.Get());
 
 	//デスクリプタヒープをセット
-	ID3D12DescriptorHeap* ppHeap[] = { _cbvSrvHeap.Get() };
+	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager->descriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
 	commandList->SetDescriptorHeaps(1, ppHeap);
 
 	//デスクリプタヒープにセットした定数バッファをセット
-	commandList->SetGraphicsRootDescriptorTable(0, _cbvSrvHeap->GetGPUDescriptorHandleForHeapStart());
-	commandList->SetGraphicsRootDescriptorTable(1, _currentFrameResource->_sceneCbvHandle);
+	commandList->SetGraphicsRootDescriptorTable(0, _textureSrv->gpuHandle);
+	commandList->SetGraphicsRootDescriptorTable(1, _currentFrameResource->_sceneCbv->gpuHandle);
 
 	commandList->RSSetViewports(1, &_viewPort);
 	commandList->RSSetScissorRects(1, &_scissorRect);
@@ -495,15 +460,13 @@ void GraphicsCore::onRender() {
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	//レンダーターゲット・デプスステンシルバッファをセット
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = {};
-	const D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
-	rtvHandle.ptr = static_cast<SIZE_T>(_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr + INT64(_frameIndex)*UINT64(_rtvDescriptorSize));
-	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv->cpuHandle;
+	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &_dsv->cpuHandle);
 
 	//描画コマンドを登録
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	commandList->ClearDepthStencilView(_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
 	commandList->IASetIndexBuffer(&_indexBufferView);
@@ -527,19 +490,17 @@ void GraphicsCore::onDestroy() {
 	//描画中に破棄してしまうと困るので待つ
 	_commandContext->commandQueue()->waitForIdle();
 
-	delete _commandContext;
-
 	for (int i = 0; i < FrameCount; ++i) {
 		delete _frameResources[i];
 	}
+
+	delete _commandContext;
+	delete _descriptorHeapManager;
 
 	_swapChain = nullptr;
 	_device = nullptr;
 	_depthStencil = nullptr;
 	_rootSignature = nullptr;
-	_rtvHeap = nullptr;
-	_dsvHeap = nullptr;
-	_cbvSrvHeap = nullptr;
 	_pipelineState = nullptr;
 
 	_vertexBuffer = nullptr;

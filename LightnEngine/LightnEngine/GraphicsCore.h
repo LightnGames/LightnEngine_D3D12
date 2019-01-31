@@ -8,6 +8,8 @@
 
 using namespace Microsoft::WRL;
 
+class DescriptorHeapManager;
+struct BufferView;
 class FrameResource;
 class CommandQueue;
 class CommandContext;
@@ -73,7 +75,6 @@ private:
 	};
 
 	UINT _frameIndex;
-	UINT _rtvDescriptorSize;
 
 	D3D12_VIEWPORT _viewPort;
 	D3D12_RECT _scissorRect;
@@ -82,9 +83,6 @@ private:
 	ComPtr<ID3D12Device> _device;
 	ComPtr<ID3D12Resource> _depthStencil;
 	ComPtr<ID3D12RootSignature> _rootSignature;
-	ComPtr<ID3D12DescriptorHeap> _rtvHeap;
-	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
-	ComPtr<ID3D12DescriptorHeap> _cbvSrvHeap;
 	ComPtr<ID3D12PipelineState> _pipelineState;
 
 	ComPtr<ID3D12Resource> _vertexBuffer;
@@ -93,10 +91,13 @@ private:
 	D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 
 	ComPtr<ID3D12Resource> _texture;
+	BufferView* _textureSrv;
+	BufferView* _dsv;
 
 	SceneConstantBuffer _constantBufferData;
 	CommandContext* _commandContext;
 	FrameResource* _frameResources[FrameCount];
 	FrameResource* _currentFrameResource;
+	DescriptorHeapManager* _descriptorHeapManager;
 };
 

@@ -145,6 +145,7 @@
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GpuResource.h" />
     <ClInclude Include="GraphicsCore.h" />
+    <ClInclude Include="MemoryAllocator.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="Win32Application.h" />
