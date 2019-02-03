@@ -177,7 +177,7 @@ inline UINT64 updateSubresources(
 	UINT64 intermediateOffset,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES) UINT firstSubresources,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES - firstSubresources) UINT numSubresources,
-	_In_range_(numSubresources) D3D12_SUBRESOURCE_DATA* pSrcData) {
+	_In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA* pSrcData) {
 
 	UINT64 requiredSize = 0;
 	UINT64 memToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * numSubresources;
@@ -214,7 +214,7 @@ inline UINT64 updateSubresources(
 	UINT64 intermediateOffset,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES) UINT firstSubresources,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES - firstSubresources) UINT numSubresources,
-	_In_range_(numSubresources) D3D12_SUBRESOURCE_DATA* pSrcData) {
+	_In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA* pSrcData) {
 
 	UINT64 requiredSize = 0;
 	D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts[MaxSubresources];

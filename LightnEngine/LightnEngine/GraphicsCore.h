@@ -13,6 +13,9 @@ struct BufferView;
 class FrameResource;
 class CommandQueue;
 class CommandContext;
+class VertexBuffer;
+class IndexBuffer;
+class Texture2D;
 
 class GraphicsCore {
 public:
@@ -81,20 +84,17 @@ private:
 
 	ComPtr<IDXGISwapChain3> _swapChain;
 	ComPtr<ID3D12Device> _device;
-	ComPtr<ID3D12Resource> _depthStencil;
 	ComPtr<ID3D12RootSignature> _rootSignature;
 	ComPtr<ID3D12PipelineState> _pipelineState;
+	Texture2D* _depthStencil;
 
-	ComPtr<ID3D12Resource> _vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
-	ComPtr<ID3D12Resource> _indexBuffer;
-	D3D12_INDEX_BUFFER_VIEW _indexBufferView;
-
-	ComPtr<ID3D12Resource> _texture;
 	BufferView* _textureSrv;
 	BufferView* _dsv;
 
 	SceneConstantBuffer _constantBufferData;
+	VertexBuffer* _vertexBuffer;
+	IndexBuffer* _indexBuffer;
+	Texture2D* _texture;
 	CommandContext* _commandContext;
 	FrameResource* _frameResources[FrameCount];
 	FrameResource* _currentFrameResource;

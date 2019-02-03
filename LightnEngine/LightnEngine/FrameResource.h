@@ -3,6 +3,8 @@
 #include "stdafx.h"
 
 struct BufferView;
+class ConstantBuffer;
+class Texture2D;
 
 using namespace Microsoft::WRL;
 class FrameResource {
@@ -11,14 +13,13 @@ public:
 	~FrameResource();
 
 	void writeConstantBuffer(const SceneConstantBuffer& buffer);
-	ComPtr<ID3D12PipelineState> _pipelineState;
 
 	UINT64 _fenceValue;
 
-	ComPtr<ID3D12Resource> _constantBuffer;
-	ComPtr<ID3D12Resource> _renderTarget;
-
+	Texture2D* _renderTarget;
 	SceneConstantBuffer* _mappedConstantBufferData;
+	SceneConstantBuffer _sceneConstantBuffer;
+	ConstantBuffer* _sceneConstant;
 	BufferView* _sceneCbv;
 	BufferView* _rtv;
 private:

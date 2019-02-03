@@ -7,6 +7,7 @@
 #include "D3D12Util.h"
 #include "D3D12Helper.h"
 #include "FrameResource.h"
+#include "GpuResource.h"
 #include "CommandQueue.h"
 #include "CommandContext.h"
 #include "DescriptorHeap.h"
@@ -85,50 +86,14 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	//デプスバッファ生成
 	{
-		D3D12_DEPTH_STENCIL_DESC dsDesc = {};
-		dsDesc.DepthEnable = TRUE;
-		dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-		dsDesc.StencilEnable = FALSE;
-		dsDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-		dsDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+		DepthTextureInfo depthInfo;
+		depthInfo.width = _width;
+		depthInfo.height = _height;
+		depthInfo.format = DXGI_FORMAT_D32_FLOAT;
+		_depthStencil = new Texture2D();
+		_depthStencil->createDepth(_device.Get(), depthInfo);
 
-		D3D12_DEPTH_STENCILOP_DESC dsopDesc = {};
-		dsopDesc.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-		dsopDesc.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-		dsopDesc.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-		dsopDesc.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-		dsDesc.FrontFace = dsopDesc;
-		dsDesc.BackFace = dsopDesc;
-
-		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-		depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-		depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-		D3D12_RESOURCE_DESC depthBufferDesc = {};
-		depthBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		depthBufferDesc.Alignment = 0;
-		depthBufferDesc.Width = _width;
-		depthBufferDesc.Height = _height;
-		depthBufferDesc.DepthOrArraySize = 1;
-		depthBufferDesc.MipLevels = 1;
-		depthBufferDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		depthBufferDesc.SampleDesc.Count = 1;
-		depthBufferDesc.SampleDesc.Quality = 0;
-		depthBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-		depthBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-		_device->CreateCommittedResource(&LTND3D12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&depthBufferDesc,
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			&depthOptimizedClearValue,
-			IID_PPV_ARGS(&_depthStencil));
-		NAME_D3D12_OBJECT(_depthStencil);
-
-		_descriptorHeapManager->createDepthStencilView(_depthStencil.GetAddressOf(), &_dsv, 1);
+		_descriptorHeapManager->createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
 	}
 
 	//ルートシグネチャのサポートバージョンをチェック
@@ -268,163 +233,58 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	}
 
+	//テクスチャコピーコマンドを発行する用のアロケーターとリスト
+	ComPtr<ID3D12Resource> uploadHeaps[3] = {};
+	auto commandListSet = _commandContext->requestCommandListSet();
+	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+
 	//頂点バッファ生成
 	{
-		Vertex triangleVertices[] = {
+		std::vector<Vertex> triangleVertices = {
 			{ { -0.25f, -0.25f, 0.0f }, { 0.0f, 1.0f } },
 		{ { -0.25f, 0.25f, 0.0f }, { 0.0f, 0.0f } },
 		{ { 0.25f, 0.25f, 0.0f }, { 1.0f, 0.0f } },
 		{ { 0.25f, -0.25f, 0.0f }, { 1.0f, 1.0f } },
 		};
 
-		const UINT vertexBufferSize = sizeof(triangleVertices);
-
-		D3D12_HEAP_PROPERTIES vertexHeapProperties = {};
-		vertexHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-		D3D12_RESOURCE_DESC vertexBufferDesc = {};
-		vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferDesc.Alignment = 0;
-		vertexBufferDesc.Width = vertexBufferSize;
-		vertexBufferDesc.Height = 1;
-		vertexBufferDesc.DepthOrArraySize = 1;
-		vertexBufferDesc.MipLevels = 1;
-		vertexBufferDesc.Format = DXGI_FORMAT_UNKNOWN;
-		vertexBufferDesc.SampleDesc.Count = 1;
-		vertexBufferDesc.SampleDesc.Quality = 0;
-		vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		vertexBufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-		throwIfFailed(_device->CreateCommittedResource(
-			&vertexHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&_vertexBuffer)
-		));
-		NAME_D3D12_OBJECT(_vertexBuffer);
-
-		//生成した頂点バッファにデータをコピー
-		UINT8* pVertexDataBegin;
-		D3D12_RANGE mapRange = {};
-		throwIfFailed(_vertexBuffer->Map(0, &mapRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-		memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-		_vertexBuffer->Unmap(0, nullptr);
-
-		_vertexBufferView.BufferLocation = _vertexBuffer->GetGPUVirtualAddress();
-		_vertexBufferView.StrideInBytes = sizeof(Vertex);
-		_vertexBufferView.SizeInBytes = vertexBufferSize;
+		_vertexBuffer = new VertexBuffer();
+		_vertexBuffer->createDeferred<Vertex>(_device.Get(), commandList, &uploadHeaps[0], triangleVertices);
 	}
 
 	//インデックスバッファ
 	{
-		UINT32 indices[] = {
+		std::vector<UINT32> indices = {
 			0, 1, 2,
 			0, 2, 3
 		};
 
-		const UINT indexBufferSize = sizeof(indices);
-
-		D3D12_HEAP_PROPERTIES indexHeapProperties = {};
-		indexHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-		D3D12_RESOURCE_DESC indexBufferDesc = {};
-		indexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		indexBufferDesc.Alignment = 0;
-		indexBufferDesc.Width = indexBufferSize;
-		indexBufferDesc.Height = 1;
-		indexBufferDesc.DepthOrArraySize = 1;
-		indexBufferDesc.MipLevels = 1;
-		indexBufferDesc.Format = DXGI_FORMAT_UNKNOWN;
-		indexBufferDesc.SampleDesc.Count = 1;
-		indexBufferDesc.SampleDesc.Quality = 0;
-		indexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		indexBufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-		throwIfFailed(_device->CreateCommittedResource(
-			&indexHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&_indexBuffer)
-		));
-		NAME_D3D12_OBJECT(_indexBuffer);
-
-		//生成した頂点バッファにデータをコピー
-		UINT8* pIndexDataBegin;
-		D3D12_RANGE mapRange = {};
-		throwIfFailed(_indexBuffer->Map(0, &mapRange, reinterpret_cast<void**>(&pIndexDataBegin)));
-		memcpy(pIndexDataBegin, indices, indexBufferSize);
-		_indexBuffer->Unmap(0, nullptr);
-
-		_indexBufferView.BufferLocation = _indexBuffer->GetGPUVirtualAddress();
-		_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
-		_indexBufferView.SizeInBytes = indexBufferSize;
+		_indexBuffer = new IndexBuffer();
+		_indexBuffer->createDeferred(_device.Get(), commandList, &uploadHeaps[1], indices);
 	}
 
-	//テクスチャコピーコマンドを発行する用のアロケーターとリスト
-	auto commandListSet = _commandContext->requestCommandListSet();
-	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
-
-	//ここにテクスチャアップロード用ヒープを置いておかないとコマンドリストを実行する前にDeleteされて面倒なことに
-	ComPtr<ID3D12Resource> textureUploadHeap;
-
-	//テクスチャ生成
+	//テクスチャ
 	{
-		//GPU読み出し専用テクスチャ本体を生成
-		D3D12_RESOURCE_DESC textureDesc = {};
-		textureDesc.MipLevels = 1;
-		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-		textureDesc.Width = TextureWidth;
-		textureDesc.Height = TextureHeight;
-		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		textureDesc.DepthOrArraySize = 1;
-		textureDesc.SampleDesc.Count = 1;
-		textureDesc.SampleDesc.Quality = 0;
-		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		auto tmpTexP = generateTextureData();
+		TextureInfo textureInfo;
+		textureInfo.width = TextureWidth;
+		textureInfo.height = TextureHeight;
+		textureInfo.mipLevels = 1;
+		textureInfo.dataPtr = tmpTexP.data();
+		textureInfo.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
-		throwIfFailed(_device->CreateCommittedResource(&LTND3D12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE, &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&_texture)));
-
-		UINT64 requiredSize = 0;
-		_device->GetCopyableFootprints(&_texture->GetDesc(), 0, 1, 0, nullptr, nullptr, nullptr, &requiredSize);
-
-		//テクスチャにデータをセットするためにCPUからも書き込み可能なバッファを生成
-		D3D12_RESOURCE_DESC textureBufferDesc = {};
-		textureBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		textureBufferDesc.Alignment = 0;
-		textureBufferDesc.Width = requiredSize;
-		textureBufferDesc.Height = 1;
-		textureBufferDesc.DepthOrArraySize = 1;
-		textureBufferDesc.MipLevels = 1;
-		textureBufferDesc.Format = DXGI_FORMAT_UNKNOWN;
-		textureBufferDesc.SampleDesc.Count = 1;
-		textureBufferDesc.SampleDesc.Quality = 0;
-		textureBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		textureBufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		throwIfFailed(_device->CreateCommittedResource(&LTND3D12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &textureBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&textureUploadHeap)));
-		NAME_D3D12_OBJECT(_texture);
-
-		//テクスチャデータをセット
-		std::vector<UINT8> texture = generateTextureData();
-		D3D12_SUBRESOURCE_DATA textureData = {};
-		textureData.pData = &texture[0];
-		textureData.RowPitch = TextureWidth * TexturePixelSize;
-		textureData.SlicePitch = textureData.RowPitch*TextureHeight;
-
-		//GPU読み出し専用バッファにコピーコマンドを発行
-		updateSubresources(commandList, _texture.Get(), textureUploadHeap.Get(), 0, 0, 1, &textureData);
-		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+		_texture = new Texture2D();
+		_texture->createDeferred(_device.Get(), commandList, &uploadHeaps[2], textureInfo);
 
 		//テクスチャのシェーダーリソースビューを生成
-		_descriptorHeapManager->createShaderResourceView(_texture.GetAddressOf(), &_textureSrv, 1);
-
-		//GPUにコマンドを発行するのでいったんクローズ
-		//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
-		_commandContext->executeCommandList(commandList);
-		_commandContext->discardCommandListSet(commandListSet);
+		_descriptorHeapManager->createShaderResourceView(_texture->getAdressOf(), &_textureSrv, 1); 
 	}
+
+	//アップロードバッファをGPUオンリーバッファにコピー
+	_commandContext->executeCommandList(commandList);
+	_commandContext->discardCommandListSet(commandListSet);
+
+	//コピーが終わるまでアップロードヒープを破棄しない
+	_commandContext->waitForIdle();
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
@@ -457,7 +317,7 @@ void GraphicsCore::onRender() {
 	commandList->RSSetScissorRects(1, &_scissorRect);
 
 	//コマンド積む用のリソースバリアを展開
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	//レンダーターゲット・デプスステンシルバッファをセット
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv->cpuHandle;
@@ -468,12 +328,12 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
-	commandList->IASetIndexBuffer(&_indexBufferView);
+	commandList->IASetVertexBuffers(0, 1, &_vertexBuffer->_vertexBufferView);
+	commandList->IASetIndexBuffer(&_indexBuffer->_indexBufferView);
 	commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 	//描画用リソースバリアを展開
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	//コマンドキューにコマンドリストを渡して実行
 	_commandContext->executeCommandList(commandListSet);
@@ -488,7 +348,7 @@ void GraphicsCore::onRender() {
 
 void GraphicsCore::onDestroy() {
 	//描画中に破棄してしまうと困るので待つ
-	_commandContext->commandQueue()->waitForIdle();
+	_commandContext->waitForIdle();
 
 	for (int i = 0; i < FrameCount; ++i) {
 		delete _frameResources[i];
@@ -496,16 +356,15 @@ void GraphicsCore::onDestroy() {
 
 	delete _commandContext;
 	delete _descriptorHeapManager;
+	delete _vertexBuffer;
+	delete _indexBuffer;
+	delete _texture;
+	delete _depthStencil;
 
 	_swapChain = nullptr;
 	_device = nullptr;
-	_depthStencil = nullptr;
 	_rootSignature = nullptr;
 	_pipelineState = nullptr;
-
-	_vertexBuffer = nullptr;
-	_indexBuffer = nullptr;
-	_texture = nullptr;
 }
 
 void GraphicsCore::moveToNextFrame() {

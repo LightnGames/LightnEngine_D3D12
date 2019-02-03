@@ -30,6 +30,8 @@ public:
 	UINT64 executeCommandList(ID3D12GraphicsCommandList* commandList);
 	void executeCommandList(CommandListSet& set);
 
+	void waitForIdle();
+
 protected:
 	const D3D12_COMMAND_LIST_TYPE _commandListType;
 

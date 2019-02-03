@@ -50,3 +50,7 @@ UINT64 CommandContext::executeCommandList(ID3D12GraphicsCommandList * commandLis
 void CommandContext::executeCommandList(CommandListSet & set) {
 	set.fenceValue = _commandQueue->executeCommandList(set.commandList);
 }
+
+void CommandContext::waitForIdle() {
+	_commandQueue->waitForIdle();
+}
