@@ -16,6 +16,8 @@ class CommandContext;
 class VertexBuffer;
 class IndexBuffer;
 class Texture2D;
+class RootSignature;
+class PipelineState;
 
 class GraphicsCore {
 public:
@@ -40,7 +42,7 @@ private:
 	static const UINT TextureHeight = 256;
 	static const UINT TexturePixelSize = 4;
 
-	std::vector<UINT8> generateTextureData() {
+	std::vector<UINT8> generateTextureData(int random = 0) {
 		const UINT rowPitch = TextureWidth * TexturePixelSize;
 		const UINT cellPitch = rowPitch >> 3;        // The width of a cell in the checkboard texture.
 		const UINT cellHeight = TextureWidth >> 3;    // The height of a cell in the checkerboard texture.
@@ -55,17 +57,33 @@ private:
 			UINT i = x / cellPitch;
 			UINT j = y / cellHeight;
 
-			if (i % 2 == j % 2) {
-				pData[n] = 0x00;        // R
-				pData[n + 1] = 0x00;    // G
-				pData[n + 2] = 0x88;    // B
-				pData[n + 3] = 0xff;    // A
+			if (random == 0) {
+				if (i % 2 == j % 2) {
+					pData[n] = 0x88;        // R
+					pData[n + 1] = 0x88;    // G
+					pData[n + 2] = 0x88;    // B
+					pData[n + 3] = 0xff;    // A
+				}
+				else {
+					pData[n] = 0x00;        // R
+					pData[n + 1] = 0x00;    // G
+					pData[n + 2] = 0x00;    // B
+					pData[n + 3] = 0x00;    // A
+				}
 			}
-			else {
-				pData[n] = 0x88;        // R
-				pData[n + 1] = 0x00;    // G
-				pData[n + 2] = 0x00;    // B
-				pData[n + 3] = 0x00;    // A
+			else if (random == 1) {
+				if (i % 2 == j % 2) {
+					pData[n] = 0x88;        // R
+					pData[n + 1] = 0x88;    // G
+					pData[n + 2] = 0x88;    // B
+					pData[n + 3] = 0xff;    // A
+				}
+				else {
+					pData[n] = 0x00;        // R
+					pData[n + 1] = 0x88;    // G
+					pData[n + 2] = 0x00;    // B
+					pData[n + 3] = 0x00;    // A
+				}
 			}
 		}
 
@@ -84,10 +102,10 @@ private:
 
 	ComPtr<IDXGISwapChain3> _swapChain;
 	ComPtr<ID3D12Device> _device;
-	ComPtr<ID3D12RootSignature> _rootSignature;
-	ComPtr<ID3D12PipelineState> _pipelineState;
-	Texture2D* _depthStencil;
 
+	PipelineState* _pipelineState;
+	RootSignature* _rootSignature;
+	Texture2D* _depthStencil;
 	BufferView* _textureSrv;
 	BufferView* _dsv;
 
@@ -95,6 +113,7 @@ private:
 	VertexBuffer* _vertexBuffer;
 	IndexBuffer* _indexBuffer;
 	Texture2D* _texture;
+	Texture2D* _texture2;
 	CommandContext* _commandContext;
 	FrameResource* _frameResources[FrameCount];
 	FrameResource* _currentFrameResource;

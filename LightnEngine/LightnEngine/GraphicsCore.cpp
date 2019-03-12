@@ -11,6 +11,7 @@
 #include "CommandQueue.h"
 #include "CommandContext.h"
 #include "DescriptorHeap.h"
+#include "PipelineState.h"
 
 GraphicsCore::GraphicsCore() {
 	_width = 1280;
@@ -34,9 +35,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	ComPtr<IDXGIFactory4> factory;
 	throwIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
-
 	ComPtr<IDXGIAdapter1> adapter;
-
 	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != factory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex) {
 		DXGI_ADAPTER_DESC1 desc;
 		adapter->GetDesc1(&desc);
@@ -103,138 +102,23 @@ void GraphicsCore::onInit(HWND hwnd) {
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	}
 
-
-	//サンプラーを定義してルートシグネチャを生成
+	//シェーダー＆パイプラインステート生成
 	{
-		D3D12_DESCRIPTOR_RANGE1 srvRangeDesc[1] = {};
-		srvRangeDesc[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRangeDesc[0].NumDescriptors = 1;
-		srvRangeDesc[0].BaseShaderRegister = 0;
-		srvRangeDesc[0].RegisterSpace = 0;
-		srvRangeDesc[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-		srvRangeDesc[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		VertexShader vertexShader;
+		vertexShader.create("shaders.hlsl");
 
-		D3D12_DESCRIPTOR_RANGE1 cbvRangeDesc[1] = {};
-		cbvRangeDesc[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-		cbvRangeDesc[0].NumDescriptors = 1;
-		cbvRangeDesc[0].BaseShaderRegister = 0;
-		cbvRangeDesc[0].RegisterSpace = 0;
-		cbvRangeDesc[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-		cbvRangeDesc[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		PixelShader pixelShader;
+		pixelShader.create("shaders.hlsl");
 
-		D3D12_ROOT_PARAMETER1 parameterDesc[2] = {};
-		parameterDesc[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		parameterDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		parameterDesc[0].DescriptorTable.NumDescriptorRanges = 1;
-		parameterDesc[0].DescriptorTable.pDescriptorRanges = &srvRangeDesc[0];
+		_rootSignature = new RootSignature();
+		_rootSignature->create(_device.Get(), vertexShader, pixelShader);
 
-		parameterDesc[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		parameterDesc[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		parameterDesc[1].DescriptorTable.NumDescriptorRanges = 1;
-		parameterDesc[1].DescriptorTable.pDescriptorRanges = &cbvRangeDesc[0];
-
-		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 0;
-		samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		samplerDesc.MinLOD = 0.0f;
-		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-		samplerDesc.ShaderRegister = 0;
-		samplerDesc.RegisterSpace = 0;
-		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSignatureDesc.Desc_1_1.NumParameters = 2;
-		rootSignatureDesc.Desc_1_1.pParameters = &parameterDesc[0];
-		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
-		rootSignatureDesc.Desc_1_1.pStaticSamplers = &samplerDesc;
-		rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-		ComPtr<ID3DBlob> signature;
-		ComPtr<ID3DBlob> error;
-		throwIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-		throwIfFailed(_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_rootSignature)));
-		NAME_D3D12_OBJECT(_rootSignature);
-	}
-
-	//シェーダー生成
-	{
-		ComPtr<ID3DBlob> vertexShader;
-		ComPtr<ID3DBlob> pixelShader;
-
-		throwIfFailed(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &vertexShader, nullptr));
-		throwIfFailed(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &pixelShader, nullptr));
-
-		D3D12_INPUT_ELEMENT_DESC inputElementDscs[] = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		};
-
-		D3D12_SHADER_BYTECODE vsByteCode = {};
-		vsByteCode.BytecodeLength = vertexShader->GetBufferSize();
-		vsByteCode.pShaderBytecode = vertexShader->GetBufferPointer();
-
-		D3D12_SHADER_BYTECODE psByteCode = {};
-		psByteCode.BytecodeLength = pixelShader->GetBufferSize();
-		psByteCode.pShaderBytecode = pixelShader->GetBufferPointer();
-
-		//パイプラインステート生成
-		D3D12_RASTERIZER_DESC rasterizerDesc = {};
-		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
-		rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
-		rasterizerDesc.FrontCounterClockwise = FALSE;
-		rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-		rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-		rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-		rasterizerDesc.DepthClipEnable = TRUE;
-		rasterizerDesc.MultisampleEnable = FALSE;
-		rasterizerDesc.AntialiasedLineEnable = FALSE;
-		rasterizerDesc.ForcedSampleCount = 0;
-		rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
-		D3D12_BLEND_DESC blendDesc = {};
-		blendDesc.AlphaToCoverageEnable = FALSE;
-		blendDesc.IndependentBlendEnable = FALSE;
-
-		const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
-			FALSE, FALSE,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_LOGIC_OP_NOOP,
-			D3D12_COLOR_WRITE_ENABLE_ALL,
-		};
-
-		for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i) {
-			blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
-		}
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { inputElementDscs, _ARRAYSIZE(inputElementDscs) };
-		psoDesc.pRootSignature = _rootSignature.Get();
-		psoDesc.VS = vsByteCode;
-		psoDesc.PS = psByteCode;
-		psoDesc.RasterizerState = rasterizerDesc;
-		psoDesc.BlendState = blendDesc;
-		psoDesc.DepthStencilState.DepthEnable = FALSE;
-		psoDesc.DepthStencilState.StencilEnable = FALSE;
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.SampleDesc.Count = 1;
-		throwIfFailed(_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
-		NAME_D3D12_OBJECT(_pipelineState);
-
+		_pipelineState = new PipelineState();
+		_pipelineState->create(_device.Get(), _rootSignature, vertexShader, pixelShader); 
 	}
 
 	//テクスチャコピーコマンドを発行する用のアロケーターとリスト
-	ComPtr<ID3D12Resource> uploadHeaps[3] = {};
+	ComPtr<ID3D12Resource> uploadHeaps[4] = {};
 	auto commandListSet = _commandContext->requestCommandListSet();
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
 
@@ -264,7 +148,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	//テクスチャ
 	{
-		auto tmpTexP = generateTextureData();
+		auto tmpTexP = generateTextureData(0);
 		TextureInfo textureInfo;
 		textureInfo.width = TextureWidth;
 		textureInfo.height = TextureHeight;
@@ -275,8 +159,21 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_texture = new Texture2D();
 		_texture->createDeferred(_device.Get(), commandList, &uploadHeaps[2], textureInfo);
 
+		auto tmpTexP2 = generateTextureData(1);
+		TextureInfo textureInfo2;
+		textureInfo2.width = TextureWidth;
+		textureInfo2.height = TextureHeight;
+		textureInfo2.mipLevels = 1;
+		textureInfo2.dataPtr = tmpTexP2.data();
+		textureInfo2.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+		_texture2 = new Texture2D();
+		_texture2->createDeferred(_device.Get(), commandList, &uploadHeaps[3], textureInfo2);
+
+		ID3D12Resource* textures[2] = { _texture->get(), _texture2->get() };
+
 		//テクスチャのシェーダーリソースビューを生成
-		_descriptorHeapManager->createShaderResourceView(_texture->getAdressOf(), &_textureSrv, 1); 
+		_descriptorHeapManager->createShaderResourceView(textures, &_textureSrv, 2);
 	}
 
 	//アップロードバッファをGPUオンリーバッファにコピー
@@ -301,18 +198,14 @@ void GraphicsCore::onUpdate() {
 }
 
 void GraphicsCore::onRender() {
-	auto commandListSet = _commandContext->requestCommandListSet(_pipelineState.Get());
+	auto commandListSet = _commandContext->requestCommandListSet(_pipelineState->_pipelineState.Get());
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
-	commandList->SetGraphicsRootSignature(_rootSignature.Get());
 
 	//デスクリプタヒープをセット
 	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager->descriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
 	commandList->SetDescriptorHeaps(1, ppHeap);
 
-	//デスクリプタヒープにセットした定数バッファをセット
-	commandList->SetGraphicsRootDescriptorTable(0, _textureSrv->gpuHandle);
-	commandList->SetGraphicsRootDescriptorTable(1, _currentFrameResource->_sceneCbv->gpuHandle);
-
+	//ビューポート設定
 	commandList->RSSetViewports(1, &_viewPort);
 	commandList->RSSetScissorRects(1, &_scissorRect);
 
@@ -323,10 +216,18 @@ void GraphicsCore::onRender() {
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv->cpuHandle;
 	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &_dsv->cpuHandle);
 
-	//描画コマンドを登録
+	//レンダーターゲットクリア
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	//描画コマンドを登録
+	commandList->SetGraphicsRootSignature(_rootSignature->_rootSignature.Get());
+
+	//デスクリプタヒープにセットした定数バッファをセット
+	commandList->SetGraphicsRootDescriptorTable(0, _textureSrv->gpuHandle);
+	commandList->SetGraphicsRootDescriptorTable(1, _currentFrameResource->_sceneCbv->gpuHandle);
+
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->IASetVertexBuffers(0, 1, &_vertexBuffer->_vertexBufferView);
 	commandList->IASetIndexBuffer(&_indexBuffer->_indexBufferView);
@@ -359,12 +260,13 @@ void GraphicsCore::onDestroy() {
 	delete _vertexBuffer;
 	delete _indexBuffer;
 	delete _texture;
+	delete _texture2;
 	delete _depthStencil;
+	delete _pipelineState;
+	delete _rootSignature;
 
 	_swapChain = nullptr;
 	_device = nullptr;
-	_rootSignature = nullptr;
-	_pipelineState = nullptr;
 }
 
 void GraphicsCore::moveToNextFrame() {
