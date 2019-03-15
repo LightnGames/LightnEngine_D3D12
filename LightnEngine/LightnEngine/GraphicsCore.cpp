@@ -12,6 +12,10 @@
 #include "CommandContext.h"
 #include "DescriptorHeap.h"
 #include "PipelineState.h"
+#include "GpuResourceManager.h"
+#include "SharedMaterial.h"
+
+#include "Utility.h"
 
 GraphicsCore::GraphicsCore() {
 	_width = 1280;
@@ -62,6 +66,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_commandContext = new CommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	_commandContext->create(_device.Get());
 
+	//リソースマネージャー
+	_gpuResourceManager = new GpuResourceManager();
+
 	//スワップチェーン生成
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.BufferCount = FrameCount;
@@ -102,21 +109,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	}
 
-	//シェーダー＆パイプラインステート生成
-	{
-		VertexShader vertexShader;
-		vertexShader.create("shaders.hlsl");
-
-		PixelShader pixelShader;
-		pixelShader.create("shaders.hlsl");
-
-		_rootSignature = new RootSignature();
-		_rootSignature->create(_device.Get(), vertexShader, pixelShader);
-
-		_pipelineState = new PipelineState();
-		_pipelineState->create(_device.Get(), _rootSignature, vertexShader, pixelShader); 
-	}
-
 	//テクスチャコピーコマンドを発行する用のアロケーターとリスト
 	ComPtr<ID3D12Resource> uploadHeaps[4] = {};
 	auto commandListSet = _commandContext->requestCommandListSet();
@@ -146,35 +138,17 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_indexBuffer->createDeferred(_device.Get(), commandList, &uploadHeaps[1], indices);
 	}
 
-	//テクスチャ
-	{
-		auto tmpTexP = generateTextureData(0);
-		TextureInfo textureInfo;
-		textureInfo.width = TextureWidth;
-		textureInfo.height = TextureHeight;
-		textureInfo.mipLevels = 1;
-		textureInfo.dataPtr = tmpTexP.data();
-		textureInfo.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	//テクスチャ読み込み
+	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, { "T_town_stone_D.dds", "T_town_stone_N.dds" });
 
-		_texture = new Texture2D();
-		_texture->createDeferred(_device.Get(), commandList, &uploadHeaps[2], textureInfo);
-
-		auto tmpTexP2 = generateTextureData(1);
-		TextureInfo textureInfo2;
-		textureInfo2.width = TextureWidth;
-		textureInfo2.height = TextureHeight;
-		textureInfo2.mipLevels = 1;
-		textureInfo2.dataPtr = tmpTexP2.data();
-		textureInfo2.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-
-		_texture2 = new Texture2D();
-		_texture2->createDeferred(_device.Get(), commandList, &uploadHeaps[3], textureInfo2);
-
-		ID3D12Resource* textures[2] = { _texture->get(), _texture2->get() };
-
-		//テクスチャのシェーダーリソースビューを生成
-		_descriptorHeapManager->createShaderResourceView(textures, &_textureSrv, 2);
-	}
+	SharedMaterialCreateSettings materialSettings;
+	materialSettings.name = "TestM";
+	materialSettings.vertexShaderName = "shaders.hlsl";
+	materialSettings.pixelShaderName = "shaders.hlsl";
+	materialSettings.vsTextures = {};
+	materialSettings.psTextures = { "T_town_stone_D.dds", "T_town_stone_N.dds" };
+	_gpuResourceManager->createSharedMaterial(_device.Get(), materialSettings);
+	_gpuResourceManager->loadSharedMaterial("TestM", _material);
 
 	//アップロードバッファをGPUオンリーバッファにコピー
 	_commandContext->executeCommandList(commandList);
@@ -193,12 +167,30 @@ void GraphicsCore::onInit(HWND hwnd) {
 }
 
 void GraphicsCore::onUpdate() {
-	_constantBufferData.offset[0] = _constantBufferData.offset[0] + 0.01f;
-	_currentFrameResource->writeConstantBuffer(_constantBufferData);
+	struct Vector4 {
+		float x;
+		float y;
+		float z;
+		float w;
+	};
+
+	struct Vector2 {
+		float x;
+		float y;
+	};
+
+	static Vector2 ff = { 2, 0 };
+	ff.x += 0.05f;
+
+	static Vector4 oo = { 0, 0, 0, 0 };
+	oo.x += 0.01f;
+
+	_material->setParameter<Vector4>("offset2", oo);
+	_material->setParameter<Vector2>("offset2_2", ff);
 }
 
 void GraphicsCore::onRender() {
-	auto commandListSet = _commandContext->requestCommandListSet(_pipelineState->_pipelineState.Get());
+	auto commandListSet = _commandContext->requestCommandListSet();
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
 
 	//デスクリプタヒープをセット
@@ -221,12 +213,9 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	//描画コマンドを登録
-	commandList->SetGraphicsRootSignature(_rootSignature->_rootSignature.Get());
-
-	//デスクリプタヒープにセットした定数バッファをセット
-	commandList->SetGraphicsRootDescriptorTable(0, _textureSrv->gpuHandle);
-	commandList->SetGraphicsRootDescriptorTable(1, _currentFrameResource->_sceneCbv->gpuHandle);
+	//マテリアルを描画
+	RenderSettings renderSettings = { commandList };
+	_material->setupRenderCommand(renderSettings);
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->IASetVertexBuffers(0, 1, &_vertexBuffer->_vertexBufferView);
@@ -256,14 +245,11 @@ void GraphicsCore::onDestroy() {
 	}
 
 	delete _commandContext;
+	delete _gpuResourceManager;
 	delete _descriptorHeapManager;
 	delete _vertexBuffer;
 	delete _indexBuffer;
-	delete _texture;
-	delete _texture2;
 	delete _depthStencil;
-	delete _pipelineState;
-	delete _rootSignature;
 
 	_swapChain = nullptr;
 	_device = nullptr;
@@ -276,6 +262,7 @@ void GraphicsCore::moveToNextFrame() {
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = _frameResources[_frameIndex];
+	SharedMaterial::frameIndex = _frameIndex;
 
 	const UINT64 fenceValue = commandQueue->incrementFence();
 	_frameResources[_frameIndex]->_fenceValue = fenceValue;

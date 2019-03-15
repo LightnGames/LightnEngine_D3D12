@@ -7,14 +7,13 @@
 #include "CommandContext.h"
 
 //class CommandContext;
+#include "ThirdParty/DDSTextureLoader12.h"
 
 class GpuResource {
 public:
 	virtual ~GpuResource() {
 		destroy();
 	}
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
 
 	void destroy() {
 		_resource = nullptr;
@@ -27,6 +26,8 @@ public:
 	ID3D12Resource** getAdressOf() {
 		return _resource.GetAddressOf();
 	}
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
 };
 
 struct DepthTextureInfo {
@@ -36,11 +37,17 @@ struct DepthTextureInfo {
 };
 
 struct TextureInfo {
+	String name;
 	uint32 width;
 	uint32 height;
 	uint32 mipLevels;
 	void* dataPtr;
 	DXGI_FORMAT format;
+};
+
+struct Vertex {
+	float position[3];
+	float color[4];
 };
 
 class Texture2D :public GpuResource {
@@ -161,10 +168,37 @@ public:
 		updateSubresources(commandList, _resource.Get(), *uploadHeap, 0, 0, 1, &textureData);
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 	}
+
+	void createDeferred2(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const String& textureName) {
+		std::unique_ptr<uint8_t[]> ddsData;
+		std::vector<D3D12_SUBRESOURCE_DATA> subresouceData;
+		throwIfFailed(DirectX::LoadDDSTextureFromFile(device, convertWString(textureName).c_str(), _resource.ReleaseAndGetAddressOf(), ddsData, subresouceData));
+
+		const UINT subresouceSize = static_cast<UINT>(subresouceData.size());
+
+		UINT64 requiredSize = 0;
+		device->GetCopyableFootprints(&_resource->GetDesc(), 0, subresouceSize, 0, nullptr, nullptr, nullptr, &requiredSize);
+
+		//テクスチャにデータをセットするためにCPUからも書き込み可能なバッファを生成
+		D3D12_RESOURCE_DESC textureBufferDesc = {};
+		textureBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		textureBufferDesc.Width = requiredSize;
+		textureBufferDesc.Height = 1;
+		textureBufferDesc.DepthOrArraySize = 1;
+		textureBufferDesc.MipLevels = 1;
+		textureBufferDesc.SampleDesc.Count = 1;
+		textureBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		throwIfFailed(device->CreateCommittedResource(&LTND3D12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &textureBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(uploadHeap)));
+
+		//GPU読み出し専用バッファにコピーコマンドを発行
+		updateSubresources(commandList, _resource.Get(), *uploadHeap, 0, 0, subresouceSize, subresouceData.data());
+		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+	}
 };
 
 class VertexBuffer :public GpuResource {
 public:
+	//直ちに頂点バッファを生成し、操作が完了するまでスレッドを停止する
 	template <typename T>
 	void createDirect(ID3D12Device* device, CommandContext* commandContext, const std::vector<T>& vertices) {
 		ComPtr<ID3D12Resource> vertexUploadHeap;
@@ -179,7 +213,6 @@ public:
 
 		//コピーが終わるまでアップロードヒープを破棄しない
 		commandContext->waitForIdle();
-
 	}
 
 	//コマンドリストに頂点バッファ生成コマンドを発行(発行のみで実行はしない)
@@ -305,12 +338,11 @@ public:
 class ConstantBuffer :public GpuResource {
 public:
 
-	template <typename T>
-	void create(ID3D12Device* device) {
+	void create(ID3D12Device* device, uint32 size) {
 		D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 
 		//256バイトでアライン
-		const UINT64 constantBufferSize = (sizeof(T) + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
+		const UINT64 constantBufferSize = (size + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
 
 		D3D12_RESOURCE_DESC resourceDesc = {};
 		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -328,9 +360,8 @@ public:
 		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&dataPtr)));
 	}
 
-	template <typename T>
-	void writeData(const T& buffer) {
-		memcpy(dataPtr, &buffer, sizeof(T));
+	void writeData(const void* bufferPtr, uint32 size, uint32 startOffset = 0) {
+		memcpy(dataPtr, reinterpret_cast<const byte*>(bufferPtr) + startOffset, size);
 	}
 
 	void* dataPtr;

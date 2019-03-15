@@ -69,7 +69,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -84,9 +89,12 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -111,11 +119,14 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -125,8 +136,10 @@
     <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="DescriptorHeap.cpp" />
     <ClCompile Include="FrameResource.cpp" />
+    <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ThirdParty\DDSTextureLoader12.cpp" />
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -144,10 +157,15 @@
     <ClInclude Include="DescriptorHeap.h" />
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GpuResource.h" />
+    <ClInclude Include="GpuResourceManager.h" />
     <ClInclude Include="GraphicsCore.h" />
     <ClInclude Include="MemoryAllocator.h" />
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="PipelineState.h" />
+    <ClInclude Include="SharedMaterial.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="ThirdParty\DDSTextureLoader12.h" />
+    <ClInclude Include="ThiredParty\DDSTextureLoader12.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="Win32Application.h" />
   </ItemGroup>

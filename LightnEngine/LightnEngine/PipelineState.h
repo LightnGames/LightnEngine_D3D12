@@ -9,29 +9,69 @@
 #include "stdafx.h"
 #include "D3D12Helper.h"
 
+#include <unordered_map>
+USE_UNORDERED_MAP
+
 struct ShaderReflectionCBV {
-	std::string name;
-	std::string type;
+	String name;
+	String type;
 	uint32 startOffset;
+	uint32 size;
 	uint32 elements;
+
+	void setSizeAndType(const String& name) {
+		this->type = name;
+
+		static UnorderedMap<String, uint32> dataTable = {
+			{"float",4},
+			{"float2",8},
+			{"float3",12},
+			{"float4",16},
+			{"float4x4",64}
+		};
+
+		size = dataTable.at(this->type);
+	}
 };
 
 struct ShaderReflectionCB {
 	uint32 bindPoint;
-	std::string name;
-	std::vector<ShaderReflectionCBV> variables;
+	String name;
+	VectorArray<ShaderReflectionCBV> variables;
+
+	uint32 getBufferSize() const {
+		uint32 size = 0;
+		for (const auto& variable : variables) {
+			size += variable.size*variable.elements;
+		}
+
+		return size;
+	}
+
+	const RefPtr<const ShaderReflectionCBV> getVariable(const String& name) const {
+		for (const auto& variable : variables) {
+			if (variable.name == name) {
+				return &variable;
+			}
+		}
+
+		return nullptr;
+	}
 };
 
 struct ShaderReflectionResult {
-	std::vector<ShaderReflectionCB> constantBuffers;
+	VectorArray<ShaderReflectionCB> constantBuffers;
 };
 
-struct VertexShader {
-	void create(const std::string& fileName) {
+using namespace Microsoft::WRL;
+
+class VertexShader {
+public:
+	void create(const String& fileName) {
 		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
 
 		//string→wstring UTF-8 Only No Include Japanese
-		std::wstring wFileName = cv.from_bytes(fileName);
+		std::wstring wFileName = cv.from_bytes(fileName.c_str());
 
 		throwIfFailed(D3DCompileFromFile(wFileName.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &vertexShader, nullptr));
 
@@ -73,8 +113,8 @@ struct VertexShader {
 
 				shaderReflectionCb.variables[j].startOffset = cbVariableDesc.StartOffset;
 				shaderReflectionCb.variables[j].name = cbVariableDesc.Name;
-				shaderReflectionCb.variables[j].type = cbVariableTypeDesc.Name;
-				shaderReflectionCb.variables[j].elements = cbVariableTypeDesc.Elements;
+				shaderReflectionCb.variables[j].elements = cbVariableTypeDesc.Elements == 0 ? 1 : cbVariableTypeDesc.Elements;
+				shaderReflectionCb.variables[j].setSizeAndType(cbVariableTypeDesc.Name);
 			}
 
 			result.constantBuffers[i] = shaderReflectionCb;
@@ -83,7 +123,7 @@ struct VertexShader {
 		cbvRangeDescs.resize(result.constantBuffers.size());
 
 		//シェーダーリソース取得
-		for (int i = 0; i < shaderDesc.BoundResources; ++i) {
+		for (UINT i = 0; i < shaderDesc.BoundResources; ++i) {
 			D3D12_SHADER_INPUT_BIND_DESC dd = {};
 			shaderReflector->GetResourceBindingDesc(i, &dd);
 
@@ -115,12 +155,13 @@ struct VertexShader {
 	D3D12_SHADER_BYTECODE byteCode;
 };
 
-struct PixelShader {
-	void create(const std::string& fileName) {
+class PixelShader {
+public:
+	void create(const String& fileName) {
 		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
 
 		//string→wstring UTF-8 Only No Include Japanese
-		std::wstring wFileName = cv.from_bytes(fileName);
+		std::wstring wFileName = cv.from_bytes(fileName.c_str());
 
 		throwIfFailed(D3DCompileFromFile(wFileName.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &pixelShader, nullptr));
 
@@ -136,7 +177,7 @@ struct PixelShader {
 		D3D12_DESCRIPTOR_RANGE1 srvRangeDesc = {};
 
 		//シェーダーリソース取得
-		for (int i = 0; i < shaderDesc.BoundResources; ++i) {
+		for (UINT i = 0; i < shaderDesc.BoundResources; ++i) {
 			D3D12_SHADER_INPUT_BIND_DESC dd = {};
 			shaderReflector->GetResourceBindingDesc(i, &dd);
 
@@ -193,7 +234,7 @@ public:
 			D3D12_ROOT_PARAMETER1 parameterDesc = {};
 			parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 			parameterDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-			parameterDesc.DescriptorTable.NumDescriptorRanges = pixelShader.srvRangeDescs.size();
+			parameterDesc.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(pixelShader.srvRangeDescs.size());
 			parameterDesc.DescriptorTable.pDescriptorRanges = pixelShader.srvRangeDescs.data();
 			rootParameters.emplace_back(parameterDesc);
 		}
@@ -203,7 +244,7 @@ public:
 			D3D12_ROOT_PARAMETER1 parameterDesc = {};
 			parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 			parameterDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-			parameterDesc.DescriptorTable.NumDescriptorRanges = vertexShader.cbvRangeDescs.size();
+			parameterDesc.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(vertexShader.cbvRangeDescs.size());
 			parameterDesc.DescriptorTable.pDescriptorRanges = vertexShader.cbvRangeDescs.data();
 			rootParameters.emplace_back(parameterDesc);
 		}
@@ -225,7 +266,7 @@ public:
 
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSignatureDesc.Desc_1_1.NumParameters = rootParameters.size();
+		rootSignatureDesc.Desc_1_1.NumParameters = static_cast<UINT>(rootParameters.size());
 		rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
 		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
 		rootSignatureDesc.Desc_1_1.pStaticSamplers = &samplerDesc;
@@ -243,6 +284,7 @@ public:
 
 class PipelineState {
 public:
+
 	void create(ID3D12Device* device, RootSignature* rootSignature, const VertexShader& vertexShader, const PixelShader& pixelShader) {
 		D3D12_RASTERIZER_DESC rasterizerDesc = {};
 		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;

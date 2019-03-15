@@ -28,8 +28,8 @@ void CommandContext::shutdown() {
 
 CommandListSet CommandContext::requestCommandListSet(ID3D12PipelineState* state) {
 	UINT64 fenceValue = _commandQueue->fenceValue();
-	auto* allocator = _commandAllocatorPool->requestAllocator(fenceValue);
-	auto* list = _commandListPool->requestCommandList(fenceValue, allocator);
+	auto allocator = _commandAllocatorPool->requestAllocator(fenceValue);
+	auto list = _commandListPool->requestCommandList(fenceValue, allocator);
 
 	throwIfFailed(allocator->Reset());
 	throwIfFailed(list->Reset(allocator, state));

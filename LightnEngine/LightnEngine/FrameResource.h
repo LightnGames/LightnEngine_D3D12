@@ -12,15 +12,9 @@ public:
 	FrameResource(ID3D12Device* device, IDXGISwapChain3* swapChain, UINT frameResourceIndex);
 	~FrameResource();
 
-	void writeConstantBuffer(const SceneConstantBuffer& buffer);
-
 	UINT64 _fenceValue;
 
 	Texture2D* _renderTarget;
-	SceneConstantBuffer* _mappedConstantBufferData;
-	SceneConstantBuffer _sceneConstantBuffer;
-	ConstantBuffer* _sceneConstant;
-	BufferView* _sceneCbv;
 	BufferView* _rtv;
 private:
 };

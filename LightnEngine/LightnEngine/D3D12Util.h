@@ -101,6 +101,22 @@ struct LTND3D12_TEXTURE_COPY_LOCATION :public D3D12_TEXTURE_COPY_LOCATION {
 
 };
 
+// Returns required size of a buffer to be used for data upload
+//inline UINT64 getRequiredIntermediateSize(
+//	_In_ ID3D12Resource* pDestinationResource,
+//	_In_range_(0, D3D12_REQ_SUBRESOURCES) UINT FirstSubresource,
+//	_In_range_(0, D3D12_REQ_SUBRESOURCES - FirstSubresource) UINT NumSubresources) {
+//	auto Desc = pDestinationResource->GetDesc();
+//	UINT64 RequiredSize = 0;
+//
+//	ID3D12Device* pDevice = nullptr;
+//	pDestinationResource->GetDevice(__uuidof(*pDevice), reinterpret_cast<void**>(&pDevice));
+//	pDevice->GetCopyableFootprints(&Desc, FirstSubresource, NumSubresources, 0, nullptr, nullptr, nullptr, &RequiredSize);
+//	pDevice->Release();
+//
+//	return RequiredSize;
+//}
+
 inline void memcpySubresources(
 	_In_ const D3D12_MEMCPY_DEST* pDest,
 	_In_ const D3D12_SUBRESOURCE_DATA* pSrc,

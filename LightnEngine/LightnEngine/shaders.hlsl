@@ -4,6 +4,12 @@ struct PSInput
     float2 uv : TEXCOORD;
 };
 
+struct VSInput
+{
+    float4 position : POSITION;
+    float2 uv : TEXCOORD;
+};
+
 Texture2D _texture : register(t0);
 Texture2D _texture2 : register(t1);
 SamplerState _sampler : register(s0);
@@ -11,22 +17,24 @@ SamplerState _sampler : register(s0);
 cbuffer Constant1 : register(b0)
 {
     float4 offset2;
-    float dummy2[60];
+    float2 offset3;
+    float dummy2[58];
 }
 
-/*cbuffer Constant2 : register(b1)
+cbuffer Constant2 : register(b1)
 {
-    float4 offset2_2;
-    float dummy2_2[60];
-}*/
+    float2 offset2_2;
+    float dummy2_2[62];
+}
 
-PSInput VSMain(float4 position : POSITION, float4 uv : TEXCOORD)
+PSInput VSMain(VSInput input)
 {
     PSInput result;
-    result.position = position;
-    result.uv = uv;
+    result.position = input.position;
+    result.uv = input.uv;
 
     result.position.y += sin(offset2.x) / 2.0f;//+offset2_2.x;
+    result.position.x += cos(offset2_2.x) / 2.0f;
 
     return result;
 }
