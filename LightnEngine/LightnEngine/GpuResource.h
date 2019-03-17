@@ -8,6 +8,7 @@
 
 //class CommandContext;
 #include "ThirdParty/DDSTextureLoader12.h"
+using namespace Microsoft::WRL;
 
 class GpuResource {
 public:
@@ -27,7 +28,7 @@ public:
 		return _resource.GetAddressOf();
 	}
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
+	ComPtr<ID3D12Resource> _resource;
 };
 
 struct DepthTextureInfo {
@@ -342,6 +343,7 @@ public:
 		D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 
 		//256バイトでアライン
+		this->size = size;
 		const UINT64 constantBufferSize = (size + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
 
 		D3D12_RESOURCE_DESC resourceDesc = {};
@@ -364,5 +366,6 @@ public:
 		memcpy(dataPtr, reinterpret_cast<const byte*>(bufferPtr) + startOffset, size);
 	}
 
+	uint32 size;
 	void* dataPtr;
 };

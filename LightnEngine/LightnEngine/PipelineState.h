@@ -23,11 +23,11 @@ struct ShaderReflectionCBV {
 		this->type = name;
 
 		static UnorderedMap<String, uint32> dataTable = {
-			{"float",4},
-			{"float2",8},
-			{"float3",12},
-			{"float4",16},
-			{"float4x4",64}
+			{ "float", 4 },
+		{ "float2", 8 },
+		{ "float3", 12 },
+		{ "float4", 16 },
+		{ "float4x4", 64 }
 		};
 
 		size = dataTable.at(this->type);
@@ -61,28 +61,16 @@ struct ShaderReflectionCB {
 
 struct ShaderReflectionResult {
 	VectorArray<ShaderReflectionCB> constantBuffers;
+	VectorArray<D3D12_DESCRIPTOR_RANGE1> cbvRangeDescs;
+	VectorArray<D3D12_DESCRIPTOR_RANGE1> srvRangeDescs;
 };
 
 using namespace Microsoft::WRL;
 
-class VertexShader {
+class Shader {
 public:
-	void create(const String& fileName) {
-		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
-
-		//string→wstring UTF-8 Only No Include Japanese
-		std::wstring wFileName = cv.from_bytes(fileName.c_str());
-
-		throwIfFailed(D3DCompileFromFile(wFileName.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &vertexShader, nullptr));
-
-		inputLayouts = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		};
-
-		byteCode.BytecodeLength = vertexShader->GetBufferSize();
-		byteCode.pShaderBytecode = vertexShader->GetBufferPointer();
-
+	ShaderReflectionResult getShaderReflection(const D3D12_SHADER_BYTECODE& byteCode) {
+		ShaderReflectionResult result;
 		ComPtr<ID3D12ShaderReflection> shaderReflector;
 		throwIfFailed(D3DReflect(byteCode.pShaderBytecode, byteCode.BytecodeLength, IID_ID3D12ShaderReflection, reinterpret_cast<void**>(shaderReflector.GetAddressOf())));
 
@@ -120,105 +108,152 @@ public:
 			result.constantBuffers[i] = shaderReflectionCb;
 		}
 
-		cbvRangeDescs.resize(result.constantBuffers.size());
-
-		//シェーダーリソース取得
+		//まずはこのシェーダーに含まれるリソースの数を調べる
+		uint32 constantBufferCount = 0;
+		uint32 textureCount = 0;
 		for (UINT i = 0; i < shaderDesc.BoundResources; ++i) {
-			D3D12_SHADER_INPUT_BIND_DESC dd = {};
-			shaderReflector->GetResourceBindingDesc(i, &dd);
+			D3D12_SHADER_INPUT_BIND_DESC bindDesc = {};
+			shaderReflector->GetResourceBindingDesc(i, &bindDesc);
 
-			switch (dd.Type) {
+			switch (bindDesc.Type) {
+			case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:
+				constantBufferCount++;
+				break;
+
+			case D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE:
+				textureCount++;
+				break;
+			}
+		}
+
+		result.cbvRangeDescs.resize(constantBufferCount);
+		result.srvRangeDescs.resize(textureCount);
+
+		uint32 constantBufferCounter = 0;
+		uint32 textureCounter = 0;
+
+		//調べたリソース数からDescriptorRangeDescを構築
+		for (UINT i = 0; i < shaderDesc.BoundResources; ++i) {
+			D3D12_SHADER_INPUT_BIND_DESC bindDesc = {};
+			shaderReflector->GetResourceBindingDesc(i, &bindDesc);
+
+			switch (bindDesc.Type) {
 				//定数バッファならレジスタ番号を調べて登録
 			case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:
-				for (size_t i = 0; i < result.constantBuffers.size(); ++i) {
-					auto& cb = result.constantBuffers[i];
-					if (cb.name == dd.Name) {
-						cb.bindPoint = dd.BindPoint;
+				for (size_t j = 0; j < result.constantBuffers.size(); ++j) {
+					auto& cb = result.constantBuffers[j];
+					if (cb.name == bindDesc.Name) {
+						cb.bindPoint = bindDesc.BindPoint;
 					}
 
-					cbvRangeDescs[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-					cbvRangeDescs[i].NumDescriptors = 1;
-					cbvRangeDescs[i].BaseShaderRegister = cb.bindPoint;
-					cbvRangeDescs[i].RegisterSpace = 0;
-					cbvRangeDescs[i].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-					cbvRangeDescs[i].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+					result.cbvRangeDescs[j].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					result.cbvRangeDescs[j].NumDescriptors = 1;
+					result.cbvRangeDescs[j].BaseShaderRegister = cb.bindPoint;
+					result.cbvRangeDescs[j].RegisterSpace = 0;
+					result.cbvRangeDescs[j].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+					result.cbvRangeDescs[j].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 				}
+				constantBufferCounter++;
+				break;
+
+				//テクスチャならSRVとして登録
+			case D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE:
+				result.srvRangeDescs[textureCounter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+				result.srvRangeDescs[textureCounter].NumDescriptors = 1;
+				result.srvRangeDescs[textureCounter].BaseShaderRegister = bindDesc.BindPoint;
+				result.srvRangeDescs[textureCounter].RegisterSpace = 0;
+				result.srvRangeDescs[textureCounter].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+				result.srvRangeDescs[textureCounter].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+				textureCounter++;
 				break;
 			}
 		}
+
+		return result;
 	}
-	
-	Microsoft::WRL::ComPtr<ID3DBlob> vertexShader;
-	std::vector<D3D12_DESCRIPTOR_RANGE1> cbvRangeDescs;
-	std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayouts;
-	ShaderReflectionResult result;
-	D3D12_SHADER_BYTECODE byteCode;
+
+	//定数バッファのサイズを定数バッファごとに配列で取得
+	VectorArray<uint32> getConstantBufferSizes() const {
+		VectorArray<uint32> cbSizes(shaderReflectionResult.constantBuffers.size());
+		for (size_t i = 0; i < cbSizes.size(); ++i) {
+			cbSizes[i] = shaderReflectionResult.constantBuffers[i].getBufferSize();
+		}
+
+		return cbSizes;
+	}
+
+	//シェーダーバイナリをD3D12_SHADER_BYTECODEで取得
+	D3D12_SHADER_BYTECODE getByteCode() const {
+		D3D12_SHADER_BYTECODE byteCode = {};
+		byteCode.BytecodeLength = shader->GetBufferSize();
+		byteCode.pShaderBytecode = shader->GetBufferPointer();
+		return byteCode;
+	}
+
+	//シェーダーリソースビューのRootParameterを生成
+	D3D12_ROOT_PARAMETER1 getSrvRootParameter(D3D12_SHADER_VISIBILITY visibility) const {
+		D3D12_ROOT_PARAMETER1 parameterDesc = {};
+		parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		parameterDesc.ShaderVisibility = visibility;
+		parameterDesc.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(shaderReflectionResult.srvRangeDescs.size());
+		parameterDesc.DescriptorTable.pDescriptorRanges = shaderReflectionResult.srvRangeDescs.data();
+
+		return parameterDesc;
+	}
+
+	//定数バッファのRootParameterを生成
+	D3D12_ROOT_PARAMETER1 getCbvRootParameter(D3D12_SHADER_VISIBILITY visibility) const {
+		D3D12_ROOT_PARAMETER1 parameterDesc = {};
+		parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		parameterDesc.ShaderVisibility = visibility;
+		parameterDesc.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(shaderReflectionResult.cbvRangeDescs.size());
+		parameterDesc.DescriptorTable.pDescriptorRanges = shaderReflectionResult.cbvRangeDescs.data();
+
+		return parameterDesc;
+	}
+
+	Microsoft::WRL::ComPtr<ID3DBlob> shader;
+	ShaderReflectionResult shaderReflectionResult;
 };
 
-class PixelShader {
+class VertexShader :public Shader {
 public:
 	void create(const String& fileName) {
-		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &shader, nullptr));
 
-		//string→wstring UTF-8 Only No Include Japanese
-		std::wstring wFileName = cv.from_bytes(fileName.c_str());
+		inputLayouts = {
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		};
 
-		throwIfFailed(D3DCompileFromFile(wFileName.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &pixelShader, nullptr));
-
-		byteCode.BytecodeLength = pixelShader->GetBufferSize();
-		byteCode.pShaderBytecode = pixelShader->GetBufferPointer();
-
-		ComPtr<ID3D12ShaderReflection> shaderReflector;
-		throwIfFailed(D3DReflect(byteCode.pShaderBytecode, byteCode.BytecodeLength, IID_ID3D12ShaderReflection, reinterpret_cast<void**>(shaderReflector.GetAddressOf())));
-
-		D3D12_SHADER_DESC shaderDesc = {};
-		shaderReflector->GetDesc(&shaderDesc);
-
-		D3D12_DESCRIPTOR_RANGE1 srvRangeDesc = {};
-
-		//シェーダーリソース取得
-		for (UINT i = 0; i < shaderDesc.BoundResources; ++i) {
-			D3D12_SHADER_INPUT_BIND_DESC dd = {};
-			shaderReflector->GetResourceBindingDesc(i, &dd);
-
-			switch (dd.Type) {
-				//定数バッファならレジスタ番号を調べて登録
-			case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:
-				//for (size_t i = 0; i < result.constantBuffers.size(); ++i) {
-				//	auto& cb = result.constantBuffers[i];
-				//	if (cb.name == dd.Name) {
-				//		cb.bindPoint = dd.BindPoint;
-				//	}
-
-				//	cbvRangeDescs[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-				//	cbvRangeDescs[i].NumDescriptors = 1;
-				//	cbvRangeDescs[i].BaseShaderRegister = cb.bindPoint;
-				//	cbvRangeDescs[i].RegisterSpace = 0;
-				//	cbvRangeDescs[i].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-				//	cbvRangeDescs[i].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-				//}
-				break;
-			case D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE:
-				srvRangeDesc.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-				srvRangeDesc.NumDescriptors = 1;
-				srvRangeDesc.BaseShaderRegister = dd.BindPoint;
-				srvRangeDesc.RegisterSpace = 0;
-				srvRangeDesc.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-				srvRangeDesc.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-				srvRangeDescs.emplace_back(srvRangeDesc);
-
-				break;
-			case D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER:
-				break;
-			}
-		int y = 0;
-		}
-
+		shaderReflectionResult = getShaderReflection(getByteCode());
 	}
 
-	Microsoft::WRL::ComPtr<ID3DBlob> pixelShader;
-	std::vector<D3D12_DESCRIPTOR_RANGE1> srvRangeDescs;
-	D3D12_SHADER_BYTECODE byteCode;
+	D3D12_ROOT_PARAMETER1 getSrvRootParameter() const {
+		return Shader::getSrvRootParameter(D3D12_SHADER_VISIBILITY_VERTEX);
+	}
+
+	D3D12_ROOT_PARAMETER1 getCbvRootParameter() const {
+		return Shader::getCbvRootParameter(D3D12_SHADER_VISIBILITY_VERTEX);
+	}
+
+	std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayouts;
+};
+
+class PixelShader :public Shader {
+public:
+	void create(const String& fileName) {
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &shader, nullptr));
+		shaderReflectionResult = getShaderReflection(getByteCode());
+	}
+
+	D3D12_ROOT_PARAMETER1 getSrvRootParameter() const {
+		return Shader::getSrvRootParameter(D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
+	D3D12_ROOT_PARAMETER1 getCbvRootParameter() const {
+		return Shader::getCbvRootParameter(D3D12_SHADER_VISIBILITY_PIXEL);
+	}
 };
 
 class RootSignature {
@@ -231,22 +266,26 @@ public:
 
 		//ピクセルシェーダー
 		{
-			D3D12_ROOT_PARAMETER1 parameterDesc = {};
-			parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			parameterDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-			parameterDesc.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(pixelShader.srvRangeDescs.size());
-			parameterDesc.DescriptorTable.pDescriptorRanges = pixelShader.srvRangeDescs.data();
-			rootParameters.emplace_back(parameterDesc);
+			const ShaderReflectionResult& result = pixelShader.shaderReflectionResult;
+			if (!result.srvRangeDescs.empty()) {
+				rootParameters.emplace_back(pixelShader.getSrvRootParameter());//DescriptorTableIndex: 1
+			}
+
+			if (!result.cbvRangeDescs.empty()) {
+				rootParameters.emplace_back(pixelShader.getCbvRootParameter());//DescriptorTableIndex: 2
+			}
 		}
 
 		//頂点シェーダー
 		{
-			D3D12_ROOT_PARAMETER1 parameterDesc = {};
-			parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			parameterDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-			parameterDesc.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(vertexShader.cbvRangeDescs.size());
-			parameterDesc.DescriptorTable.pDescriptorRanges = vertexShader.cbvRangeDescs.data();
-			rootParameters.emplace_back(parameterDesc);
+			const ShaderReflectionResult& result = vertexShader.shaderReflectionResult;
+			if (!result.srvRangeDescs.empty()) {
+				rootParameters.emplace_back(vertexShader.getSrvRootParameter());//DescriptorTableIndex: 3
+			}
+
+			if (!result.cbvRangeDescs.empty()) {
+				rootParameters.emplace_back(vertexShader.getCbvRootParameter());//DescriptorTableIndex: 4
+			}
 		}
 
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -318,8 +357,8 @@ public:
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { vertexShader.inputLayouts.data(), static_cast<UINT>(vertexShader.inputLayouts.size()) };
 		psoDesc.pRootSignature = rootSignature->_rootSignature.Get();
-		psoDesc.VS = vertexShader.byteCode;
-		psoDesc.PS = pixelShader.byteCode;
+		psoDesc.VS = vertexShader.getByteCode();
+		psoDesc.PS = pixelShader.getByteCode();
 		psoDesc.RasterizerState = rasterizerDesc;
 		psoDesc.BlendState = blendDesc;
 		psoDesc.DepthStencilState.DepthEnable = FALSE;

@@ -1,25 +1,19 @@
 #pragma once
 #include "Utility.h"
 #include "stdafx.h"
-#include <vector>
-#include <memory>
 
 #define DEBUG
 
 using namespace Microsoft::WRL;
 
 struct BufferView;
-class SharedMaterial;
 class DescriptorHeapManager;
 class GpuResourceManager;
 class FrameResource;
 class CommandQueue;
 class CommandContext;
-class VertexBuffer;
-class IndexBuffer;
 class Texture2D;
-class RootSignature;
-class PipelineState;
+class MeshRenderSet;
 
 class GraphicsCore {
 public:
@@ -51,14 +45,12 @@ private:
 	Texture2D* _depthStencil;
 	BufferView* _dsv;
 
-	VertexBuffer* _vertexBuffer;
-	IndexBuffer* _indexBuffer;
 	CommandContext* _commandContext;
 	FrameResource* _frameResources[FrameCount];
 	FrameResource* _currentFrameResource;
 	DescriptorHeapManager* _descriptorHeapManager;
 	GpuResourceManager* _gpuResourceManager;
 
-	RefPtr<SharedMaterial> _material;
+	RefPtr<MeshRenderSet> _mesh;
 };
 

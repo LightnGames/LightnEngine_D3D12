@@ -11,15 +11,4 @@
 
 #define D3D12_RESOURCE_STATE_UNKNOWN ((D3D12_RESOURCE_STATES)-1)
 
-static const UINT FrameCount = 3;
-static const int CommandListCount = 3;
-static const int CommandListPre = 0;
-static const int CommandListMid = 1;
-static const int CommandListPost = 2;
-
-using byte = unsigned char;
-using uint16 = unsigned short;
-using uint32 = unsigned int;
-using ulong = unsigned long;
-using ulong2 = unsigned long long;
-using int32 = int;
+constexpr UINT FrameCount = 3;

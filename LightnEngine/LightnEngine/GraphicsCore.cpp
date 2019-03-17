@@ -14,6 +14,7 @@
 #include "PipelineState.h"
 #include "GpuResourceManager.h"
 #include "SharedMaterial.h"
+#include "MeshRenderSet.h"
 
 #include "Utility.h"
 
@@ -109,35 +110,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	}
 
-	//テクスチャコピーコマンドを発行する用のアロケーターとリスト
-	ComPtr<ID3D12Resource> uploadHeaps[4] = {};
-	auto commandListSet = _commandContext->requestCommandListSet();
-	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
-
-	//頂点バッファ生成
-	{
-		std::vector<Vertex> triangleVertices = {
-			{ { -0.25f, -0.25f, 0.0f }, { 0.0f, 1.0f } },
-		{ { -0.25f, 0.25f, 0.0f }, { 0.0f, 0.0f } },
-		{ { 0.25f, 0.25f, 0.0f }, { 1.0f, 0.0f } },
-		{ { 0.25f, -0.25f, 0.0f }, { 1.0f, 1.0f } },
-		};
-
-		_vertexBuffer = new VertexBuffer();
-		_vertexBuffer->createDeferred<Vertex>(_device.Get(), commandList, &uploadHeaps[0], triangleVertices);
-	}
-
-	//インデックスバッファ
-	{
-		std::vector<UINT32> indices = {
-			0, 1, 2,
-			0, 2, 3
-		};
-
-		_indexBuffer = new IndexBuffer();
-		_indexBuffer->createDeferred(_device.Get(), commandList, &uploadHeaps[1], indices);
-	}
-
 	//テクスチャ読み込み
 	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, { "T_town_stone_D.dds", "T_town_stone_N.dds" });
 
@@ -148,14 +120,10 @@ void GraphicsCore::onInit(HWND hwnd) {
 	materialSettings.vsTextures = {};
 	materialSettings.psTextures = { "T_town_stone_D.dds", "T_town_stone_N.dds" };
 	_gpuResourceManager->createSharedMaterial(_device.Get(), materialSettings);
-	_gpuResourceManager->loadSharedMaterial("TestM", _material);
 
-	//アップロードバッファをGPUオンリーバッファにコピー
-	_commandContext->executeCommandList(commandList);
-	_commandContext->discardCommandListSet(commandListSet);
-
-	//コピーが終わるまでアップロードヒープを破棄しない
-	_commandContext->waitForIdle();
+	//メッシュデータ読み込み
+	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, "a");
+	_gpuResourceManager->loadMeshSets("a", _mesh);
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
@@ -182,11 +150,15 @@ void GraphicsCore::onUpdate() {
 	static Vector2 ff = { 2, 0 };
 	ff.x += 0.05f;
 
+	static Vector4 cc = { 0, 0, 0, 0 };
+	cc.x += 0.1f;
+
 	static Vector4 oo = { 0, 0, 0, 0 };
 	oo.x += 0.01f;
 
-	_material->setParameter<Vector4>("offset2", oo);
-	_material->setParameter<Vector2>("offset2_2", ff);
+	_mesh->getMaterial(0)->setParameter<Vector4>("offset2", oo);
+	_mesh->getMaterial(0)->setParameter<Vector2>("offset2_2", ff);
+	_mesh->getMaterial(0)->setParameter<Vector4>("col", cc);
 }
 
 void GraphicsCore::onRender() {
@@ -213,14 +185,9 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	//マテリアルを描画
-	RenderSettings renderSettings = { commandList };
-	_material->setupRenderCommand(renderSettings);
-
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->IASetVertexBuffers(0, 1, &_vertexBuffer->_vertexBufferView);
-	commandList->IASetIndexBuffer(&_indexBuffer->_indexBufferView);
-	commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+	//メッシュを描画
+	RenderSettings renderSettings = { commandList, _frameIndex };
+	_mesh->setupRenderCommand(renderSettings);
 
 	//描画用リソースバリアを展開
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -247,8 +214,6 @@ void GraphicsCore::onDestroy() {
 	delete _commandContext;
 	delete _gpuResourceManager;
 	delete _descriptorHeapManager;
-	delete _vertexBuffer;
-	delete _indexBuffer;
 	delete _depthStencil;
 
 	_swapChain = nullptr;
@@ -256,13 +221,12 @@ void GraphicsCore::onDestroy() {
 }
 
 void GraphicsCore::moveToNextFrame() {
-	CommandQueue* commandQueue = _commandContext->commandQueue();
+	RefPtr<CommandQueue> commandQueue = _commandContext->commandQueue();
 	const UINT64 currentFenceValue = _frameResources[_frameIndex]->_fenceValue;
 	commandQueue->waitForFence(currentFenceValue);
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = _frameResources[_frameIndex];
-	SharedMaterial::frameIndex = _frameIndex;
 
 	const UINT64 fenceValue = commandQueue->incrementFence();
 	_frameResources[_frameIndex]->_fenceValue = fenceValue;

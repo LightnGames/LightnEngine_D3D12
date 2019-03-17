@@ -1,8 +1,15 @@
 #pragma once
 
 #include "Utility.h"
-#include "PipelineState.h"
-#include "DescriptorHeap.h"
+
+struct ID3D12Device;
+struct ID3D12GraphicsCommandList;
+struct BufferView;
+class ConstantBuffer;
+class RootSignature;
+class PipelineState;
+class VertexShader;
+class PixelShader;
 
 struct ConstantBufferPerFrame {
 	ConstantBufferPerFrame() :constantBufferViews() {}
@@ -10,100 +17,71 @@ struct ConstantBufferPerFrame {
 		shutdown();
 	}
 
-	void shutdown() {
-		DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
-		for (auto&& cbv : constantBufferViews) {
-			if (cbv != nullptr) {
-				descriptorHeapManager.discardConstantBufferView(cbv);
-			}
-		}
+	void shutdown();
 
-		for (uint32 i = 0; i < FrameCount; ++i) {
+	void create(ID3D12Device* device, const VectorArray<uint32>& bufferSizes);
 
-			for (auto&& cb : constantBuffers[i]) {
-				cb.reset();
-			}
-
-			constantBuffers[i].clear();
-		}
+	//個の定数バッファは有効か？(初期化されていれば配列が０以上なのでそれで判断)
+	bool isEnableBuffer() const {
+		return constantBuffers[0].size() > 0;
 	}
 
-	void create(ID3D12Device* device, const VectorArray<uint32>& bufferSizes) {
-		const uint32 constantBufferCount = static_cast<uint32>(bufferSizes.size());
-		DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
+	//現在設定されている定数バッファのデータを指定フレームの定数バッファに更新
+	void flashBufferData(uint32 frameIndex);
 
-		for (int i = 0; i < FrameCount; ++i) {
-			constantBuffers[i].resize(constantBufferCount);
-
-			UniquePtr<ID3D12Resource*[]> p = makeUnique<ID3D12Resource*[]>(constantBufferCount);
-			for (uint32 j = 0; j < constantBufferCount; ++j) {
-				constantBuffers[i][j] = makeUnique<ConstantBuffer>();
-				constantBuffers[i][j]->create(device, bufferSizes[j]);
-				p[j] = constantBuffers[i][j]->get();
-			}
-
-			descriptorHeapManager.createConstantBufferView(p.get(), &constantBufferViews[i], constantBufferCount);
-		}
-	}
-
-	VectorArray<UniquePtr<ConstantBuffer>> constantBuffers[FrameCount];
-	RefPtr<BufferView> constantBufferViews[FrameCount];
+	VectorArray<UniquePtr<byte[]>> dataPtrs;
+	VectorArray<UniquePtr<ConstantBuffer>> constantBuffers[3];
+	RefPtr<BufferView> constantBufferViews[3];
 };
 
 struct RenderSettings {
 	ID3D12GraphicsCommandList* commandList;
+	const uint32 frameIndex;
 };
 
 class SharedMaterial {
 public:
-	~SharedMaterial() {
-		DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-		if (srvPixel != nullptr) {
-			manager.discardShaderResourceView(srvPixel);
-		}
-	}
+	~SharedMaterial();
 
-	void create(ID3D12Device* device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader) {
-		rootSignature.create(device, *vertexShader, *pixelShader);
-		pipelineState.create(device, &rootSignature, *vertexShader, *pixelShader);
+	void create(ID3D12Device* device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader);
 
-		this->vertexShader = vertexShader;
-		this->pixelShader = pixelShader;
-	}
+	//このマテリアルを描画するための描画コマンドを積み込む
+	void setupRenderCommand(RenderSettings& settings);
 
-	void setupRenderCommand(RenderSettings& settings) {
-		ID3D12GraphicsCommandList* commandList = settings.commandList;
-		commandList->SetPipelineState(pipelineState._pipelineState.Get());
-		commandList->SetGraphicsRootSignature(rootSignature._rootSignature.Get());
-
-		//デスクリプタヒープにセットした定数バッファをセット
-		commandList->SetGraphicsRootDescriptorTable(0, srvPixel->gpuHandle);
-		commandList->SetGraphicsRootDescriptorTable(1, vertexConstantBuffer.constantBufferViews[frameIndex]->gpuHandle);
-
-		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	}
-
+	//パラメータ名と値から直接更新
 	template <class T>
 	void setParameter(const String& name, const T& parameter) {
 		RefPtr<T> data = getParameter<T>(name);
-		*data = parameter;
+
+		if (data != nullptr) {
+			*data = parameter;
+		}
 	}
 
+	//名前から更新する領域のポインタを取得
 	template <class T>
 	RefPtr<T> getParameter(const String& name) {
-		auto& vertexCb = vertexConstantBuffer.constantBuffers[frameIndex];
-		for (size_t i = 0; i < vertexShader->result.constantBuffers.size(); ++i) {
-			const auto variable = vertexShader->result.constantBuffers[i].getVariable(name);
+		//頂点シェーダー定義からパラメータを検索
+		for (size_t i = 0; i < vertexShader->shaderReflectionResult.constantBuffers.size(); ++i) {
+			const auto variable = vertexShader->shaderReflectionResult.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexCb[i]->dataPtr) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexConstantBuffer.dataPtrs[i].get()) + variable->startOffset);
+			}
+		}
+
+		//ピクセルシェーダー定義からパラメータを検索
+		for (size_t i = 0; i < pixelShader->shaderReflectionResult.constantBuffers.size(); ++i) {
+			const auto variable = pixelShader->shaderReflectionResult.constantBuffers[i].getVariable(name);
+			if (variable != nullptr) {
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelConstantBuffer.dataPtrs[i].get()) + variable->startOffset);
 			}
 		}
 
 		return nullptr;
 	}
 
-	PipelineState pipelineState;
-	RootSignature rootSignature;
+	UniquePtr<PipelineState> pipelineState;
+	UniquePtr<RootSignature> rootSignature;
 
 	RefPtr<VertexShader> vertexShader;
 	RefPtr<PixelShader> pixelShader;
@@ -113,6 +91,4 @@ public:
 
 	ConstantBufferPerFrame vertexConstantBuffer;
 	ConstantBufferPerFrame pixelConstantBuffer;
-
-	static uint32 frameIndex;
 };

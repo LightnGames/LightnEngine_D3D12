@@ -46,7 +46,6 @@ UINT64 CommandContext::executeCommandList(ID3D12GraphicsCommandList * commandLis
 	return _commandQueue->executeCommandList(commandList);
 }
 
-//コマンドリストセットのフェンス値インクリメントも行う版
 void CommandContext::executeCommandList(CommandListSet & set) {
 	set.fenceValue = _commandQueue->executeCommandList(set.commandList);
 }

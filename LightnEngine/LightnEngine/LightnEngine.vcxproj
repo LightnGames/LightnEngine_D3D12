@@ -139,6 +139,8 @@
     <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MeshRenderSet.cpp" />
+    <ClCompile Include="SharedMaterial.cpp" />
     <ClCompile Include="ThirdParty\DDSTextureLoader12.cpp" />
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
@@ -161,6 +163,7 @@
     <ClInclude Include="GraphicsCore.h" />
     <ClInclude Include="MemoryAllocator.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="MeshRenderSet.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="SharedMaterial.h" />
     <ClInclude Include="stdafx.h" />

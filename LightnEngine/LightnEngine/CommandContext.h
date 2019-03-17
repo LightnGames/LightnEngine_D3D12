@@ -17,7 +17,6 @@ struct CommandListSet {
 
 class CommandContext :private NonCopyable{
 public:
-
 	CommandContext(D3D12_COMMAND_LIST_TYPE type) :_commandListType(type) {}
 	virtual ~CommandContext();
 
@@ -28,11 +27,17 @@ public:
 	//引数のパイプラインステートは、要求コマンドリストが引数のパイプラインステートのみしか使用しないなどドライバが最適化できる場合に指定する。
 	//例えばBundleのみの描画を行う時。(https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/nf-d3d12-id3d12graphicscommandlist-reset)
 	CommandListSet requestCommandListSet(ID3D12PipelineState* state = nullptr);
+
+	//コマンドリストセットのコマンドリストとコマンドアロケーターを返却する
 	void discardCommandListSet(const CommandListSet& set);
 
+	//コマンドリストをコマンドキューに渡して実行する。戻り値は渡したコマンドリストのフェンス値
 	UINT64 executeCommandList(ID3D12GraphicsCommandList* commandList);
+
+	//コマンドリストセットのフェンス値インクリメントも行う
 	void executeCommandList(CommandListSet& set);
 
+	//すべてのコマンドキューが完了するまで待機
 	void waitForIdle();
 
 protected:

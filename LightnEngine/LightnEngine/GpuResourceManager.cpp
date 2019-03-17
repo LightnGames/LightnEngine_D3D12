@@ -4,10 +4,11 @@
 #include "GpuResource.h"
 #include "CommandContext.h"
 #include "SharedMaterial.h"
+#include "MeshRenderSet.h"
+#include "stdafx.h"
 #include <cassert>
 
 GpuResourceManager* Singleton<GpuResourceManager>::_singleton = 0;
-uint32 SharedMaterial::frameIndex = 0;
 
 WString convertWString(const String& srcStr) {
 	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t, MyAllocator<wchar_t>> cv;
@@ -49,10 +50,10 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 	material->create(device, vertexShader, pixelShader);
 
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-	
+
 	//頂点シェーダーテクスチャSRV生成
 	if (settings.vsTextures.size() > 0) {
-		RefPtr<ID3D12Resource>* textures = new RefPtr<ID3D12Resource>[settings.vsTextures.size()];
+		VectorArray<RefPtr<ID3D12Resource>> textures(settings.vsTextures.size());
 
 		for (size_t i = 0; i < settings.vsTextures.size(); ++i) {
 			RefPtr<Texture2D> texturePtr;
@@ -61,13 +62,12 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 			textures[i] = texturePtr->get();
 		}
 
-		manager.createShaderResourceView(textures, &material->srvVertex, static_cast<uint32>(settings.vsTextures.size()));
-		delete[] textures;
+		manager.createShaderResourceView(textures.data(), &material->srvVertex, static_cast<uint32>(settings.vsTextures.size()));
 	}
 
 	//ピクセルシェーダーテクスチャSRV生成
 	if (settings.psTextures.size() > 0) {
-		RefPtr<ID3D12Resource>* textures = new RefPtr<ID3D12Resource>[settings.psTextures.size()];
+		VectorArray<RefPtr<ID3D12Resource>> textures(settings.psTextures.size());
 
 		for (size_t i = 0; i < settings.psTextures.size(); ++i) {
 			RefPtr<Texture2D> texturePtr;
@@ -76,22 +76,27 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 			textures[i] = texturePtr->get();
 		}
 
-		manager.createShaderResourceView(textures, &material->srvPixel, static_cast<uint32>(settings.psTextures.size()));
-		delete[] textures;
+		manager.createShaderResourceView(textures.data(), &material->srvPixel, static_cast<uint32>(settings.psTextures.size()));
 	}
 
-	VectorArray<uint32> vertexCbSizes(vertexShader->result.constantBuffers.size());
-	for (size_t i = 0; i < vertexCbSizes.size(); ++i) {
-		vertexCbSizes[i] = vertexShader->result.constantBuffers[i].getBufferSize();
+	//頂点シェーダーの定数バッファサイズを取得して定数バッファ本体を生成
+	VectorArray<uint32> vertexCbSizes = vertexShader->getConstantBufferSizes();
+	if (!vertexCbSizes.empty()) {
+		material->vertexConstantBuffer.create(device, vertexCbSizes);
 	}
 
-	material->vertexConstantBuffer.create(device, vertexCbSizes);
+	//ピクセルシェーダーの定数バッファサイズを取得して定数バッファ本体を生成
+	VectorArray<uint32> pixelCbSizes = pixelShader->getConstantBufferSizes();
+	if (!pixelCbSizes.empty()) {
+		material->pixelConstantBuffer.create(device, pixelCbSizes);
+	}
 
+	//生成したマテリアルをキャッシュに登録
 	_sharedMaterials.emplace(settings.name, material);
 }
 
 //テクスチャをまとめて生成する。まとめて送るのでCPUオーバーヘッドが少ない
-void GpuResourceManager::createTextures(ID3D12Device* device, CommandContext& commandContext, const std::vector<String>& settings) {
+void GpuResourceManager::createTextures(ID3D12Device* device, CommandContext& commandContext, const VectorArray<String>& settings) {
 	VectorArray<ComPtr<ID3D12Resource>> uploadHeaps(settings.size());
 	auto commandListSet = commandContext.requestCommandListSet();
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
@@ -111,6 +116,52 @@ void GpuResourceManager::createTextures(ID3D12Device* device, CommandContext& co
 	commandContext.waitForIdle();
 }
 
+void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & commandContext, const String & fileName) {
+	MeshRenderSet* meshSet = new MeshRenderSet();
+	ComPtr<ID3D12Resource> uploadHeaps[2] = {};
+	auto commandListSet = commandContext.requestCommandListSet();
+	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+
+	//頂点バッファ生成
+	{
+		std::vector<Vertex> triangleVertices = {
+			{ { -0.25f, -0.25f, 0.0f }, { 0.0f, 1.0f } },
+		{ { -0.25f, 0.25f, 0.0f }, { 0.0f, 0.0f } },
+		{ { 0.25f, 0.25f, 0.0f }, { 1.0f, 0.0f } },
+		{ { 0.25f, -0.25f, 0.0f }, { 1.0f, 1.0f } },
+		};
+
+		meshSet->vertexBuffer = makeUnique<VertexBuffer>();
+		meshSet->vertexBuffer->createDeferred<Vertex>(device, commandList, &uploadHeaps[0], triangleVertices);
+	}
+
+	//インデックスバッファ
+	{
+		std::vector<UINT32> indices = {
+			0, 1, 2,
+			0, 2, 3
+		};
+
+		meshSet->indexBuffer = makeUnique<IndexBuffer>();
+		meshSet->indexBuffer->createDeferred(device, commandList, &uploadHeaps[1], indices);
+	}
+
+	//アップロードバッファをGPUオンリーバッファにコピー
+	commandContext.executeCommandList(commandList);
+	commandContext.discardCommandListSet(commandListSet);
+
+	//コピーが終わるまでアップロードヒープを破棄しない
+	commandContext.waitForIdle();
+
+	MaterialSlot slot;
+	slot.indexCount = 6;
+	slot.indexOffset = 0;
+	loadSharedMaterial("TestM", slot.material);
+
+	meshSet->materialSlots.emplace_back(slot);
+	_meshes.emplace(fileName, std::move(meshSet));
+}
+
 void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) {
 	assert(_sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
 	dstMaterial = _sharedMaterials.at(materialName).get();
@@ -119,6 +170,11 @@ void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<S
 void GpuResourceManager::loadTexture(const String & textureName, RefPtr<Texture2D>& dstTexture) {
 	assert(_textures.count(textureName) > 0 && "テクスチャが見つかりません");
 	dstTexture = _textures.at(textureName).get();
+}
+
+void GpuResourceManager::loadMeshSets(const String & meshName, RefPtr<MeshRenderSet>& dstMeshSet) {
+	assert(_meshes.count(meshName) > 0 && "メッシュが見つかりません");
+	dstMeshSet = _meshes.at(meshName).get();
 }
 
 void GpuResourceManager::shutdown() {

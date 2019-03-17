@@ -301,8 +301,8 @@ public:
 	byte* blockPtr;
 	uint32 allocateBlockSize;
 	uint32 allocateDataSize;
-	std::vector<Block*> freeList;
 	uint32 freeListFlags;
+	std::vector<Block*> freeList;
 
 #ifdef DEBUG_ARRAY
 	std::list<Block*> activeList;

@@ -27,6 +27,12 @@ cbuffer Constant2 : register(b1)
     float dummy2_2[62];
 }
 
+cbuffer ConstantPS : register(b2)
+{
+    float4 col;
+    float dummy[60];
+}
+
 PSInput VSMain(VSInput input)
 {
     PSInput result;
@@ -41,6 +47,6 @@ PSInput VSMain(VSInput input)
 
 float4 PSMain(PSInput input) : SV_Target
 {
-    float4 color = _texture.Sample(_sampler, input.uv)/10 + _texture2.Sample(_sampler, input.uv);
+    float4 color = _texture.Sample(_sampler, input.uv) / 10 + _texture2.Sample(_sampler, input.uv)+float4(sin(col.x) / 2.0f, 0, 0, 0);
     return lerp(color, pow(color, 1.0f/2.2f), input.uv.x > 0.5f ? 1.0f : 0.0f);//linear work fllow
 }
