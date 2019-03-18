@@ -7,7 +7,7 @@
 #include "CommandContext.h"
 
 //class CommandContext;
-#include "ThirdParty/DDSTextureLoader12.h"
+#include "ThirdParty/DirectXTex/DDSTextureLoader12.h"
 using namespace Microsoft::WRL;
 
 class GpuResource {

@@ -6,7 +6,7 @@ struct PSInput
 
 struct VSInput
 {
-    float4 position : POSITION;
+    float3 position : POSITION;
     float2 uv : TEXCOORD;
 };
 
@@ -18,7 +18,10 @@ cbuffer Constant1 : register(b0)
 {
     float4 offset2;
     float2 offset3;
-    float dummy2[58];
+    float4x4 mtxWorld;
+    float4x4 mtxView;
+    float4x4 mtxProj;
+    float dummy2[10];
 }
 
 cbuffer Constant2 : register(b1)
@@ -36,11 +39,16 @@ cbuffer ConstantPS : register(b2)
 PSInput VSMain(VSInput input)
 {
     PSInput result;
-    result.position = input.position;
+
+    float4 worldPos = mul(float4(input.position, 1), mtxWorld);
+    float4 viewPos = mul(worldPos, mtxView);
+    result.position = mul(viewPos, mtxProj);
+
+    //result.position = input.position;
     result.uv = input.uv;
 
-    result.position.y += sin(offset2.x) / 2.0f;//+offset2_2.x;
-    result.position.x += cos(offset2_2.x) / 2.0f;
+    //result.position.y += sin(offset2.x) / 2.0f;//+offset2_2.x;
+    //result.position.x += cos(offset2_2.x) / 2.0f;
 
     return result;
 }

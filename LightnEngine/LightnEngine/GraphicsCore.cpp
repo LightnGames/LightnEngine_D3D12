@@ -1,8 +1,6 @@
 #include "GraphicsCore.h"
-#include <d3dcompiler.h>
 #include <stdexcept>
-#include <string>
-#include <vector>
+#include <LMath.h>
 
 #include "D3D12Util.h"
 #include "D3D12Helper.h"
@@ -11,18 +9,17 @@
 #include "CommandQueue.h"
 #include "CommandContext.h"
 #include "DescriptorHeap.h"
-#include "PipelineState.h"
 #include "GpuResourceManager.h"
 #include "SharedMaterial.h"
 #include "MeshRenderSet.h"
+#include "ImguiWindow.h"
 
-#include "Utility.h"
+#include "ThirdParty/Imgui/imgui.h"
 
 GraphicsCore::GraphicsCore() {
 	_width = 1280;
 	_height = 720;
 }
-
 
 GraphicsCore::~GraphicsCore() {
 }
@@ -60,22 +57,26 @@ void GraphicsCore::onInit(HWND hwnd) {
 	throwIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device)));
 
 	//デスクリプタヒープマネージャー
-	_descriptorHeapManager = new DescriptorHeapManager();
+	_descriptorHeapManager = makeUnique<DescriptorHeapManager>();
 	_descriptorHeapManager->create(_device.Get());
 
 	//コマンドキュー生成
-	_commandContext = new CommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	_commandContext = makeUnique<CommandContext>(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	_commandContext->create(_device.Get());
 
 	//リソースマネージャー
-	_gpuResourceManager = new GpuResourceManager();
+	_gpuResourceManager = makeUnique<GpuResourceManager>();
+
+	//Imgui初期化
+	_imguiWindow = makeUnique<ImguiWindow>();
+	_imguiWindow->init(hwnd, _device.Get());
 
 	//スワップチェーン生成
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.BufferCount = FrameCount;
 	swapChainDesc.Width = _width;
 	swapChainDesc.Height = _height;
-	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapChainDesc.Format = RenderTargetFormat;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
@@ -97,17 +98,10 @@ void GraphicsCore::onInit(HWND hwnd) {
 		depthInfo.width = _width;
 		depthInfo.height = _height;
 		depthInfo.format = DXGI_FORMAT_D32_FLOAT;
-		_depthStencil = new Texture2D();
+		_depthStencil = makeUnique<Texture2D>();
 		_depthStencil->createDepth(_device.Get(), depthInfo);
 
 		_descriptorHeapManager->createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
-	}
-
-	//ルートシグネチャのサポートバージョンをチェック
-	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-	if (FAILED(_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData)))) {
-		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	}
 
 	//テクスチャ読み込み
@@ -127,25 +121,15 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
-		_frameResources[i] = new FrameResource(_device.Get(), _swapChain.Get(), i);
+		_frameResources[i] = makeUnique<FrameResource>(_device.Get(), _swapChain.Get(), i);
 	}
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
-	_currentFrameResource = _frameResources[_frameIndex];
+	_currentFrameResource = _frameResources[_frameIndex].get();
 }
 
 void GraphicsCore::onUpdate() {
-	struct Vector4 {
-		float x;
-		float y;
-		float z;
-		float w;
-	};
-
-	struct Vector2 {
-		float x;
-		float y;
-	};
+	_imguiWindow->startFrame();
 
 	static Vector2 ff = { 2, 0 };
 	ff.x += 0.05f;
@@ -156,8 +140,20 @@ void GraphicsCore::onUpdate() {
 	static Vector4 oo = { 0, 0, 0, 0 };
 	oo.x += 0.01f;
 
-	_mesh->getMaterial(0)->setParameter<Vector4>("offset2", oo);
-	_mesh->getMaterial(0)->setParameter<Vector2>("offset2_2", ff);
+	static float z = 2.0f;
+
+	ImGui::Begin("TestD3D12");
+	ImGui::Text("Lightn");
+	ImGui::SliderFloat("World Z", &z, -1, 10);
+	ImGui::End();
+
+	Matrix4 mtxWorld = Matrix4::translateXYZ({ 0, 0, z });
+	Matrix4 mtxView = Matrix4::identity;
+	Matrix4 mtxProj = Matrix4::perspectiveFovLH(30, _width / static_cast<float>(_height), 0.01f, 100);
+
+	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxWorld", mtxWorld.transpose());
+	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 	_mesh->getMaterial(0)->setParameter<Vector4>("col", cc);
 }
 
@@ -166,7 +162,7 @@ void GraphicsCore::onRender() {
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
 
 	//デスクリプタヒープをセット
-	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager->descriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
+	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager->getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
 	commandList->SetDescriptorHeaps(1, ppHeap);
 
 	//ビューポート設定
@@ -189,6 +185,9 @@ void GraphicsCore::onRender() {
 	RenderSettings renderSettings = { commandList, _frameIndex };
 	_mesh->setupRenderCommand(renderSettings);
 
+	//ImguiWindow描画
+	_imguiWindow->renderFrame(commandList);
+
 	//描画用リソースバリアを展開
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
@@ -208,13 +207,14 @@ void GraphicsCore::onDestroy() {
 	_commandContext->waitForIdle();
 
 	for (int i = 0; i < FrameCount; ++i) {
-		delete _frameResources[i];
+		_frameResources[i].reset();
 	}
 
-	delete _commandContext;
-	delete _gpuResourceManager;
-	delete _descriptorHeapManager;
-	delete _depthStencil;
+	_imguiWindow.reset();
+	_commandContext.reset();
+	_gpuResourceManager.reset();
+	_descriptorHeapManager.reset();
+	_depthStencil.reset();
 
 	_swapChain = nullptr;
 	_device = nullptr;
@@ -226,7 +226,7 @@ void GraphicsCore::moveToNextFrame() {
 	commandQueue->waitForFence(currentFenceValue);
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
-	_currentFrameResource = _frameResources[_frameIndex];
+	_currentFrameResource = _frameResources[_frameIndex].get();
 
 	const UINT64 fenceValue = commandQueue->incrementFence();
 	_frameResources[_frameIndex]->_fenceValue = fenceValue;

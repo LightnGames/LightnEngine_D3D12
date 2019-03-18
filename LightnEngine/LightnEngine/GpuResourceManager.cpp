@@ -131,8 +131,8 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 		{ { 0.25f, -0.25f, 0.0f }, { 1.0f, 1.0f } },
 		};
 
-		meshSet->vertexBuffer = makeUnique<VertexBuffer>();
-		meshSet->vertexBuffer->createDeferred<Vertex>(device, commandList, &uploadHeaps[0], triangleVertices);
+		meshSet->_vertexBuffer = makeUnique<VertexBuffer>();
+		meshSet->_vertexBuffer->createDeferred<Vertex>(device, commandList, &uploadHeaps[0], triangleVertices);
 	}
 
 	//インデックスバッファ
@@ -142,8 +142,8 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 			0, 2, 3
 		};
 
-		meshSet->indexBuffer = makeUnique<IndexBuffer>();
-		meshSet->indexBuffer->createDeferred(device, commandList, &uploadHeaps[1], indices);
+		meshSet->_indexBuffer = makeUnique<IndexBuffer>();
+		meshSet->_indexBuffer->createDeferred(device, commandList, &uploadHeaps[1], indices);
 	}
 
 	//アップロードバッファをGPUオンリーバッファにコピー
@@ -158,7 +158,7 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 	slot.indexOffset = 0;
 	loadSharedMaterial("TestM", slot.material);
 
-	meshSet->materialSlots.emplace_back(slot);
+	meshSet->_materialSlots.emplace_back(slot);
 	_meshes.emplace(fileName, std::move(meshSet));
 }
 

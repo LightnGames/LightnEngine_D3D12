@@ -62,7 +62,9 @@ public:
 	void discardShaderResourceView(BufferView* bufferView);
 	void discardDepthStencilView(BufferView* bufferView);
 
-	ID3D12DescriptorHeap* descriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type);
+	//Direct3Dのデスクリプタヒープをタイプから直接取得
+	RefPtr<ID3D12DescriptorHeap> getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type);
+	RefPtr<DescriptorHeap> getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type);
 
 private:
 

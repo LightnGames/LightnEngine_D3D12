@@ -1,5 +1,4 @@
 #pragma once
-#include <d3d12.h>
 #include <d3dcompiler.h>
 #include <vector>
 #include <iostream>
@@ -8,6 +7,7 @@
 #include <cstdio>
 #include "stdafx.h"
 #include "D3D12Helper.h"
+#include "GraphicsConstantSettings.h"
 
 #include <unordered_map>
 USE_UNORDERED_MAP
@@ -19,15 +19,20 @@ struct ShaderReflectionCBV {
 	uint32 size;
 	uint32 elements;
 
+	//変数の型名からサイズと型名をセット
 	void setSizeAndType(const String& name) {
 		this->type = name;
 
 		static UnorderedMap<String, uint32> dataTable = {
 			{ "float", 4 },
-		{ "float2", 8 },
-		{ "float3", 12 },
-		{ "float4", 16 },
-		{ "float4x4", 64 }
+			{ "float2", 8 },
+			{ "float3", 12 },
+			{ "float4", 16 },
+			{ "float4x4", 64 },
+			{ "uint", 4 },
+			{ "uint2", 8 },
+			{ "uint3", 12 },
+			{ "uint4", 16 }
 		};
 
 		size = dataTable.at(this->type);
@@ -39,6 +44,7 @@ struct ShaderReflectionCB {
 	String name;
 	VectorArray<ShaderReflectionCBV> variables;
 
+	//定数バッファに含まれる変数の総サイズを取得
 	uint32 getBufferSize() const {
 		uint32 size = 0;
 		for (const auto& variable : variables) {
@@ -48,6 +54,7 @@ struct ShaderReflectionCB {
 		return size;
 	}
 
+	//名前から定数バッファに含まれる変数を取得
 	const RefPtr<const ShaderReflectionCBV> getVariable(const String& name) const {
 		for (const auto& variable : variables) {
 			if (variable.name == name) {
@@ -69,6 +76,7 @@ using namespace Microsoft::WRL;
 
 class Shader {
 public:
+	//シェーダーバイナリからリフレクション結果を取得する
 	ShaderReflectionResult getShaderReflection(const D3D12_SHADER_BYTECODE& byteCode) {
 		ShaderReflectionResult result;
 		ComPtr<ID3D12ShaderReflection> shaderReflector;
@@ -288,6 +296,7 @@ public:
 			}
 		}
 
+		//とりあえずこの静的サンプラーを使用(現在はこれで固定)
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
 		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
@@ -302,6 +311,13 @@ public:
 		samplerDesc.ShaderRegister = 0;
 		samplerDesc.RegisterSpace = 0;
 		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		//ルートシグネチャのサポートバージョンをチェック(してるだけ。。。)
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData)))) {
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
 
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -366,7 +382,7 @@ public:
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.RTVFormats[0] = RenderTargetFormat;
 		psoDesc.SampleDesc.Count = 1;
 		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
 		NAME_D3D12_OBJECT(_pipelineState);

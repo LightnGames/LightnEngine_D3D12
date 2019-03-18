@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Utility.h"
+#include "GraphicsConstantSettings.h"
 
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
@@ -10,6 +11,8 @@ class RootSignature;
 class PipelineState;
 class VertexShader;
 class PixelShader;
+
+#include "PipelineState.h"
 
 struct ConstantBufferPerFrame {
 	ConstantBufferPerFrame() :constantBufferViews() {}
@@ -30,8 +33,8 @@ struct ConstantBufferPerFrame {
 	void flashBufferData(uint32 frameIndex);
 
 	VectorArray<UniquePtr<byte[]>> dataPtrs;
-	VectorArray<UniquePtr<ConstantBuffer>> constantBuffers[3];
-	RefPtr<BufferView> constantBufferViews[3];
+	VectorArray<UniquePtr<ConstantBuffer>> constantBuffers[FrameCount];
+	RefPtr<BufferView> constantBufferViews[FrameCount];
 };
 
 struct RenderSettings {

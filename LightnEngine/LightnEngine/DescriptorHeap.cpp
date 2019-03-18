@@ -205,11 +205,21 @@ void DescriptorHeapManager::discardDepthStencilView(BufferView * bufferView) {
 }
 
 
-ID3D12DescriptorHeap * DescriptorHeapManager::descriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type) {
+RefPtr<ID3D12DescriptorHeap> DescriptorHeapManager::getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type) {
 	switch (type) {
 	case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV: return _cbvSrvHeap->descriptorHeap(); break;
 	case D3D12_DESCRIPTOR_HEAP_TYPE_RTV: return _rtvHeap->descriptorHeap(); break;
 	case D3D12_DESCRIPTOR_HEAP_TYPE_DSV: return _dsvHeap->descriptorHeap(); break;
+	}
+
+	return nullptr;
+}
+
+RefPtr<DescriptorHeap> DescriptorHeapManager::getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type) {
+	switch (type) {
+	case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV: return _cbvSrvHeap; break;
+	case D3D12_DESCRIPTOR_HEAP_TYPE_RTV: return _rtvHeap; break;
+	case D3D12_DESCRIPTOR_HEAP_TYPE_DSV: return _dsvHeap; break;
 	}
 
 	return nullptr;

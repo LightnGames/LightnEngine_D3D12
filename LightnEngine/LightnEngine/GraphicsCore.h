@@ -1,14 +1,18 @@
 #pragma once
 #include "Utility.h"
 #include "stdafx.h"
+#include "GraphicsConstantSettings.h"
 
 #define DEBUG
 
 using namespace Microsoft::WRL;
 
+struct ID3D12Device;
+struct IDXGISwapChain3;
 struct BufferView;
 class DescriptorHeapManager;
 class GpuResourceManager;
+class ImguiWindow;
 class FrameResource;
 class CommandQueue;
 class CommandContext;
@@ -42,15 +46,16 @@ private:
 	ComPtr<IDXGISwapChain3> _swapChain;
 	ComPtr<ID3D12Device> _device;
 
-	Texture2D* _depthStencil;
-	BufferView* _dsv;
+	UniquePtr<Texture2D> _depthStencil;
+	RefPtr<BufferView> _dsv;
 
-	CommandContext* _commandContext;
-	FrameResource* _frameResources[FrameCount];
-	FrameResource* _currentFrameResource;
-	DescriptorHeapManager* _descriptorHeapManager;
-	GpuResourceManager* _gpuResourceManager;
+	UniquePtr<CommandContext> _commandContext;
+	UniquePtr<FrameResource> _frameResources[FrameCount];
+	UniquePtr<DescriptorHeapManager> _descriptorHeapManager;
+	UniquePtr<GpuResourceManager> _gpuResourceManager;
+	UniquePtr<ImguiWindow> _imguiWindow;
 
+	RefPtr<FrameResource> _currentFrameResource;
 	RefPtr<MeshRenderSet> _mesh;
 };
 

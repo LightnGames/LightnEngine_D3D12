@@ -4,7 +4,7 @@
 
 GraphicsCore* Win32Application::_tmpCore = nullptr;
 
-Win32Application::Win32Application(){
+Win32Application::Win32Application() {
 }
 
 
@@ -64,9 +64,14 @@ int Win32Application::run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int n
 	return static_cast<char>(msg.wParam);
 }
 
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	GraphicsCore* graphicsCore = reinterpret_cast<GraphicsCore*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	graphicsCore = _tmpCore;
+
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam)) {
+		return true;
+	}
 
 	switch (message) {
 	case WM_PAINT:

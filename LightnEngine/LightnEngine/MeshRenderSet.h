@@ -19,7 +19,8 @@ public:
 	void setupRenderCommand(RenderSettings& settings);
 	RefPtr<SharedMaterial> getMaterial(uint32 index);
 
-	UniquePtr<VertexBuffer> vertexBuffer;
-	UniquePtr<IndexBuffer> indexBuffer;
-	VectorArray<MaterialSlot> materialSlots;
+//private://CreateŠÖ”‚ğì‚Á‚½‚çPrivate‚É‚·‚éBB
+	UniquePtr<VertexBuffer> _vertexBuffer;
+	UniquePtr<IndexBuffer> _indexBuffer;
+	VectorArray<MaterialSlot> _materialSlots;
 };
