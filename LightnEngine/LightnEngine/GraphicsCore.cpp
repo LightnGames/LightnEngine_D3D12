@@ -116,8 +116,8 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_gpuResourceManager->createSharedMaterial(_device.Get(), materialSettings);
 
 	//メッシュデータ読み込み
-	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, "a");
-	_gpuResourceManager->loadMeshSets("a", _mesh);
+	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, "cube.fbx");
+	_gpuResourceManager->loadMeshSets("cube.fbx", _mesh);
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
@@ -141,13 +141,19 @@ void GraphicsCore::onUpdate() {
 	oo.x += 0.01f;
 
 	static float z = 2.0f;
+	static float pitch = 0;
+	static float yaw = 0;
+	static float roll = 0;
 
 	ImGui::Begin("TestD3D12");
 	ImGui::Text("Lightn");
 	ImGui::SliderFloat("World Z", &z, -1, 10);
+	ImGui::SliderAngle("Picth", &pitch);
+	ImGui::SliderAngle("Yaw", &yaw);
+	ImGui::SliderAngle("Roll", &roll);
 	ImGui::End();
 
-	Matrix4 mtxWorld = Matrix4::translateXYZ({ 0, 0, z });
+	Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll },true)).multiply(Matrix4::translateXYZ({ 0, 0, z }));
 	Matrix4 mtxView = Matrix4::identity;
 	Matrix4 mtxProj = Matrix4::perspectiveFovLH(30, _width / static_cast<float>(_height), 0.01f, 100);
 

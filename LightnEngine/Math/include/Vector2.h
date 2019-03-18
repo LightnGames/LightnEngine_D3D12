@@ -48,6 +48,8 @@ struct Vector2 {
 	Vector2& operator *=(const float& s);
 	Vector2& operator /=(const float& s);
 
+	bool operator ==(const Vector2& v2) const;
+
 	//’è”
 	static const Vector2 zero;
 	static const Vector2 one;

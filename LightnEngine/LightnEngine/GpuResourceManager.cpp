@@ -7,6 +7,7 @@
 #include "MeshRenderSet.h"
 #include "stdafx.h"
 #include <cassert>
+#include <LMath.h>
 
 GpuResourceManager* Singleton<GpuResourceManager>::_singleton = 0;
 
@@ -116,35 +117,133 @@ void GpuResourceManager::createTextures(ID3D12Device* device, CommandContext& co
 	commandContext.waitForIdle();
 }
 
+struct RawVertex {
+	Vector3 position;
+	//Vector3 normal;
+	Vector2 texcoord;
+
+	bool operator==(const RawVertex &left) const {
+		return position == left.position && texcoord == texcoord;
+	}
+};
+
+#define HashCombine(hash,seed) hash + 0x9e3779b9 + (seed << 6) + (seed >> 2)
+
+namespace std {
+	template<>
+	class hash<RawVertex> {
+	public:
+
+		size_t operator () (const RawVertex &p) const {
+			size_t seed = 0;
+
+			seed ^= HashCombine(hash<float>()(p.position.x), seed);
+			seed ^= HashCombine(hash<float>()(p.position.y), seed);
+			seed ^= HashCombine(hash<float>()(p.position.z), seed);
+			seed ^= HashCombine(hash<float>()(p.texcoord.x), seed);
+			seed ^= HashCombine(hash<float>()(p.texcoord.y), seed);
+			return seed;
+		}
+	};
+}
+
+#include <unordered_map>
+USE_UNORDERED_MAP
+
+#include <fbxsdk.h>
+using namespace fbxsdk;
 void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & commandContext, const String & fileName) {
+	fbxsdk::FbxManager* manager = fbxsdk::FbxManager::Create();
+	FbxIOSettings* ios = FbxIOSettings::Create(manager, IOSROOT);
+	manager->SetIOSettings(ios);
+	FbxScene* scene = FbxScene::Create(manager, "");
+
+	FbxImporter* importer = FbxImporter::Create(manager, "");
+	importer->Initialize(fileName.c_str(), -1, manager->GetIOSettings());
+	importer->Import(scene);
+	importer->Destroy();
+
+	FbxGeometryConverter geometryConverter(manager);
+	geometryConverter.Triangulate(scene, true);
+
+	FbxMesh* mesh = scene->GetMember<FbxMesh>(0);
+	const uint32 materialCount = mesh->GetElementMaterialCount();
+	const uint32 vertexCount = mesh->GetControlPointsCount();
+	const uint32 polygonCount = mesh->GetPolygonCount();
+	const uint32 polygonVertexCount = 3;
+	const uint32 indexCount = polygonCount * polygonVertexCount;
+
+	FbxStringList uvSetNames;
+	bool bIsUnmapped = false;
+	mesh->GetUVSetNames(uvSetNames);
+
+	FbxLayerElementMaterial* meshMaterials = mesh->GetLayer(0)->GetMaterials();
+
+	//マテリアルごとの頂点インデックス数を調べる
+	VectorArray<uint32> materialIndexSize(materialCount);
+	for (int i = 0; i < polygonCount; ++i) {
+		const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
+		materialIndexSize[materialId] += polygonVertexCount;
+	}
+
+	UnorderedMap<RawVertex, uint32> optimizedVertices;//重複しない頂点情報と新しい頂点インデックス
+	VectorArray<UINT32> indices(indexCount);//新しい頂点インデックスでできたインデックスバッファ
+	VectorArray<uint32> materialIndexCounter(materialCount);//マテリアルごとのインデックス数を管理
+
+	optimizedVertices.reserve(indexCount);
+
+	for (uint32 i = 0; i < polygonCount; ++i) {
+		const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
+		uint32& checkIndex = materialIndexCounter[materialId];
+
+		for (uint32 j = 0; j < polygonVertexCount; ++j) {
+			const uint32 vertexIndex = mesh->GetPolygonVertex(i, j);
+			FbxVector4 v = mesh->GetControlPointAt(vertexIndex);
+			FbxVector4 normal;
+			FbxVector2 texcoord;
+
+			FbxString uvSetName = uvSetNames.GetStringAt(0);//UVSetは０番インデックスのみ対応
+			mesh->GetPolygonVertexUV(i, j, uvSetName, texcoord, bIsUnmapped);
+			mesh->GetPolygonVertexNormal(i, j, normal);
+
+			RawVertex r;
+			r.position = { (float)v[0], (float)v[1], (float)v[2] };
+			//r.normal = { (float)normal[0], (float)normal[1], (float)normal[2] };
+			r.texcoord = { (float)texcoord[0], (float)texcoord[1] };
+
+			if (optimizedVertices.count(r) == 0) {
+				uint32 vertexIndex = static_cast<uint32>(optimizedVertices.size());
+				indices[checkIndex] = vertexIndex;
+				optimizedVertices.emplace(r, vertexIndex);
+			}
+			else {
+				indices[checkIndex] = optimizedVertices.at(r);
+			}
+
+			checkIndex++;
+		}
+	}
+
+	//UnorederedMapの配列からVectorArrayに変換
+	VectorArray<RawVertex> vertices(optimizedVertices.size());
+	for (const auto& vertex : optimizedVertices) {
+		vertices[vertex.second] = vertex.first;
+	}
+
+	manager->Destroy();
+
 	MeshRenderSet* meshSet = new MeshRenderSet();
 	ComPtr<ID3D12Resource> uploadHeaps[2] = {};
 	auto commandListSet = commandContext.requestCommandListSet();
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
 
 	//頂点バッファ生成
-	{
-		std::vector<Vertex> triangleVertices = {
-			{ { -0.25f, -0.25f, 0.0f }, { 0.0f, 1.0f } },
-		{ { -0.25f, 0.25f, 0.0f }, { 0.0f, 0.0f } },
-		{ { 0.25f, 0.25f, 0.0f }, { 1.0f, 0.0f } },
-		{ { 0.25f, -0.25f, 0.0f }, { 1.0f, 1.0f } },
-		};
-
-		meshSet->_vertexBuffer = makeUnique<VertexBuffer>();
-		meshSet->_vertexBuffer->createDeferred<Vertex>(device, commandList, &uploadHeaps[0], triangleVertices);
-	}
+	meshSet->_vertexBuffer = makeUnique<VertexBuffer>();
+	meshSet->_vertexBuffer->createDeferred<RawVertex>(device, commandList, &uploadHeaps[0], vertices);
 
 	//インデックスバッファ
-	{
-		std::vector<UINT32> indices = {
-			0, 1, 2,
-			0, 2, 3
-		};
-
-		meshSet->_indexBuffer = makeUnique<IndexBuffer>();
-		meshSet->_indexBuffer->createDeferred(device, commandList, &uploadHeaps[1], indices);
-	}
+	meshSet->_indexBuffer = makeUnique<IndexBuffer>();
+	meshSet->_indexBuffer->createDeferred(device, commandList, &uploadHeaps[1], indices);
 
 	//アップロードバッファをGPUオンリーバッファにコピー
 	commandContext.executeCommandList(commandList);
@@ -154,7 +253,7 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 	commandContext.waitForIdle();
 
 	MaterialSlot slot;
-	slot.indexCount = 6;
+	slot.indexCount = static_cast<uint32>(indices.size());
 	slot.indexOffset = 0;
 	loadSharedMaterial("TestM", slot.material);
 

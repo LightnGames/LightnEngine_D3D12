@@ -137,6 +137,11 @@ Vector2 & Vector2::operator/=(const float & s) {
 	return *this;
 }
 
+bool Vector2::operator == (const Vector2& v2) const{
+	return approximately(x, v2.x)
+		&& approximately(y, v2.y);
+}
+
 Vector2 & operator*(const float & s, Vector2 & v) {
 	v *= s;
 	return v;

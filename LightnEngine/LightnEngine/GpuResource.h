@@ -201,7 +201,7 @@ class VertexBuffer :public GpuResource {
 public:
 	//直ちに頂点バッファを生成し、操作が完了するまでスレッドを停止する
 	template <typename T>
-	void createDirect(ID3D12Device* device, CommandContext* commandContext, const std::vector<T>& vertices) {
+	void createDirect(ID3D12Device* device, CommandContext* commandContext, const VectorArray<T>& vertices) {
 		ComPtr<ID3D12Resource> vertexUploadHeap;
 		auto commandListSet = commandContext->requestCommandListSet();
 		ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
@@ -218,7 +218,7 @@ public:
 
 	//コマンドリストに頂点バッファ生成コマンドを発行(発行のみで実行はしない)
 	template <typename T>
-	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const std::vector<T>& vertices) {
+	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const VectorArray<T>& vertices) {
 		const UINT64 vertexBufferSize = static_cast<UINT64>(sizeof(T)*vertices.size());
 
 		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
@@ -270,7 +270,7 @@ public:
 
 class IndexBuffer :public GpuResource {
 public:
-	void createDirect(ID3D12Device* device, CommandContext* commandContext, const std::vector<UINT32>& indices) {
+	void createDirect(ID3D12Device* device, CommandContext* commandContext, const VectorArray<UINT32>& indices) {
 		ComPtr<ID3D12Resource> indexUploadHeap;
 
 		auto commandListSet = commandContext->requestCommandListSet();
@@ -287,7 +287,7 @@ public:
 	}
 
 	//コマンドリストにインデックスバッファ生成コマンドを発行(発行のみで実行はしない)
-	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const std::vector<UINT32>& indices) {
+	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const VectorArray<UINT32>& indices) {
 		const UINT64 indexBufferSize = static_cast<UINT64>(sizeof(UINT32)*indices.size());
 
 		D3D12_HEAP_PROPERTIES indexHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
