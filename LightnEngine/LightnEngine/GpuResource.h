@@ -60,23 +60,6 @@ public:
 
 	//デプステクスチャとして生成
 	void createDepth(ID3D12Device* device, const DepthTextureInfo& info) {
-		D3D12_DEPTH_STENCIL_DESC dsDesc = {};
-		dsDesc.DepthEnable = TRUE;
-		dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-		dsDesc.StencilEnable = FALSE;
-		dsDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-		dsDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-
-		D3D12_DEPTH_STENCILOP_DESC dsopDesc = {};
-		dsopDesc.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-		dsopDesc.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-		dsopDesc.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-		dsopDesc.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-		dsDesc.FrontFace = dsopDesc;
-		dsDesc.BackFace = dsopDesc;
-
 		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
 		depthOptimizedClearValue.Format = info.format;
 		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
@@ -331,8 +314,10 @@ public:
 		_indexBufferView.BufferLocation = _resource->GetGPUVirtualAddress();
 		_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
 		_indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
+		_indexCount = static_cast<uint32>(indices.size());
 	}
 
+	uint32 _indexCount;
 	D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 };
 

@@ -89,7 +89,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	throwIfFailed(swapChain.As(&_swapChain));
 
 	//ビューポート初期化
-	_viewPort = { 0.0f, 0.0f, static_cast<float>(_width), static_cast<float>(_height) };
+	_viewPort = { 0.0f, 0.0f, static_cast<float>(_width), static_cast<float>(_height), 0.0f, 1.0f };
 	_scissorRect = { 0, 0, static_cast<LONG>(_width), static_cast<LONG>(_height) };
 
 	//デプスバッファ生成
@@ -97,27 +97,58 @@ void GraphicsCore::onInit(HWND hwnd) {
 		DepthTextureInfo depthInfo;
 		depthInfo.width = _width;
 		depthInfo.height = _height;
-		depthInfo.format = DXGI_FORMAT_D32_FLOAT;
+		depthInfo.format = DepthStencilFormat;
 		_depthStencil = makeUnique<Texture2D>();
 		_depthStencil->createDepth(_device.Get(), depthInfo);
 
 		_descriptorHeapManager->createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
 	}
 
+	String meshName("Cerberus/Cerberus.fbx");
+	String diffuseEnv("cubemapEnvHDR.dds");
+	String specularEnv("cubemapSpecularHDR.dds");
+	String specularBrdf("cubemapBrdf.dds");
+	String albedo("Cerberus/Cerberus_A.dds");
+	String normal("Cerberus/Cerberus_N.dds");
+	String metallic("Cerberus/Cerberus_M.dds");
+	String roughness("Cerberus/Cerberus_R.dds");
+
 	//テクスチャ読み込み
-	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, { "T_town_stone_D.dds", "T_town_stone_N.dds" });
+	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, { albedo, normal, metallic, roughness, diffuseEnv, specularEnv, specularBrdf });
 
 	SharedMaterialCreateSettings materialSettings;
 	materialSettings.name = "TestM";
 	materialSettings.vertexShaderName = "shaders.hlsl";
 	materialSettings.pixelShaderName = "shaders.hlsl";
 	materialSettings.vsTextures = {};
-	materialSettings.psTextures = { "T_town_stone_D.dds", "T_town_stone_N.dds" };
+	materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness };
 	_gpuResourceManager->createSharedMaterial(_device.Get(), materialSettings);
 
+	SharedMaterialCreateSettings skyMatSettings;
+	skyMatSettings.name = "TestS";
+	skyMatSettings.vertexShaderName = "skyShaders.hlsl";
+	skyMatSettings.pixelShaderName = "skyShaders.hlsl";
+	skyMatSettings.vsTextures = {};
+	skyMatSettings.psTextures = { diffuseEnv };
+	_gpuResourceManager->createSharedMaterial(_device.Get(), skyMatSettings);
+
 	//メッシュデータ読み込み
-	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, "cube.fbx");
-	_gpuResourceManager->loadMeshSets("cube.fbx", _mesh);
+	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, meshName);
+	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, "skySphere.fbx");
+	_gpuResourceManager->loadMeshSets(meshName, _mesh);
+	_gpuResourceManager->loadMeshSets("skySphere.fbx", _sky);
+
+	MaterialSlot slot;
+	slot.indexCount = _mesh->_indexBuffer->_indexCount;
+	slot.indexOffset = 0;
+	_gpuResourceManager->loadSharedMaterial("TestM", slot.material);
+	_mesh->_materialSlots.emplace_back(slot);
+
+	MaterialSlot skySlot;
+	skySlot.indexCount = _sky->_indexBuffer->_indexCount;
+	skySlot.indexOffset = 0;
+	_gpuResourceManager->loadSharedMaterial("TestS", skySlot.material);
+	_sky->_materialSlots.emplace_back(skySlot);
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
@@ -140,7 +171,7 @@ void GraphicsCore::onUpdate() {
 	static Vector4 oo = { 0, 0, 0, 0 };
 	oo.x += 0.01f;
 
-	static float z = 2.0f;
+	static float z = 0.0f;
 	static float pitch = 0;
 	static float yaw = 0;
 	static float roll = 0;
@@ -153,14 +184,20 @@ void GraphicsCore::onUpdate() {
 	ImGui::SliderAngle("Roll", &roll);
 	ImGui::End();
 
-	Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll },true)).multiply(Matrix4::translateXYZ({ 0, 0, z }));
+	Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll },true)).multiply(Matrix4::translateXYZ({ z, 0, 10.5f }));
 	Matrix4 mtxView = Matrix4::identity;
-	Matrix4 mtxProj = Matrix4::perspectiveFovLH(30, _width / static_cast<float>(_height), 0.01f, 100);
+	Matrix4 mtxProj = Matrix4::perspectiveFovLH(radianFromDegree(50), _width / static_cast<float>(_height), 0.01f, 1000);
+	//mtxProj = Matrix4::identity;
 
 	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxWorld", mtxWorld.transpose());
 	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
 	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 	_mesh->getMaterial(0)->setParameter<Vector4>("col", cc);
+
+	Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
+	_sky->getMaterial(0)->setParameter<Matrix4>("mtxWorld", skyMtxWorld.transpose());
+	_sky->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+	_sky->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 }
 
 void GraphicsCore::onRender() {
@@ -190,6 +227,7 @@ void GraphicsCore::onRender() {
 	//メッシュを描画
 	RenderSettings renderSettings = { commandList, _frameIndex };
 	_mesh->setupRenderCommand(renderSettings);
+	_sky->setupRenderCommand(renderSettings);
 
 	//ImguiWindow描画
 	_imguiWindow->renderFrame(commandList);

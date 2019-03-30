@@ -53,7 +53,7 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 
 	//頂点シェーダーテクスチャSRV生成
-	if (settings.vsTextures.size() > 0) {
+	if (vertexShader->shaderReflectionResult.srvRangeDescs.size() > 0) {
 		VectorArray<RefPtr<ID3D12Resource>> textures(settings.vsTextures.size());
 
 		for (size_t i = 0; i < settings.vsTextures.size(); ++i) {
@@ -62,12 +62,13 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 
 			textures[i] = texturePtr->get();
 		}
-
+		//settings.vsTextures.size()
 		manager.createShaderResourceView(textures.data(), &material->srvVertex, static_cast<uint32>(settings.vsTextures.size()));
 	}
+	//assert(vertexShader->shaderReflectionResult.srvRangeDescs.size()== settings.vsTextures.size() && "頂点シェーダー定義と指定したテクスチャ枚数が異なります！");
 
 	//ピクセルシェーダーテクスチャSRV生成
-	if (settings.psTextures.size() > 0) {
+	if (pixelShader->shaderReflectionResult.srvRangeDescs.size() > 0) {
 		VectorArray<RefPtr<ID3D12Resource>> textures(settings.psTextures.size());
 
 		for (size_t i = 0; i < settings.psTextures.size(); ++i) {
@@ -79,6 +80,8 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 
 		manager.createShaderResourceView(textures.data(), &material->srvPixel, static_cast<uint32>(settings.psTextures.size()));
 	}
+	//assert(pixelShader->shaderReflectionResult.srvRangeDescs.size() == settings.psTextures.size() && "ピクセルシェーダー定義と指定したテクスチャ枚数が異なります！");
+
 
 	//頂点シェーダーの定数バッファサイズを取得して定数バッファ本体を生成
 	VectorArray<uint32> vertexCbSizes = vertexShader->getConstantBufferSizes();
@@ -119,7 +122,8 @@ void GpuResourceManager::createTextures(ID3D12Device* device, CommandContext& co
 
 struct RawVertex {
 	Vector3 position;
-	//Vector3 normal;
+	Vector3 normal;
+	Vector3 tangent;
 	Vector2 texcoord;
 
 	bool operator==(const RawVertex &left) const {
@@ -140,6 +144,9 @@ namespace std {
 			seed ^= HashCombine(hash<float>()(p.position.x), seed);
 			seed ^= HashCombine(hash<float>()(p.position.y), seed);
 			seed ^= HashCombine(hash<float>()(p.position.z), seed);
+			seed ^= HashCombine(hash<float>()(p.normal.x), seed);
+			seed ^= HashCombine(hash<float>()(p.normal.y), seed);
+			seed ^= HashCombine(hash<float>()(p.normal.z), seed);
 			seed ^= HashCombine(hash<float>()(p.texcoord.x), seed);
 			seed ^= HashCombine(hash<float>()(p.texcoord.y), seed);
 			return seed;
@@ -159,12 +166,16 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 	FbxScene* scene = FbxScene::Create(manager, "");
 
 	FbxImporter* importer = FbxImporter::Create(manager, "");
-	importer->Initialize(fileName.c_str(), -1, manager->GetIOSettings());
+	bool isSuccsess = importer->Initialize(fileName.c_str(), -1, manager->GetIOSettings());
+	assert(isSuccsess && "FBX読み込み失敗");
+
 	importer->Import(scene);
 	importer->Destroy();
 
 	FbxGeometryConverter geometryConverter(manager);
 	geometryConverter.Triangulate(scene, true);
+
+	FbxAxisSystem::DirectX.ConvertScene(scene);
 
 	FbxMesh* mesh = scene->GetMember<FbxMesh>(0);
 	const uint32 materialCount = mesh->GetElementMaterialCount();
@@ -194,7 +205,7 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 
 	for (uint32 i = 0; i < polygonCount; ++i) {
 		const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
-		uint32& checkIndex = materialIndexCounter[materialId];
+		uint32& indexCount = materialIndexCounter[materialId];
 
 		for (uint32 j = 0; j < polygonVertexCount; ++j) {
 			const uint32 vertexIndex = mesh->GetPolygonVertex(i, j);
@@ -207,21 +218,27 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 			mesh->GetPolygonVertexNormal(i, j, normal);
 
 			RawVertex r;
-			r.position = { (float)v[0], (float)v[1], (float)v[2] };
-			//r.normal = { (float)normal[0], (float)normal[1], (float)normal[2] };
-			r.texcoord = { (float)texcoord[0], (float)texcoord[1] };
+			r.position = { (float)v[0], (float)v[1], -(float)v[2] };//FBXは右手座標系なので左手座標系に直すためにZを反転する
+			r.normal = { (float)normal[0], (float)normal[1], -(float)normal[2] };
+			r.texcoord = { (float)texcoord[0], 1 - (float)texcoord[1] };
 
+			const Vector3 vectorUp = { 0.0f, 1, EPSILON };
+			r.tangent = Vector3::cross(r.normal, vectorUp);
+
+			//Zを反転するとポリゴンが左回りになるので右回りになるようにインデックスを0,1,2 → 2,1,0にする
+			const uint32 indexInverseCorrectionedValue = indexCount + 2 - j;
 			if (optimizedVertices.count(r) == 0) {
 				uint32 vertexIndex = static_cast<uint32>(optimizedVertices.size());
-				indices[checkIndex] = vertexIndex;
+				indices[indexInverseCorrectionedValue] = vertexIndex;
 				optimizedVertices.emplace(r, vertexIndex);
 			}
 			else {
-				indices[checkIndex] = optimizedVertices.at(r);
+				indices[indexInverseCorrectionedValue] = optimizedVertices.at(r);
 			}
 
-			checkIndex++;
 		}
+
+		indexCount += polygonVertexCount;
 	}
 
 	//UnorederedMapの配列からVectorArrayに変換
@@ -252,12 +269,6 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 	//コピーが終わるまでアップロードヒープを破棄しない
 	commandContext.waitForIdle();
 
-	MaterialSlot slot;
-	slot.indexCount = static_cast<uint32>(indices.size());
-	slot.indexOffset = 0;
-	loadSharedMaterial("TestM", slot.material);
-
-	meshSet->_materialSlots.emplace_back(slot);
 	_meshes.emplace(fileName, std::move(meshSet));
 }
 

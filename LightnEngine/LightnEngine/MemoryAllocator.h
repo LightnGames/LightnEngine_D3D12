@@ -164,6 +164,7 @@ public:
 
 		//同じサイズのブロックだった場合
 		if (currentBlock->size == blockNum) {
+			currentBlock->enable = true;
 			return dataPtr + blockLocalIndex(currentBlock) * BLOCK_DATA_SIZE;
 		}
 

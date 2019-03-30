@@ -230,8 +230,10 @@ public:
 		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &shader, nullptr));
 
 		inputLayouts = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		shaderReflectionResult = getShaderReflection(getByteCode());
@@ -298,10 +300,10 @@ public:
 
 		//とりあえずこの静的サンプラーを使用(現在はこれで固定)
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		samplerDesc.MipLODBias = 0;
 		samplerDesc.MaxAnisotropy = 0;
 		samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
@@ -358,17 +360,38 @@ public:
 		blendDesc.AlphaToCoverageEnable = FALSE;
 		blendDesc.IndependentBlendEnable = FALSE;
 
-		const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
-			FALSE, FALSE,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_LOGIC_OP_NOOP,
-			D3D12_COLOR_WRITE_ENABLE_ALL,
-		};
+		D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {};
+		defaultRenderTargetBlendDesc.BlendEnable = FALSE;
+		defaultRenderTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+		defaultRenderTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		defaultRenderTargetBlendDesc.DestBlend = D3D12_BLEND_ZERO;
+		defaultRenderTargetBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+		defaultRenderTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+		defaultRenderTargetBlendDesc.LogicOpEnable = FALSE;
+		defaultRenderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		defaultRenderTargetBlendDesc.SrcBlend = D3D12_BLEND_ONE;
+		defaultRenderTargetBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
 
 		for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i) {
 			blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
 		}
+
+		D3D12_DEPTH_STENCIL_DESC dsDesc = {};
+		dsDesc.DepthEnable = TRUE;
+		dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+		dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+		dsDesc.StencilEnable = FALSE;
+		dsDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+		dsDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+
+		D3D12_DEPTH_STENCILOP_DESC dsopDesc = {};
+		dsopDesc.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+		dsopDesc.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+		dsopDesc.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+		dsopDesc.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+		dsDesc.FrontFace = dsopDesc;
+		dsDesc.BackFace = dsopDesc;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { vertexShader.inputLayouts.data(), static_cast<UINT>(vertexShader.inputLayouts.size()) };
@@ -377,12 +400,12 @@ public:
 		psoDesc.PS = pixelShader.getByteCode();
 		psoDesc.RasterizerState = rasterizerDesc;
 		psoDesc.BlendState = blendDesc;
-		psoDesc.DepthStencilState.DepthEnable = FALSE;
-		psoDesc.DepthStencilState.StencilEnable = FALSE;
+		psoDesc.DepthStencilState = dsDesc;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = RenderTargetFormat;
+		psoDesc.DSVFormat = DepthStencilFormat;
 		psoDesc.SampleDesc.Count = 1;
 		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
 		NAME_D3D12_OBJECT(_pipelineState);

@@ -140,19 +140,27 @@ void DescriptorHeapManager::createConstantBufferView(ID3D12Resource ** constantB
 
 void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderResources, BufferView ** dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request ShaderResource View 0");
-	BufferView* srv = _cbvSrvHeap->allocateBufferView(viewCount);
+	RefPtr<BufferView> srv = _cbvSrvHeap->allocateBufferView(viewCount);
 
 	ID3D12Device* device = nullptr;
 	shaderResources[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
 
 	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = srv->cpuHandle;
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	for (uint32 i = 0; i < viewCount; ++i) {
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		auto desc = shaderResources[i]->GetDesc();
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = desc.Format;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = desc.MipLevels;
+
+		//テクスチャ配列が６枚あればキューブマップとして処理する...
+		if (desc.DepthOrArraySize == 6) {
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			srvDesc.TextureCube.MipLevels = desc.MipLevels;
+		}
+		else {
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MipLevels = desc.MipLevels;
+		}
 
 		device->CreateShaderResourceView(shaderResources[i], &srvDesc, descriptorHandle);
 		descriptorHandle.ptr += _cbvSrvHeap->incrimentSize();
@@ -165,7 +173,7 @@ void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderRes
 
 void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStencils, BufferView ** dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request DepthStencil View 0");
-	BufferView* dsv = _dsvHeap->allocateBufferView(viewCount);
+	RefPtr<BufferView> dsv = _dsvHeap->allocateBufferView(viewCount);
 
 	ID3D12Device* device = nullptr;
 	depthStencils[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));

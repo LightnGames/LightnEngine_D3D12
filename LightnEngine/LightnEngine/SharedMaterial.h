@@ -44,6 +44,7 @@ struct RenderSettings {
 
 class SharedMaterial {
 public:
+	SharedMaterial() :srvVertex(nullptr), srvPixel(nullptr) {}
 	~SharedMaterial();
 
 	void create(ID3D12Device* device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader);

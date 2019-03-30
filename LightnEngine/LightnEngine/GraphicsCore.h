@@ -56,6 +56,7 @@ private:
 	UniquePtr<ImguiWindow> _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
+	RefPtr<MeshRenderSet> _sky;
 	RefPtr<MeshRenderSet> _mesh;
 };
 
