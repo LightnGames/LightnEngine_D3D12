@@ -122,8 +122,8 @@ public:
 	}
 
 	void init(uint32 allocateBlockNum) {
-		allocateBlockSize = allocateBlockNum * BLOCK_AND_HEADER_SIZE;
-		allocateDataSize = allocateBlockNum * BLOCK_DATA_SIZE;
+		allocateBlockSize = allocateBlockNum * (ulong2)BLOCK_AND_HEADER_SIZE;
+		allocateDataSize = allocateBlockNum * (ulong2)BLOCK_DATA_SIZE;
 
 		dataPtr = new byte[allocateDataSize];
 		blockPtr = new byte[allocateBlockSize];
@@ -292,16 +292,18 @@ public:
 
 	template<typename T>
 	T* allocateMemory() {
-		T* ptr = (T*)divideMemory((sizeof(T) + (BLOCK_DATA_SIZE - 1)) / BLOCK_DATA_SIZE);
-		ptr = new (ptr)T();
-		return ptr;
+		return (T*)allocateMemory(sizeof(T));//コンストラクタの呼び出しは別途必要！
+	}
+
+	void* allocateMemory(uint32 size) {
+		return divideMemory((size + (BLOCK_DATA_SIZE - 1)) / BLOCK_DATA_SIZE);;
 	}
 
 	const uint32 BLOCK_DATA_SIZE;
 	byte* dataPtr;
 	byte* blockPtr;
-	uint32 allocateBlockSize;
-	uint32 allocateDataSize;
+	ulong2 allocateBlockSize;
+	ulong2 allocateDataSize;
 	uint32 freeListFlags;
 	std::vector<Block*> freeList;
 
