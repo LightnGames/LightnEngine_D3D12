@@ -162,19 +162,16 @@ void GraphicsCore::onInit(HWND hwnd) {
 void GraphicsCore::onUpdate() {
 	_imguiWindow->startFrame();
 
-	static Vector2 ff = { 2, 0 };
-	ff.x += 0.05f;
-
-	static Vector4 cc = { 0, 0, 0, 0 };
-	cc.x += 0.1f;
-
-	static Vector4 oo = { 0, 0, 0, 0 };
-	oo.x += 0.01f;
-
 	static float z = 0.0f;
 	static float pitch = 0;
 	static float yaw = 0;
 	static float roll = 0;
+
+	static float pitchL = 1.0f;
+	static float yawL = 0.2f;
+	static float rollL = 0;
+	static Vector3 color = Vector3::one;
+	static float intensity = 1.0f;
 
 	ImGui::Begin("TestD3D12");
 	ImGui::Text("Lightn");
@@ -182,6 +179,14 @@ void GraphicsCore::onUpdate() {
 	ImGui::SliderAngle("Picth", &pitch);
 	ImGui::SliderAngle("Yaw", &yaw);
 	ImGui::SliderAngle("Roll", &roll);
+	ImGui::End();
+
+	ImGui::Begin("DirectionalLight");
+	ImGui::SliderAngle("Picth", &pitchL);
+	ImGui::SliderAngle("Yaw", &yawL);
+	ImGui::SliderAngle("Roll", &rollL);
+	ImGui::SliderFloat("Intensity", &intensity, 0, 10);
+	ImGui::ColorEdit3("Color", (float*)&color);
 	ImGui::End();
 
 	Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll },true)).multiply(Matrix4::translateXYZ({ z, 0, 10.5f }));
@@ -192,7 +197,9 @@ void GraphicsCore::onUpdate() {
 	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxWorld", mtxWorld.transpose());
 	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
 	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
-	_mesh->getMaterial(0)->setParameter<Vector4>("col", cc);
+	_mesh->getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL },true), Vector3::forward));
+	_mesh->getMaterial(0)->setParameter<Vector3>("color", color);
+	_mesh->getMaterial(0)->setParameter<float>("intensity", intensity);
 
 	Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
 	_sky->getMaterial(0)->setParameter<Matrix4>("mtxWorld", skyMtxWorld.transpose());
