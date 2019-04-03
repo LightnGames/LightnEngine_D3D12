@@ -171,7 +171,4 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="shaders.hlsl" />
-  </ItemGroup>
 </Project>

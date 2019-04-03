@@ -30,7 +30,8 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 	}
 	else {
 		UniquePtr<VertexShader> newVertexShader = makeUnique<VertexShader>();
-		newVertexShader->create(settings.vertexShaderName);
+		String fullPath = "Shaders/" + settings.vertexShaderName;
+		newVertexShader->create(fullPath);
 		vertexShader = newVertexShader.get();
 		_vertexShaders.emplace(settings.vertexShaderName, std::move(newVertexShader));
 	}
@@ -42,7 +43,8 @@ void GpuResourceManager::createSharedMaterial(ID3D12Device* device, const Shared
 	}
 	else {
 		UniquePtr<PixelShader> newPixelShader = makeUnique<PixelShader>();
-		newPixelShader->create(settings.pixelShaderName);
+		String fullPath = "Shaders/" + settings.pixelShaderName;
+		newPixelShader->create(fullPath);
 		pixelShader = newPixelShader.get();
 		_pixelShaders.emplace(settings.pixelShaderName, std::move(newPixelShader));
 	}
@@ -107,7 +109,8 @@ void GpuResourceManager::createTextures(ID3D12Device* device, CommandContext& co
 
 	for (size_t i = 0; i < settings.size(); ++i) {
 		Texture2D* texture = new Texture2D();
-		texture->createDeferred2(device, commandList, &uploadHeaps[i], settings[i]);
+		String fullPath = "Resources/" + settings[i];
+		texture->createDeferred2(device, commandList, &uploadHeaps[i], fullPath);
 
 		_textures.emplace(settings[i], texture);
 	}
@@ -166,7 +169,8 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 	FbxScene* scene = FbxScene::Create(manager, "");
 
 	FbxImporter* importer = FbxImporter::Create(manager, "");
-	bool isSuccsess = importer->Initialize(fileName.c_str(), -1, manager->GetIOSettings());
+	String fullPath = "Resources/" + fileName;
+	bool isSuccsess = importer->Initialize(fullPath.c_str(), -1, manager->GetIOSettings());
 	assert(isSuccsess && "FBX読み込み失敗");
 
 	importer->Import(scene);
@@ -192,7 +196,7 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 
 	//マテリアルごとの頂点インデックス数を調べる
 	VectorArray<uint32> materialIndexSize(materialCount);
-	for (int i = 0; i < polygonCount; ++i) {
+	for (uint32 i = 0; i < polygonCount; ++i) {
 		const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
 		materialIndexSize[materialId] += polygonVertexCount;
 	}
