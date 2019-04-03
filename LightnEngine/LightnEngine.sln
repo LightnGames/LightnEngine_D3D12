@@ -4,8 +4,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.27703.2042
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightnEngine", "LightnEngine\LightnEngine.vcxproj", "{857EAE99-3423-426D-949B-E91B09500DD8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E6D9A99E-B33F-42FE-B22E-B9319BC6C795} = {E6D9A99E-B33F-42FE-B22E-B9319BC6C795}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Math", "Math\Math.vcxproj", "{E6D9A99E-B33F-42FE-B22E-B9319BC6C795}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MemoryAllocator", "MemoryAllocator\MemoryAllocator.vcxproj", "{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +36,14 @@ Global
 		{E6D9A99E-B33F-42FE-B22E-B9319BC6C795}.Release|x64.Build.0 = Release|x64
 		{E6D9A99E-B33F-42FE-B22E-B9319BC6C795}.Release|x86.ActiveCfg = Release|Win32
 		{E6D9A99E-B33F-42FE-B22E-B9319BC6C795}.Release|x86.Build.0 = Release|Win32
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Debug|x64.ActiveCfg = Debug|x64
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Debug|x64.Build.0 = Debug|x64
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Debug|x86.ActiveCfg = Debug|Win32
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Debug|x86.Build.0 = Debug|Win32
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Release|x64.ActiveCfg = Release|x64
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Release|x64.Build.0 = Release|x64
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Release|x86.ActiveCfg = Release|Win32
+		{1FC1A4C0-827A-4781-85CB-4FCBA1F38940}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma once
+
 #include <iostream>
 #include <bitset>
 #include <vector>
@@ -113,11 +115,11 @@ struct Block {
 
 constexpr uint32 BLOCK_AND_HEADER_SIZE = sizeof(Block) + sizeof(uint32);
 
-class BitFlagAllocator {
+class GenericAllocator {
 public:
-	BitFlagAllocator(uint32 blockDataSize) :BLOCK_DATA_SIZE(blockDataSize) {}
+	GenericAllocator(uint32 blockDataSize) :BLOCK_DATA_SIZE(blockDataSize) {}
 
-	~BitFlagAllocator() {
+	~GenericAllocator() {
 		shutdown();
 	}
 

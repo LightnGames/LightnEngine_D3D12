@@ -2,7 +2,7 @@
 #include "D3D12Helper.h"
 #include "D3D12Util.h"
 
-#include "MemoryAllocator.h"
+#include <GenericAllocator.h>
 
 DescriptorHeapManager* Singleton<DescriptorHeapManager>::_singleton = 0;
 
@@ -31,7 +31,7 @@ void DescriptorHeap::create(ID3D12Device * device, uint32 maxDescriptorCount) {
 	_cpuHandleStart = _descriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	_gpuHandleStart = _descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
-	_allocator = new BitFlagAllocator(sizeof(BufferView));
+	_allocator = new GenericAllocator(sizeof(BufferView));
 	_allocator->init(maxDescriptorCount);
 }
 

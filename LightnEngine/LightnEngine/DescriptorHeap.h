@@ -4,7 +4,7 @@
 #include "Utility.h"
 
 constexpr UINT MAX_HEAP_NUM = 1024;
-class BitFlagAllocator;
+class GenericAllocator;
 
 struct BufferView {
 	virtual ~BufferView() {}
@@ -41,7 +41,7 @@ private:
 	UINT _incrimentSize;
 
 
-	BitFlagAllocator* _allocator;
+	GenericAllocator* _allocator;
 };
 
 class DescriptorHeapManager : public Singleton<DescriptorHeapManager> {
