@@ -87,6 +87,7 @@ bool operator!=(const MyAllocator<T>&, const MyAllocator<U>&) {
 #include <string>
 #include <codecvt> 
 #include <memory>
+#include <unordered_map>
 
 template <class T>
 using VectorArray = std::vector<T, MyAllocator<T>>;
@@ -98,7 +99,7 @@ template <class T>
 using UniquePtr = std::unique_ptr<T>;
 
 template <class T>
-using RefPtr = T*;
+using RefPtr = T *;
 
 template <class T, class ...Args>
 UniquePtr<T> makeUnique(Args ...args) {
@@ -136,6 +137,14 @@ namespace std {
 	};
 } // namespace std
 
-#define USE_UNORDERED_MAP \
-template <class T, class U> \
+template <class T, class U>
 using UnorderedMap = std::unordered_map < T, U, std::hash<T>, std::equal_to<T>, MyAllocator<std::pair<const T, U>>>; 
+
+//以下グラフィックスインターフェース定義。グラフィックスAPIインターフェースヘッダーに移動する
+struct SharedMaterialCreateSettings {
+	String name;
+	String vertexShaderName;
+	String pixelShaderName;
+	VectorArray<String> vsTextures;
+	VectorArray<String> psTextures;
+};

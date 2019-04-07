@@ -1,8 +1,6 @@
 #pragma once
 
-#include "Utility.h"
-#include <unordered_map> 
-USE_UNORDERED_MAP
+#include <Utility.h>
 
 struct ID3D12Device;
 struct BufferView;
@@ -13,21 +11,13 @@ class Texture2D;
 class SharedMaterial;
 class CommandContext;
 
-struct SharedMaterialCreateSettings {
-	String name;
-	String vertexShaderName;
-	String pixelShaderName;
-	VectorArray<String> vsTextures;
-	VectorArray<String> psTextures;
-};
-
 class GpuResourceManager :public Singleton<GpuResourceManager> {
 public:
 	~GpuResourceManager();
 
 	void createSharedMaterial(ID3D12Device* device, const SharedMaterialCreateSettings& settings);
 	void createTextures(ID3D12Device* device, CommandContext& commandContext, const VectorArray<String>& settings);
-	void createMeshSets(ID3D12Device* device, CommandContext& commandContext, const String& fileName);
+	void createMeshSets(ID3D12Device* device, CommandContext& commandContext, const VectorArray<String>& fileName);
 
 	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial);
 	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture);

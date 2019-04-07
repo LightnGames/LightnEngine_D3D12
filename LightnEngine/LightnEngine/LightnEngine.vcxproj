@@ -22,32 +22,32 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{857EAE99-3423-426D-949B-E91B09500DD8}</ProjectGuid>
     <RootNamespace>LightnEngine</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -94,11 +94,11 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Library\ThirdParty\FbxSDK\include;$(SolutionDir)Math\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)TaskSystem\include;$(SolutionDir)D3D12Graphics\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);$(SolutionDir)Math\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;TaskSystem_$(Configuration).lib;D3D12Graphics_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Utility\lib;$(SolutionDir)TaskSystem\lib;$(SolutionDir)Math\lib;$(SolutionDir)D3D12Graphics\lib;$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -124,68 +124,24 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Library\ThirdParty\FbxSDK\include;$(SolutionDir)Math\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)TaskSystem\include;$(SolutionDir)D3D12Graphics\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);$(SolutionDir)Math\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;TaskSystem_$(Configuration).lib;D3D12Graphics_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Utility\lib;$(SolutionDir)TaskSystem\lib;$(SolutionDir)Math\lib;$(SolutionDir)D3D12Graphics\lib;$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CommandAllocatorPool.cpp" />
-    <ClCompile Include="CommandContext.cpp" />
-    <ClCompile Include="CommandListPool.cpp" />
-    <ClCompile Include="CommandQueue.cpp" />
-    <ClCompile Include="DescriptorHeap.cpp" />
-    <ClCompile Include="FrameResource.cpp" />
-    <ClCompile Include="GpuResourceManager.cpp" />
-    <ClCompile Include="GraphicsCore.cpp" />
-    <ClCompile Include="ImguiWindow.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="MeshRenderSet.cpp" />
-    <ClCompile Include="SharedMaterial.cpp" />
-    <ClCompile Include="ThirdParty\DirectXTex\DDSTextureLoader12.cpp" />
-    <ClCompile Include="ThirdParty\Imgui\imgui.cpp" />
-    <ClCompile Include="ThirdParty\Imgui\imgui_demo.cpp" />
-    <ClCompile Include="ThirdParty\Imgui\imgui_draw.cpp" />
-    <ClCompile Include="ThirdParty\Imgui\imgui_impl_dx12.cpp" />
-    <ClCompile Include="ThirdParty\Imgui\imgui_impl_win32.cpp" />
-    <ClCompile Include="ThirdParty\Imgui\imgui_widgets.cpp" />
-    <ClCompile Include="Win32Application.cpp" />
+    <ClInclude Include="GFXInterface.h" />
+    <ClInclude Include="ThiredParty\DDSTextureLoader12.h" />
+    <ClInclude Include="Win32Application.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CommandAllocatorPool.h" />
-    <ClInclude Include="CommandContext.h" />
-    <ClInclude Include="CommandListPool.h" />
-    <ClInclude Include="CommandQueue.h" />
-    <ClInclude Include="D3D12Helper.h" />
-    <ClInclude Include="D3D12Util.h" />
-    <ClInclude Include="DescriptorHeap.h" />
-    <ClInclude Include="FrameResource.h" />
-    <ClInclude Include="GpuResource.h" />
-    <ClInclude Include="GpuResourceManager.h" />
-    <ClInclude Include="GraphicsConstantSettings.h" />
-    <ClInclude Include="GraphicsCore.h" />
-    <ClInclude Include="ImguiWindow.h" />
-    <ClInclude Include="Mesh.h" />
-    <ClInclude Include="MeshRenderSet.h" />
-    <ClInclude Include="PipelineState.h" />
-    <ClInclude Include="SharedMaterial.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="ThirdParty\DirectXTex\DDSTextureLoader12.h" />
-    <ClInclude Include="ThirdParty\Imgui\imconfig.h" />
-    <ClInclude Include="ThirdParty\Imgui\imgui.h" />
-    <ClInclude Include="ThirdParty\Imgui\imgui_impl_dx12.h" />
-    <ClInclude Include="ThirdParty\Imgui\imgui_impl_win32.h" />
-    <ClInclude Include="ThirdParty\Imgui\imgui_internal.h" />
-    <ClInclude Include="ThirdParty\Imgui\imstb_rectpack.h" />
-    <ClInclude Include="ThirdParty\Imgui\imstb_textedit.h" />
-    <ClInclude Include="ThirdParty\Imgui\imstb_truetype.h" />
-    <ClInclude Include="ThiredParty\DDSTextureLoader12.h" />
-    <ClInclude Include="Utility.h" />
-    <ClInclude Include="Win32Application.h" />
+    <ClCompile Include="GFXInterface.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

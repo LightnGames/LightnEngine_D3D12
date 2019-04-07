@@ -15,19 +15,13 @@ public:
 	}
 };
 
-class SceneManager {
+class SceneManager : Singleton<SceneManager> {
 public:
 
-	void changeScene(Scene* newScene) {
-		if (_activeScene != nullptr) {
-			_activeScene->onDestroy();
-			_activeScene = nullptr;
-		}
-		_activeScene = newScene;
-	}
+	void changeScene(Scene* newScene);
 
 	template<class T>
-	T* changeScene() {
+	RefPtr<T> changeScene() {
 		T* newScene = new T();
 		newScene->onStart();
 		changeScene(newScene);
@@ -35,9 +29,7 @@ public:
 		return newScene;
 	}
 
-	void updateScene() {
-		_activeScene->onUpdate();
-	}
+	void updateScene();
 
-	Scene * _activeScene;
+	UniquePtr<Scene> _activeScene;
 };

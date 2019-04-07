@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <Utility.h>
 #include <list>
 #include <memory>
 
@@ -27,5 +28,5 @@ public:
 	}
 
 private:
-	std::list<std::unique_ptr<GameTask>> _childs;
+	ListArray<UniquePtr<GameTask>> _childs;
 };

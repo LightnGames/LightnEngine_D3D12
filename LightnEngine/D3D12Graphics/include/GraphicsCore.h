@@ -29,9 +29,13 @@ public:
 	void onRender();
 	void onDestroy();
 
+	void createTextures(const VectorArray<String>& textureNames);
+	void createMeshSets(const VectorArray<String>& fileNames);
+	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
+
 public:
-	GETTER(UINT, width);
-	GETTER(UINT, height);
+	UINT _width;
+	UINT _height;
 
 private:
 

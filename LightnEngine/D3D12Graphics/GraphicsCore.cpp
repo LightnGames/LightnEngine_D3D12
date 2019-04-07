@@ -16,9 +16,7 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-GraphicsCore::GraphicsCore() {
-	_width = 1280;
-	_height = 720;
+GraphicsCore::GraphicsCore() : _width(1280), _height(720) {
 }
 
 GraphicsCore::~GraphicsCore() {
@@ -133,8 +131,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_gpuResourceManager->createSharedMaterial(_device.Get(), skyMatSettings);
 
 	//メッシュデータ読み込み
-	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, meshName);
-	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, "skySphere.fbx");
+	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, { meshName,"skySphere.fbx" });
 	_gpuResourceManager->loadMeshSets(meshName, _mesh);
 	_gpuResourceManager->loadMeshSets("skySphere.fbx", _sky);
 
@@ -269,6 +266,18 @@ void GraphicsCore::onDestroy() {
 
 	_swapChain = nullptr;
 	_device = nullptr;
+}
+
+void GraphicsCore::createTextures(const VectorArray<String>& textureNames){
+	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, textureNames);
+}
+
+void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames){
+	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, fileNames);
+}
+
+void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings){
+	_gpuResourceManager->createSharedMaterial(_device.Get(), settings);
 }
 
 void GraphicsCore::moveToNextFrame() {

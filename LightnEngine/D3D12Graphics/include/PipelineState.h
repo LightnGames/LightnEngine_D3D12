@@ -5,12 +5,10 @@
 #include <locale> 
 #include <codecvt> 
 #include <cstdio>
+#include <Utility.h>
 #include "stdafx.h"
 #include "D3D12Helper.h"
 #include "GraphicsConstantSettings.h"
-
-#include <unordered_map>
-USE_UNORDERED_MAP
 
 struct ShaderReflectionCBV {
 	String name;

@@ -281,13 +281,13 @@ public:
 	}
 
 	//basePtrを開始としたデータ本体のローカルポインタを返す
-	inline constexpr ulong2 dataLocalIndex(void* blockPtr) {
+	inline ulong2 dataLocalIndex(void* blockPtr) {
 		ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(dataPtr);
 		return localPtr / BLOCK_DATA_SIZE;
 	}
 
 	//basePtrを開始としたブロックのローカルポインタを返す
-	inline constexpr ulong2 blockLocalIndex(void* blockPtr) {
+	inline ulong2 blockLocalIndex(void* blockPtr) {
 		ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(this->blockPtr);
 		return localPtr / BLOCK_AND_HEADER_SIZE;
 	}

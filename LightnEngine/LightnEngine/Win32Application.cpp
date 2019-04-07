@@ -1,17 +1,20 @@
 #include "Win32Application.h"
-#include "GraphicsCore.h"
+#include "GFXInterface.h"
+#include <GraphicsCore.h>
+#include <Scene.h>
 #include <dxgidebug.h>
 
-GraphicsCore* Win32Application::_tmpCore = nullptr;
+UniquePtr<GFXInterface> Win32Application::_tmpCore = nullptr;
+UniquePtr<SceneManager> Win32Application::_sceneManager = nullptr;
 
-Win32Application::Win32Application() {
+Win32Application::Win32Application() :_hwnd(0){
 }
 
 
 Win32Application::~Win32Application() {
 }
 
-int Win32Application::run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int nCmdShow) {
+void Win32Application::init(HINSTANCE hInstance, int nCmdShow){
 	WNDCLASSEX windowClass = { 0 };
 	windowClass.cbSize = sizeof(WNDCLASSEX);
 	windowClass.style = CS_HREDRAW | CS_VREDRAW;
@@ -21,7 +24,7 @@ int Win32Application::run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int n
 	windowClass.lpszClassName = "LightnEngine";
 	RegisterClassEx(&windowClass);
 
-	RECT windowRect = { 0, 0, static_cast<LONG>(graphicsCore->width()), static_cast<LONG>(graphicsCore->height()) };
+	RECT windowRect = { 0, 0, static_cast<LONG>(1280), static_cast<LONG>(720) };
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 	_hwnd = CreateWindow(
@@ -35,13 +38,17 @@ int Win32Application::run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int n
 		nullptr,
 		nullptr,
 		hInstance,
-		graphicsCore);
-	_tmpCore = graphicsCore;
+		nullptr);
 
-	graphicsCore->onInit(_hwnd);
+	_sceneManager = makeUnique<SceneManager>();
+	_tmpCore = makeUnique<GFXInterface>();
+
+	_tmpCore->init(_hwnd);
 
 	ShowWindow(_hwnd, nCmdShow);
+}
 
+int Win32Application::run() {
 	MSG msg = {};
 	while (msg.message != WM_QUIT) {
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -50,7 +57,7 @@ int Win32Application::run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int n
 		}
 	}
 
-	graphicsCore->onDestroy();
+	_tmpCore->onDestroy();
 
 #ifdef DEBUG
 	//メモリリークしているComオブジェクトを表示
@@ -66,18 +73,16 @@ int Win32Application::run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int n
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-	GraphicsCore* graphicsCore = reinterpret_cast<GraphicsCore*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-	graphicsCore = _tmpCore;
-
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam)) {
 		return true;
 	}
 
 	switch (message) {
 	case WM_PAINT:
-		if (graphicsCore) {
-			graphicsCore->onUpdate();
-			graphicsCore->onRender();
+		if (_tmpCore) {
+			_sceneManager->updateScene();
+			_tmpCore->onUpdate();
+			_tmpCore->onRender();
 		}
 		return 0;
 

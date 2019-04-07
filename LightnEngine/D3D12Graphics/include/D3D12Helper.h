@@ -1,5 +1,6 @@
 #pragma once
 #include "stdafx.h"
+#include <iostream>
 
 inline std::string HrToString(HRESULT hr) {
 	char str[64] = {};

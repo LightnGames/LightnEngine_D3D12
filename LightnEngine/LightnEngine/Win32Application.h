@@ -1,23 +1,25 @@
 #pragma once
 #include <Windows.h>
-#include "Utility.h"
+#include <Utility.h>
 
-class GraphicsCore;
+class GFXInterface;
+class SceneManager;
 
 class Win32Application {
 public:
 	Win32Application();
 	~Win32Application();
 
-	int run(HINSTANCE hInstance, GraphicsCore* graphicsCore, int nCmdShow);
+	void init(HINSTANCE hInstance, int nCmdShow);
+	int run();
 
 protected:
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	
-	//Kariiiiiiiiii
-	static GraphicsCore* _tmpCore;
 
 public:
-	GETTER(HWND, hwnd);
-};
+	HWND _hwnd;
 
+	static UniquePtr<GFXInterface> _tmpCore;
+	static UniquePtr<SceneManager> _sceneManager;
+};

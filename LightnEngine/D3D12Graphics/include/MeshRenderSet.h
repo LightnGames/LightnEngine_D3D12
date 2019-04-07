@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Utility.h"
+#include <Utility.h>
 struct RenderSettings;
 class SharedMaterial;
 class VertexBuffer;

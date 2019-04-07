@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -18,10 +18,60 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\CommandAllocatorPool.h" />
+    <ClInclude Include="include\CommandContext.h" />
+    <ClInclude Include="include\CommandListPool.h" />
+    <ClInclude Include="include\CommandQueue.h" />
+    <ClInclude Include="include\D3D12Helper.h" />
+    <ClInclude Include="include\D3D12Util.h" />
+    <ClInclude Include="include\DescriptorHeap.h" />
+    <ClInclude Include="include\FrameResource.h" />
+    <ClInclude Include="include\GpuResource.h" />
+    <ClInclude Include="include\GpuResourceManager.h" />
+    <ClInclude Include="include\GraphicsConstantSettings.h" />
+    <ClInclude Include="include\GraphicsCore.h" />
+    <ClInclude Include="include\ImguiWindow.h" />
+    <ClInclude Include="include\Mesh.h" />
+    <ClInclude Include="include\MeshRenderSet.h" />
+    <ClInclude Include="include\PipelineState.h" />
+    <ClInclude Include="include\SharedMaterial.h" />
+    <ClInclude Include="include\stdafx.h" />
+    <ClInclude Include="ThirdParty\DirectXTex\DDSTextureLoader12.h" />
+    <ClInclude Include="ThirdParty\Imgui\imconfig.h" />
+    <ClInclude Include="ThirdParty\Imgui\imgui.h" />
+    <ClInclude Include="ThirdParty\Imgui\imgui_impl_dx12.h" />
+    <ClInclude Include="ThirdParty\Imgui\imgui_impl_win32.h" />
+    <ClInclude Include="ThirdParty\Imgui\imgui_internal.h" />
+    <ClInclude Include="ThirdParty\Imgui\imstb_rectpack.h" />
+    <ClInclude Include="ThirdParty\Imgui\imstb_textedit.h" />
+    <ClInclude Include="ThirdParty\Imgui\imstb_truetype.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CommandAllocatorPool.cpp" />
+    <ClCompile Include="CommandContext.cpp" />
+    <ClCompile Include="CommandListPool.cpp" />
+    <ClCompile Include="CommandQueue.cpp" />
+    <ClCompile Include="DescriptorHeap.cpp" />
+    <ClCompile Include="FrameResource.cpp" />
+    <ClCompile Include="GpuResourceManager.cpp" />
+    <ClCompile Include="GraphicsCore.cpp" />
+    <ClCompile Include="ImguiWindow.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MeshRenderSet.cpp" />
+    <ClCompile Include="SharedMaterial.cpp" />
+    <ClCompile Include="ThirdParty\DirectXTex\DDSTextureLoader12.cpp" />
+    <ClCompile Include="ThirdParty\Imgui\imgui.cpp" />
+    <ClCompile Include="ThirdParty\Imgui\imgui_demo.cpp" />
+    <ClCompile Include="ThirdParty\Imgui\imgui_draw.cpp" />
+    <ClCompile Include="ThirdParty\Imgui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="ThirdParty\Imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="ThirdParty\Imgui\imgui_widgets.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{974E4F89-3D06-43DF-88A3-AC226AB886AD}</ProjectGuid>
-    <RootNamespace>TaskSystem</RootNamespace>
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{0B3B18B1-1253-4CC7-AE57-ABDBBED2B261}</ProjectGuid>
+    <RootNamespace>D3D12Graphics</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -85,11 +135,12 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)TaskSystem\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Library\ThirdParty\FbxSDK\include;$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)D3D12Graphics\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Math\lib;$(SolutionDir)Utility\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Math_$(Configuration).lib;Utility_$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);$(SolutionDir)Utility\lib;$(SolutionDir)Math\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -99,6 +150,9 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -110,6 +164,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
@@ -122,23 +177,16 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)TaskSystem\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Library\ThirdParty\FbxSDK\include;$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)D3D12Graphics\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(SolutionDir)Math\lib;$(SolutionDir)Utility\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Math_$(Configuration).lib;Utility_$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);$(SolutionDir)Utility\lib;$(SolutionDir)Math\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="GameTask.cpp" />
-    <ClCompile Include="Scene.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="include\GameTask.h" />
-    <ClInclude Include="include\Scene.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
