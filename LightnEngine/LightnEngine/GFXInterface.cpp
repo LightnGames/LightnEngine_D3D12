@@ -1,5 +1,6 @@
 #include "GFXInterface.h"
 #include <GraphicsCore.h>
+#include <GpuResourceManager.h>
 
 GFXInterface* Singleton<GFXInterface>::_singleton = 0;
 
@@ -46,5 +47,35 @@ void GFXInterface::createMeshSets(const VectorArray<String>& fileNames){
 void GFXInterface::createSharedMaterial(const SharedMaterialCreateSettings& settings){
 #ifdef D3D12
 	_graphicsCore->createSharedMaterial(settings);
+#endif
+}
+
+void GFXInterface::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial){
+#ifdef D3D12
+	_graphicsCore->getGpuResourceManager()->loadSharedMaterial(materialName, dstMaterial);
+#endif
+}
+
+void GFXInterface::loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture){
+#ifdef D3D12
+	_graphicsCore->getGpuResourceManager()->loadTexture(textureName, dstTexture);
+#endif
+}
+
+void GFXInterface::loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet){
+#ifdef D3D12
+	_graphicsCore->getGpuResourceManager()->loadMeshSets(meshName, dstMeshSet);
+#endif
+}
+
+uint32 GFXInterface::getWidth() const{
+#ifdef D3D12
+	return _graphicsCore->_width;
+#endif
+}
+
+uint32 GFXInterface::getHeight() const{
+#ifdef D3D12
+	return _graphicsCore->_height;
 #endif
 }

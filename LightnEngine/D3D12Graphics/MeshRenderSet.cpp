@@ -2,7 +2,7 @@
 #include "SharedMaterial.h"
 #include "GpuResource.h"
 
-void MeshRenderSet::setupRenderCommand(RenderSettings & settings) {
+void MeshRenderSet::setupRenderCommand(RenderSettings & settings) const{
 	ID3D12GraphicsCommandList* commandList = settings.commandList;
 	for (auto&& material : _materialSlots) {
 		material.material->setupRenderCommand(settings);

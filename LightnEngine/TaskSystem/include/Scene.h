@@ -15,8 +15,10 @@ public:
 	}
 };
 
-class SceneManager : Singleton<SceneManager> {
+class SceneManager :public Singleton<SceneManager> {
 public:
+	SceneManager();
+	~SceneManager();
 
 	void changeScene(Scene* newScene);
 

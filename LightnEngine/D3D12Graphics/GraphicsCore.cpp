@@ -16,7 +16,14 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-GraphicsCore::GraphicsCore() : _width(1280), _height(720) {
+GraphicsCore::GraphicsCore() :
+	_width(1280),
+	_height(720),
+	_frameIndex(0),
+	_viewPort({}),
+	_scissorRect({}),
+	_dsv(nullptr), 
+	_currentFrameResource(nullptr){
 }
 
 GraphicsCore::~GraphicsCore() {
@@ -102,51 +109,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_descriptorHeapManager->createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
 	}
 
-	String meshName("Cerberus/Cerberus.fbx");
-	String diffuseEnv("cubemapEnvHDR.dds");
-	String specularEnv("cubemapSpecularHDR.dds");
-	String specularBrdf("cubemapBrdf.dds");
-	String albedo("Cerberus/Cerberus_A.dds");
-	String normal("Cerberus/Cerberus_N.dds");
-	String metallic("Cerberus/Cerberus_M.dds");
-	String roughness("Cerberus/Cerberus_R.dds");
-
-	//テクスチャ読み込み
-	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, { albedo, normal, metallic, roughness, diffuseEnv, specularEnv, specularBrdf });
-
-	SharedMaterialCreateSettings materialSettings;
-	materialSettings.name = "TestM";
-	materialSettings.vertexShaderName = "shaders.hlsl";
-	materialSettings.pixelShaderName = "shaders.hlsl";
-	materialSettings.vsTextures = {};
-	materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness };
-	_gpuResourceManager->createSharedMaterial(_device.Get(), materialSettings);
-
-	SharedMaterialCreateSettings skyMatSettings;
-	skyMatSettings.name = "TestS";
-	skyMatSettings.vertexShaderName = "skyShaders.hlsl";
-	skyMatSettings.pixelShaderName = "skyShaders.hlsl";
-	skyMatSettings.vsTextures = {};
-	skyMatSettings.psTextures = { diffuseEnv };
-	_gpuResourceManager->createSharedMaterial(_device.Get(), skyMatSettings);
-
-	//メッシュデータ読み込み
-	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, { meshName,"skySphere.fbx" });
-	_gpuResourceManager->loadMeshSets(meshName, _mesh);
-	_gpuResourceManager->loadMeshSets("skySphere.fbx", _sky);
-
-	MaterialSlot slot;
-	slot.indexCount = _mesh->_indexBuffer->_indexCount;
-	slot.indexOffset = 0;
-	_gpuResourceManager->loadSharedMaterial("TestM", slot.material);
-	_mesh->_materialSlots.emplace_back(slot);
-
-	MaterialSlot skySlot;
-	skySlot.indexCount = _sky->_indexBuffer->_indexCount;
-	skySlot.indexOffset = 0;
-	_gpuResourceManager->loadSharedMaterial("TestS", skySlot.material);
-	_sky->_materialSlots.emplace_back(skySlot);
-
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
 		_frameResources[i] = makeUnique<FrameResource>(_device.Get(), _swapChain.Get(), i);
@@ -158,50 +120,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 void GraphicsCore::onUpdate() {
 	_imguiWindow->startFrame();
-
-	static float z = 0.0f;
-	static float pitch = 0;
-	static float yaw = 0;
-	static float roll = 0;
-
-	static float pitchL = 1.0f;
-	static float yawL = 0.2f;
-	static float rollL = 0;
-	static Vector3 color = Vector3::one;
-	static float intensity = 1.0f;
-
-	ImGui::Begin("TestD3D12");
-	ImGui::Text("Lightn");
-	ImGui::SliderFloat("World Z", &z, -1, 10);
-	ImGui::SliderAngle("Picth", &pitch);
-	ImGui::SliderAngle("Yaw", &yaw);
-	ImGui::SliderAngle("Roll", &roll);
-	ImGui::End();
-
-	ImGui::Begin("DirectionalLight");
-	ImGui::SliderAngle("Picth", &pitchL);
-	ImGui::SliderAngle("Yaw", &yawL);
-	ImGui::SliderAngle("Roll", &rollL);
-	ImGui::SliderFloat("Intensity", &intensity, 0, 10);
-	ImGui::ColorEdit3("Color", (float*)&color);
-	ImGui::End();
-
-	Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll },true)).multiply(Matrix4::translateXYZ({ z, 0, 10.5f }));
-	Matrix4 mtxView = Matrix4::identity;
-	Matrix4 mtxProj = Matrix4::perspectiveFovLH(radianFromDegree(50), _width / static_cast<float>(_height), 0.01f, 1000);
-	//mtxProj = Matrix4::identity;
-
-	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxWorld", mtxWorld.transpose());
-	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-	_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
-	_mesh->getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL },true), Vector3::forward));
-	_mesh->getMaterial(0)->setParameter<Vector3>("color", color);
-	_mesh->getMaterial(0)->setParameter<float>("intensity", intensity);
-
-	Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-	_sky->getMaterial(0)->setParameter<Matrix4>("mtxWorld", skyMtxWorld.transpose());
-	_sky->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-	_sky->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 }
 
 void GraphicsCore::onRender() {
@@ -230,8 +148,10 @@ void GraphicsCore::onRender() {
 
 	//メッシュを描画
 	RenderSettings renderSettings = { commandList, _frameIndex };
-	_mesh->setupRenderCommand(renderSettings);
-	_sky->setupRenderCommand(renderSettings);
+	auto& meshes = _gpuResourceManager->getMeshes();
+	for (const auto& mesh : meshes) {
+		mesh.second->setupRenderCommand(renderSettings);
+	}
 
 	//ImguiWindow描画
 	_imguiWindow->renderFrame(commandList);
@@ -278,6 +198,10 @@ void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames){
 
 void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings){
 	_gpuResourceManager->createSharedMaterial(_device.Get(), settings);
+}
+
+RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager(){
+	return _gpuResourceManager.get();
 }
 
 void GraphicsCore::moveToNextFrame() {

@@ -42,7 +42,6 @@ void Win32Application::init(HINSTANCE hInstance, int nCmdShow){
 
 	_sceneManager = makeUnique<SceneManager>();
 	_tmpCore = makeUnique<GFXInterface>();
-
 	_tmpCore->init(_hwnd);
 
 	ShowWindow(_hwnd, nCmdShow);
@@ -80,8 +79,8 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
 	switch (message) {
 	case WM_PAINT:
 		if (_tmpCore) {
-			_sceneManager->updateScene();
 			_tmpCore->onUpdate();
+			_sceneManager->updateScene();
 			_tmpCore->onRender();
 		}
 		return 0;

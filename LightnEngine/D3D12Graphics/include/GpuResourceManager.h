@@ -25,6 +25,8 @@ public:
 
 	void shutdown();
 
+	const UnorderedMap<String, UniquePtr<MeshRenderSet>>& getMeshes() const;
+
 private:
 	UnorderedMap<String, UniquePtr<VertexShader>> _vertexShaders;
 	UnorderedMap<String, UniquePtr<PixelShader>> _pixelShaders;

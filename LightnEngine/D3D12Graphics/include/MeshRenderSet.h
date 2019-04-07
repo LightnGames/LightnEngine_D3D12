@@ -16,7 +16,7 @@ class MeshRenderSet {
 public:
 	~MeshRenderSet() {}
 
-	void setupRenderCommand(RenderSettings& settings);
+	void setupRenderCommand(RenderSettings& settings) const;
 	RefPtr<SharedMaterial> getMaterial(uint32 index);
 
 //private://CreateŠÖ”‚ğì‚Á‚½‚çPrivate‚É‚·‚éBB

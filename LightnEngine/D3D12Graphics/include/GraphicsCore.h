@@ -33,6 +33,8 @@ public:
 	void createMeshSets(const VectorArray<String>& fileNames);
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
+	RefPtr<GpuResourceManager> getGpuResourceManager();
+
 public:
 	UINT _width;
 	UINT _height;
@@ -60,7 +62,5 @@ private:
 	UniquePtr<ImguiWindow> _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
-	RefPtr<MeshRenderSet> _sky;
-	RefPtr<MeshRenderSet> _mesh;
 };
 

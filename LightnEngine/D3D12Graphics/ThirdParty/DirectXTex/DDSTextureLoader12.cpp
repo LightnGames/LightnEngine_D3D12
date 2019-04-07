@@ -14,7 +14,7 @@
 // http://go.microsoft.com/fwlink/?LinkID=615561
 //--------------------------------------------------------------------------------------
 
-#include "DDSTextureLoader12.h"
+#include "ThirdParty/DirectXTex/DDSTextureLoader12.h"
 
 #include <assert.h>
 #include <algorithm>

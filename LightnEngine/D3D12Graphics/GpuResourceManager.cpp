@@ -299,3 +299,7 @@ void GpuResourceManager::shutdown() {
 	_sharedMaterials.clear();
 	_textures.clear();
 }
+
+const UnorderedMap<String, UniquePtr<MeshRenderSet>>& GpuResourceManager::getMeshes() const{
+	return _meshes;
+}
