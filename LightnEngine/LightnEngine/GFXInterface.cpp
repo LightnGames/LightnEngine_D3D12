@@ -1,6 +1,8 @@
 #include "GFXInterface.h"
 #include <GraphicsCore.h>
 #include <GpuResourceManager.h>
+#include <MeshRenderSet.h>
+#include <GpuResource.h>
 
 GFXInterface* Singleton<GFXInterface>::_singleton = 0;
 

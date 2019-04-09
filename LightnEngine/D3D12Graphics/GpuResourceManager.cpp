@@ -249,16 +249,19 @@ void GpuResourceManager::createMeshSets(ID3D12Device * device, CommandContext & 
 
 		manager->Destroy();
 
-		MeshRenderSet* meshSet = new MeshRenderSet();
-
 		//頂点バッファ生成
-		meshSet->_vertexBuffer = makeUnique<VertexBuffer>();
-		meshSet->_vertexBuffer->createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter], vertices);
+		UniquePtr<VertexBuffer> vertexBuffer = makeUnique<VertexBuffer>();
+		vertexBuffer->createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
 
 		//インデックスバッファ
-		meshSet->_indexBuffer = makeUnique<IndexBuffer>();
-		meshSet->_indexBuffer->createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter + 1], indices);
-		uploadHeapCounter += 2;
+		UniquePtr<IndexBuffer> indexBuffer = makeUnique<IndexBuffer>();
+		indexBuffer->createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter++], indices);
+
+		//マテリアルスロット
+		MaterialSlot slot;
+		slot.indexCount = indexCount;
+		slot.indexOffset = 0;
+		MeshRenderSet* meshSet = new MeshRenderSet(std::move(vertexBuffer), std::move(indexBuffer), { slot });
 
 		_meshes.emplace(fileName, std::move(meshSet));
 	}

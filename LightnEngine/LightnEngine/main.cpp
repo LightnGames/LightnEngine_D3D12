@@ -48,17 +48,13 @@ public:
 		gfx.loadMeshSets(meshName, _mesh);
 		gfx.loadMeshSets("skySphere.fbx", _sky);
 
-		MaterialSlot slot;
-		slot.indexCount = _mesh->_indexBuffer->_indexCount;
-		slot.indexOffset = 0;
-		gfx.loadSharedMaterial("TestM", slot.material);
-		_mesh->_materialSlots.emplace_back(slot);
+		RefPtr<SharedMaterial> m1;
+		RefPtr<SharedMaterial> m2;
+		gfx.loadSharedMaterial("TestM", m1);
+		gfx.loadSharedMaterial("TestS", m2);
 
-		MaterialSlot skySlot;
-		skySlot.indexCount = _sky->_indexBuffer->_indexCount;
-		skySlot.indexOffset = 0;
-		gfx.loadSharedMaterial("TestS", skySlot.material);
-		_sky->_materialSlots.emplace_back(skySlot);
+		_mesh->setMaterial(0, m1);
+		_sky->setMaterial(0, m2);
 	}
 	void onUpdate() override {
 		Scene::onUpdate();

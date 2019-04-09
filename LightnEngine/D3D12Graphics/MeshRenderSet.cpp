@@ -2,6 +2,10 @@
 #include "SharedMaterial.h"
 #include "GpuResource.h"
 
+MeshRenderSet::MeshRenderSet(UniquePtr<VertexBuffer> vertexBuffer, UniquePtr<IndexBuffer> indexBuffer, const VectorArray<MaterialSlot>& materialSlots) :
+	_vertexBuffer(std::move(vertexBuffer)), _indexBuffer(std::move(indexBuffer)), _materialSlots(materialSlots) {
+}
+
 void MeshRenderSet::setupRenderCommand(RenderSettings & settings) const{
 	ID3D12GraphicsCommandList* commandList = settings.commandList;
 	for (auto&& material : _materialSlots) {
@@ -12,6 +16,14 @@ void MeshRenderSet::setupRenderCommand(RenderSettings & settings) const{
 	}
 }
 
+void MeshRenderSet::setMaterial(uint32 index, RefPtr<SharedMaterial> material){
+	_materialSlots[index].material = material;
+}
+
 RefPtr<SharedMaterial> MeshRenderSet::getMaterial(uint32 index) {
 	return _materialSlots[index].material;
+}
+
+RefPtr<MaterialSlot> MeshRenderSet::getMaterialSlot(uint32 index){
+	return &_materialSlots[index];
 }
