@@ -8,14 +8,6 @@ struct PSInput
     float3 viewDir : VIEWDIR;
 };
 
-struct VSInput
-{
-    float3 position : POSITION;
-    float3 normal : NORMAL;
-    float3 tangent : TANGENT;
-    float2 uv : TEXCOORD;
-};
-
 TextureCube irradianceMap : register(t0);
 TextureCube prefilterMap : register(t1);
 Texture2D brdfLUT : register(t2);
@@ -28,49 +20,12 @@ SamplerState _sampler : register(s0);
 #define PI 3.1415926535897
 #define EPSILON 1e-6
 
-cbuffer Constant1 : register(b0)
-{
-    float4 offset2;
-    float2 offset3;
-    float4x4 mtxWorld;
-    float4x4 mtxView;
-    float4x4 mtxProj;
-    float dummy2[10];
-}
-
-cbuffer Constant2 : register(b1)
-{
-    float2 offset2_2;
-    float dummy2_2[62];
-}
-
 cbuffer DirectionalLightBuffer : register(b0)
 {
     float intensity;
     float3 direction;
     float4 color;
 };
-
-PSInput VSMain(VSInput input)
-{
-    PSInput result;
-
-    float4 worldPos = mul(float4(input.position, 1), mtxWorld);
-    float4 viewPos = mul(worldPos, mtxView);
-    result.position = mul(viewPos, mtxProj);
-    result.normal = mul(input.normal, (float3x3) mtxWorld);
-    result.tangent = mul(input.tangent, (float3x3) mtxWorld);
-    result.binormal = cross(result.normal, result.tangent);
-
-    //result.position = input.position;
-    result.uv = input.uv;
-    result.viewDir = normalize(float3(0, 0, 0) - worldPos.xyz);
-
-    //result.position.y += sin(offset2.x) / 2.0f;//+offset2_2.x;
-    //result.position.x += cos(offset2_2.x) / 2.0f;
-
-    return result;
-}
 
 //ŠgŽU”½ŽËBRDF
 float3 DiffuseBRDF(float3 diffuseColor)

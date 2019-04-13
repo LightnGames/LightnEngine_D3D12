@@ -3,7 +3,14 @@
 #include "DescriptorHeap.h"
 #include "GpuResource.h"
 
-void ConstantBufferPerFrame::shutdown() {
+ConstantBufferMaterial::ConstantBufferMaterial(){
+}
+
+ConstantBufferMaterial::~ConstantBufferMaterial(){
+	shutdown();
+}
+
+void ConstantBufferMaterial::shutdown() {
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	for (auto&& cbv : constantBufferViews) {
 		if (cbv != nullptr) {
@@ -20,7 +27,7 @@ void ConstantBufferPerFrame::shutdown() {
 	}
 }
 
-void ConstantBufferPerFrame::create(ID3D12Device * device, const VectorArray<uint32>& bufferSizes) {
+void ConstantBufferMaterial::create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes) {
 	const uint32 constantBufferCount = static_cast<uint32>(bufferSizes.size());
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 
@@ -45,10 +52,26 @@ void ConstantBufferPerFrame::create(ID3D12Device * device, const VectorArray<uin
 	}
 }
 
-void ConstantBufferPerFrame::flashBufferData(uint32 frameIndex) {
+bool ConstantBufferMaterial::isEnableBuffer() const{
+	return !constantBuffers[0].empty();
+}
+
+void ConstantBufferMaterial::flashBufferData(uint32 frameIndex) {
 	for (size_t i = 0; i < constantBuffers[frameIndex].size(); ++i) {
 		constantBuffers[frameIndex][i]->writeData(dataPtrs[i].get(), constantBuffers[frameIndex][i]->size);
 	}
+}
+
+void Root32bitConstantMaterial::create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes) {
+	dataPtrs.resize(bufferSizes.size());
+
+	for (size_t i = 0; i < bufferSizes.size(); ++i) {
+		dataPtrs[i] = UniquePtr<byte[]>(new byte[bufferSizes[i]]);
+	}
+}
+
+bool Root32bitConstantMaterial::isEnableConstant() const{
+	return !dataPtrs.empty();
 }
 
 SharedMaterial::~SharedMaterial() {
@@ -69,7 +92,7 @@ void SharedMaterial::create(ID3D12Device * device, RefPtr<VertexShader> vertexSh
 }
 
 void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
-	ID3D12GraphicsCommandList* commandList = settings.commandList;
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
 	commandList->SetPipelineState(pipelineState->_pipelineState.Get());
@@ -91,6 +114,11 @@ void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
 		descriptorTableIndex++;
 	}
 
+	if (pixelRoot32bitConstant.isEnableConstant()) {
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, pixelShader->shaderReflectionResult.root32bitConstants[0].getBufferSize() / 4, pixelRoot32bitConstant.dataPtrs[0].get(), 0);
+		descriptorTableIndex++;
+	}
+
 	if (srvVertex != nullptr) {
 		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvVertex->gpuHandle);
 		descriptorTableIndex++;
@@ -98,6 +126,11 @@ void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
 
 	if (vertexConstantBuffer.isEnableBuffer()) {
 		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, vertexConstantBuffer.constantBufferViews[frameIndex]->gpuHandle);
+		descriptorTableIndex++;
+	}
+
+	if (vertexRoot32bitConstant.isEnableConstant()) {
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, vertexShader->shaderReflectionResult.root32bitConstants[0].getBufferSize() / 4, vertexRoot32bitConstant.dataPtrs[0].get(), 0);
 		descriptorTableIndex++;
 	}
 

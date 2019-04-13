@@ -14,20 +14,16 @@ class PixelShader;
 
 #include "PipelineState.h"
 
-struct ConstantBufferPerFrame {
-	ConstantBufferPerFrame() :constantBufferViews() {}
-	~ConstantBufferPerFrame() {
-		shutdown();
-	}
+struct ConstantBufferMaterial {
+	ConstantBufferMaterial();
+	~ConstantBufferMaterial();
 
 	void shutdown();
 
-	void create(ID3D12Device* device, const VectorArray<uint32>& bufferSizes);
+	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);
 
-	//個の定数バッファは有効か？(初期化されていれば配列が０以上なのでそれで判断)
-	bool isEnableBuffer() const {
-		return constantBuffers[0].size() > 0;
-	}
+	//この定数バッファは有効か？(初期化されていれば配列が０以上なのでそれで判断)
+	bool isEnableBuffer() const;
 
 	//現在設定されている定数バッファのデータを指定フレームの定数バッファに更新
 	void flashBufferData(uint32 frameIndex);
@@ -37,8 +33,15 @@ struct ConstantBufferPerFrame {
 	RefPtr<BufferView> constantBufferViews[FrameCount];
 };
 
+struct Root32bitConstantMaterial {
+	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);
+	bool isEnableConstant() const;
+
+	VectorArray<UniquePtr<byte[]>> dataPtrs;
+};
+
 struct RenderSettings {
-	ID3D12GraphicsCommandList* commandList;
+	RefPtr<ID3D12GraphicsCommandList> commandList;
 	const uint32 frameIndex;
 };
 
@@ -66,18 +69,40 @@ public:
 	template <class T>
 	RefPtr<T> getParameter(const String& name) {
 		//頂点シェーダー定義からパラメータを検索
-		for (size_t i = 0; i < vertexShader->shaderReflectionResult.constantBuffers.size(); ++i) {
-			const auto variable = vertexShader->shaderReflectionResult.constantBuffers[i].getVariable(name);
+		const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
+
+		//定数バッファ
+		for (size_t i = 0; i < vsReflection.constantBuffers.size(); ++i) {
+			const auto variable = vsReflection.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
 				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexConstantBuffer.dataPtrs[i].get()) + variable->startOffset);
 			}
 		}
 
+		//ルート32bit定数
+		for (size_t i = 0; i < vsReflection.root32bitConstants.size(); ++i) {
+			const auto variable = vsReflection.root32bitConstants[i].getVariable(name);
+			if (variable != nullptr) {
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexRoot32bitConstant.dataPtrs[i].get()) + variable->startOffset);
+			}
+		}
+
 		//ピクセルシェーダー定義からパラメータを検索
-		for (size_t i = 0; i < pixelShader->shaderReflectionResult.constantBuffers.size(); ++i) {
-			const auto variable = pixelShader->shaderReflectionResult.constantBuffers[i].getVariable(name);
+		const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
+
+		//定数バッファ
+		for (size_t i = 0; i < psReflection.constantBuffers.size(); ++i) {
+			const auto variable = psReflection.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
 				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelConstantBuffer.dataPtrs[i].get()) + variable->startOffset);
+			}
+		}
+
+		//ルート32bit定数
+		for (size_t i = 0; i < psReflection.root32bitConstants.size(); ++i) {
+			const auto variable = psReflection.root32bitConstants[i].getVariable(name);
+			if (variable != nullptr) {
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelRoot32bitConstant.dataPtrs[i].get()) + variable->startOffset);
 			}
 		}
 
@@ -93,6 +118,8 @@ public:
 	RefPtr<BufferView> srvPixel;
 	RefPtr<BufferView> srvVertex;
 
-	ConstantBufferPerFrame vertexConstantBuffer;
-	ConstantBufferPerFrame pixelConstantBuffer;
+	Root32bitConstantMaterial vertexRoot32bitConstant;
+	Root32bitConstantMaterial pixelRoot32bitConstant;
+	ConstantBufferMaterial vertexConstantBuffer;
+	ConstantBufferMaterial pixelConstantBuffer;
 };

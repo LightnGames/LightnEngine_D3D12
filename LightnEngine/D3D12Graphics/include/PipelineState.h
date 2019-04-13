@@ -46,7 +46,7 @@ struct ShaderReflectionCB {
 	uint32 getBufferSize() const {
 		uint32 size = 0;
 		for (const auto& variable : variables) {
-			size += variable.size*variable.elements;
+			size += variable.size * variable.elements;
 		}
 
 		return size;
@@ -66,6 +66,7 @@ struct ShaderReflectionCB {
 
 struct ShaderReflectionResult {
 	VectorArray<ShaderReflectionCB> constantBuffers;
+	VectorArray<ShaderReflectionCB> root32bitConstants;
 	VectorArray<D3D12_DESCRIPTOR_RANGE1> cbvRangeDescs;
 	VectorArray<D3D12_DESCRIPTOR_RANGE1> srvRangeDescs;
 };
@@ -83,7 +84,7 @@ public:
 		D3D12_SHADER_DESC shaderDesc = {};
 		shaderReflector->GetDesc(&shaderDesc);
 
-		result.constantBuffers.resize(shaderDesc.ConstantBuffers);
+		result.constantBuffers.reserve(shaderDesc.ConstantBuffers);
 
 		//定数バッファ取得
 		for (UINT i = 0; i < shaderDesc.ConstantBuffers; ++i) {
@@ -111,11 +112,16 @@ public:
 				shaderReflectionCb.variables[j].setSizeAndType(cbVariableTypeDesc.Name);
 			}
 
-			result.constantBuffers[i] = shaderReflectionCb;
+			//定数バッファとして扱うのか32bit定数としてあつかうのか定数バッファの先頭文字で判断
+			if (shaderReflectionCb.name.substr(0, 20) == "ROOT_32BIT_CONSTANTS") {
+				result.root32bitConstants.emplace_back(shaderReflectionCb);
+			}
+			else {
+				result.constantBuffers.emplace_back(shaderReflectionCb);
+			}
 		}
 
 		//まずはこのシェーダーに含まれるリソースの数を調べる
-		uint32 constantBufferCount = 0;
 		uint32 textureCount = 0;
 		for (UINT i = 0; i < shaderDesc.BoundResources; ++i) {
 			D3D12_SHADER_INPUT_BIND_DESC bindDesc = {};
@@ -123,7 +129,6 @@ public:
 
 			switch (bindDesc.Type) {
 			case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:
-				constantBufferCount++;
 				break;
 
 			case D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE:
@@ -132,10 +137,11 @@ public:
 			}
 		}
 
-		result.cbvRangeDescs.resize(constantBufferCount);
+		result.cbvRangeDescs.resize(result.constantBuffers.size());
 		result.srvRangeDescs.resize(textureCount);
 
-		uint32 constantBufferCounter = 0;
+		uint32 cbCounter = 0;
+		uint32 root32bitCounter = 0;
 		uint32 textureCounter = 0;
 
 		//調べたリソース数からDescriptorRangeDescを構築
@@ -148,18 +154,31 @@ public:
 			case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:
 				for (size_t j = 0; j < result.constantBuffers.size(); ++j) {
 					auto& cb = result.constantBuffers[j];
-					if (cb.name == bindDesc.Name) {
-						cb.bindPoint = bindDesc.BindPoint;
+					if (cb.name != bindDesc.Name) {
+						continue;
 					}
 
-					result.cbvRangeDescs[j].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-					result.cbvRangeDescs[j].NumDescriptors = 1;
-					result.cbvRangeDescs[j].BaseShaderRegister = cb.bindPoint;
-					result.cbvRangeDescs[j].RegisterSpace = 0;
-					result.cbvRangeDescs[j].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-					result.cbvRangeDescs[j].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+					cb.bindPoint = bindDesc.BindPoint;
+
+					result.cbvRangeDescs[cbCounter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					result.cbvRangeDescs[cbCounter].NumDescriptors = 1;
+					result.cbvRangeDescs[cbCounter].BaseShaderRegister = cb.bindPoint;
+					result.cbvRangeDescs[cbCounter].RegisterSpace = 0;
+					result.cbvRangeDescs[cbCounter].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+					result.cbvRangeDescs[cbCounter].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+					cbCounter++;
 				}
-				constantBufferCounter++;
+
+				//ルート32bit定数ならバインドポイントのみをセット
+				for (size_t j = 0; j < result.root32bitConstants.size(); ++j) {
+					if (result.root32bitConstants[j].name != bindDesc.Name) {
+						continue;
+					}
+
+					result.root32bitConstants[root32bitCounter].bindPoint = bindDesc.BindPoint;
+					root32bitCounter++;
+				}
+
 				break;
 
 				//テクスチャならSRVとして登録
@@ -183,6 +202,16 @@ public:
 		VectorArray<uint32> cbSizes(shaderReflectionResult.constantBuffers.size());
 		for (size_t i = 0; i < cbSizes.size(); ++i) {
 			cbSizes[i] = shaderReflectionResult.constantBuffers[i].getBufferSize();
+		}
+
+		return cbSizes;
+	}
+
+	//定数バッファのサイズを定数バッファごとに配列で取得
+	VectorArray<uint32> getRoot32bitConstantSizes() const {
+		VectorArray<uint32> cbSizes(shaderReflectionResult.root32bitConstants.size());
+		for (size_t i = 0; i < cbSizes.size(); ++i) {
+			cbSizes[i] = shaderReflectionResult.root32bitConstants[i].getBufferSize();
 		}
 
 		return cbSizes;
@@ -218,6 +247,22 @@ public:
 		return parameterDesc;
 	}
 
+	//ルート32bit定数のRootParameterを生成
+	VectorArray<D3D12_ROOT_PARAMETER1> getRoot32bitRootParameter(D3D12_SHADER_VISIBILITY visibility) const {
+		VectorArray <D3D12_ROOT_PARAMETER1> parameterDescs(shaderReflectionResult.root32bitConstants.size());
+
+		//ルート32bit定数はRANGEでまとめられないのでROOT_PARAMETERをある数分生成する
+		for (size_t i = 0; i < parameterDescs.size(); ++i) {
+			parameterDescs[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+			parameterDescs[i].ShaderVisibility = visibility;
+			parameterDescs[i].Constants.Num32BitValues = shaderReflectionResult.root32bitConstants[i].getBufferSize() / 4;//32bitごとの数なので4byteで割る
+			parameterDescs[i].Constants.RegisterSpace = 0;
+			parameterDescs[i].Constants.ShaderRegister = shaderReflectionResult.root32bitConstants[i].bindPoint;
+		}
+
+		return parameterDescs;
+	}
+
 	Microsoft::WRL::ComPtr<ID3DBlob> shader;
 	ShaderReflectionResult shaderReflectionResult;
 };
@@ -245,7 +290,11 @@ public:
 		return Shader::getCbvRootParameter(D3D12_SHADER_VISIBILITY_VERTEX);
 	}
 
-	std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayouts;
+	VectorArray<D3D12_ROOT_PARAMETER1> getRoot32bitRootParameter() const {
+		return Shader::getRoot32bitRootParameter(D3D12_SHADER_VISIBILITY_VERTEX);
+	}
+
+	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts;
 };
 
 class PixelShader :public Shader {
@@ -262,6 +311,10 @@ public:
 	D3D12_ROOT_PARAMETER1 getCbvRootParameter() const {
 		return Shader::getCbvRootParameter(D3D12_SHADER_VISIBILITY_PIXEL);
 	}
+
+	VectorArray<D3D12_ROOT_PARAMETER1> getRoot32bitRootParameter() const {
+		return Shader::getRoot32bitRootParameter(D3D12_SHADER_VISIBILITY_PIXEL);
+	}
 };
 
 class RootSignature {
@@ -269,8 +322,8 @@ public:
 
 	RootSignature() {}
 
-	void create(ID3D12Device* device, const VertexShader& vertexShader, const PixelShader& pixelShader) {
-		std::vector<D3D12_ROOT_PARAMETER1> rootParameters;
+	void create(RefPtr<ID3D12Device> device, const VertexShader& vertexShader, const PixelShader& pixelShader) {
+		VectorArray<D3D12_ROOT_PARAMETER1> rootParameters;
 
 		//ピクセルシェーダー
 		{
@@ -281,6 +334,11 @@ public:
 
 			if (!result.cbvRangeDescs.empty()) {
 				rootParameters.emplace_back(pixelShader.getCbvRootParameter());//DescriptorTableIndex: 2
+			}
+
+			auto root32bitConstants = pixelShader.getRoot32bitRootParameter();
+			for (const auto& root32bitConstant : root32bitConstants) {
+				rootParameters.emplace_back(root32bitConstant);
 			}
 		}
 
@@ -293,6 +351,11 @@ public:
 
 			if (!result.cbvRangeDescs.empty()) {
 				rootParameters.emplace_back(vertexShader.getCbvRootParameter());//DescriptorTableIndex: 4
+			}
+
+			auto root32bitConstants = vertexShader.getRoot32bitRootParameter();
+			for (const auto& root32bitConstant : root32bitConstants) {
+				rootParameters.emplace_back(root32bitConstant);
 			}
 		}
 
@@ -340,7 +403,7 @@ public:
 class PipelineState {
 public:
 
-	void create(ID3D12Device* device, RootSignature* rootSignature, const VertexShader& vertexShader, const PixelShader& pixelShader) {
+	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature, const VertexShader& vertexShader, const PixelShader& pixelShader) {
 		D3D12_RASTERIZER_DESC rasterizerDesc = {};
 		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 		rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;

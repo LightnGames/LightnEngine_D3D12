@@ -29,8 +29,8 @@ public:
 
 		SharedMaterialCreateSettings materialSettings;
 		materialSettings.name = "TestM";
-		materialSettings.vertexShaderName = "shaders.hlsl";
-		materialSettings.pixelShaderName = "shaders.hlsl";
+		materialSettings.vertexShaderName = "shader_vs.hlsl";
+		materialSettings.pixelShaderName = "shader_ps.hlsl";
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness };
 		gfx.createSharedMaterial(materialSettings);
