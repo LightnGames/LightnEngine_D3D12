@@ -2,9 +2,10 @@
 
 #include <Utility.h>
 #include <LMath.h>
+#include <GpuResource.h>
+
 struct RenderSettings;
 class SharedMaterial;
-#include <GpuResource.h>
 
 //マテリアルごとのインデックス範囲データ
 struct MaterialSlot {
@@ -26,8 +27,8 @@ public:
 	void setMaterial(uint32 index, RefPtr<SharedMaterial> material);
 	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
 
-	VertexBuffer* _vertexBuffer;
-	IndexBuffer* _indexBuffer;
+	VertexBuffer _vertexBuffer;
+	IndexBuffer _indexBuffer;
 
 private:
 	VectorArray<MaterialSlot> _materialSlots;

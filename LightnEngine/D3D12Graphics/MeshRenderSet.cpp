@@ -7,8 +7,6 @@ MeshRenderSet::MeshRenderSet(const VectorArray<MaterialSlot>& materialSlots) : _
 }
 
 MeshRenderSet::~MeshRenderSet() {
-	delete _vertexBuffer;
-	delete _indexBuffer;
 	_materialSlots.clear();
 }
 
@@ -16,8 +14,8 @@ void MeshRenderSet::setupRenderCommand(RenderSettings & settings) const{
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	for (auto&& material : _materialSlots) {
 		material.material->setupRenderCommand(settings);
-		commandList->IASetVertexBuffers(0, 1, &_vertexBuffer->_vertexBufferView);
-		commandList->IASetIndexBuffer(&_indexBuffer->_indexBufferView);
+		commandList->IASetVertexBuffers(0, 1, &_vertexBuffer._vertexBufferView);
+		commandList->IASetIndexBuffer(&_indexBuffer._indexBufferView);
 		commandList->DrawIndexedInstanced(material.indexCount, 1, material.indexOffset, 0, 0);
 	}
 }

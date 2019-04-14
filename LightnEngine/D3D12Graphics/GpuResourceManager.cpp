@@ -119,11 +119,14 @@ void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandCont
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 	for (size_t i = 0; i < settings.size(); ++i) {
-		Texture2D texture;
 		String fullPath = "Resources/" + settings[i];
-		texture.createDeferred2(device, commandList, &uploadHeaps[i], fullPath);
 
-		_resourcePool->_textures.emplace(settings[i], std::move(texture));
+		_resourcePool->_textures.emplace(std::piecewise_construct,
+			std::make_tuple(settings[i]),
+			std::make_tuple());
+
+		Texture2D& tex = _resourcePool->_textures.at(settings[i]);
+		tex.createDeferred2(device, commandList, &uploadHeaps[i], fullPath);
 	}
 
 	//アップロードバッファをGPUオンリーバッファにコピー
@@ -271,17 +274,22 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 		MaterialSlot slot;
 		slot.indexCount = indexCount;
 		slot.indexOffset = 0;
-		MeshRenderSet* meshSet = new MeshRenderSet({ slot });
+
+		//MeshRenderSet* meshSet = new MeshRenderSet({ slot });
+		const VectorArray<MaterialSlot> materialSlots = { slot };
+		_resourcePool->_meshes.emplace(std::piecewise_construct,
+			std::make_tuple(fileName),
+			std::make_tuple(materialSlots));
+
+		MeshRenderSet& renderSet = _resourcePool->_meshes.at(fileName);
 
 		//頂点バッファ生成
-		meshSet->_vertexBuffer = new VertexBuffer();
-		meshSet->_vertexBuffer->createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
+		//meshSet->_vertexBuffer = new VertexBuffer();
+		renderSet._vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
 
 		//インデックスバッファ
-		meshSet->_indexBuffer = new IndexBuffer();
-		meshSet->_indexBuffer->createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter++], indices);
-
-		_resourcePool->_meshes.emplace(fileName, std::move(*meshSet));
+		//meshSet->_indexBuffer = new IndexBuffer();
+		renderSet._indexBuffer.createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter++], indices);
 	}
 
 	//アップロードバッファをGPUオンリーバッファにコピー
@@ -290,7 +298,6 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 
 	//コピーが終わるまでアップロードヒープを破棄しない
 	commandContext.waitForIdle();
-
 }
 
 void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) {

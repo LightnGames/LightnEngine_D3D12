@@ -9,7 +9,7 @@
 #include <Utility.h>
 using namespace Microsoft::WRL;
 
-class GpuResource {
+class GpuResource :private NonCopyable {
 public:
 	virtual ~GpuResource() {
 		destroy();
@@ -179,8 +179,9 @@ public:
 	}
 };
 
-class VertexBuffer :public GpuResource {
+class VertexBuffer :public GpuResource{
 public:
+
 	//直ちに頂点バッファを生成し、操作が完了するまでスレッドを停止する
 	template <typename T>
 	void createDirect(ID3D12Device* device, CommandContext* commandContext, const VectorArray<T>& vertices) {
