@@ -20,10 +20,14 @@ void ConstantBufferMaterial::shutdown() {
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		for (auto&& cb : constantBuffers[i]) {
-			cb.reset();
+			delete cb;
 		}
 
 		constantBuffers[i].clear();
+	}
+
+	for (auto&& data : dataPtrs) {
+		delete data;
 	}
 }
 
@@ -37,7 +41,7 @@ void ConstantBufferMaterial::create(RefPtr<ID3D12Device> device, const VectorArr
 
 		UniquePtr<ID3D12Resource* []> constantBufferPtrs = makeUnique<ID3D12Resource * []>(constantBufferCount);
 		for (uint32 j = 0; j < constantBufferCount; ++j) {
-			constantBuffers[i][j] = makeUnique<ConstantBuffer>();
+			constantBuffers[i][j] = new ConstantBuffer();
 			constantBuffers[i][j]->create(device, bufferSizes[j]);
 			constantBufferPtrs[j] = constantBuffers[i][j]->get();
 		}
@@ -48,7 +52,7 @@ void ConstantBufferMaterial::create(RefPtr<ID3D12Device> device, const VectorArr
 	//定数バッファに書き込むための共有メモリ領域を確保
 	dataPtrs.resize(constantBufferCount);
 	for (uint32 i = 0; i < constantBufferCount; ++i) {
-		dataPtrs[i] = UniquePtr<byte[]>(new byte[bufferSizes[i]]);
+		dataPtrs[i] = new byte[bufferSizes[i]];
 	}
 }
 
@@ -58,7 +62,13 @@ bool ConstantBufferMaterial::isEnableBuffer() const {
 
 void ConstantBufferMaterial::flashBufferData(uint32 frameIndex) {
 	for (size_t i = 0; i < constantBuffers[frameIndex].size(); ++i) {
-		constantBuffers[frameIndex][i]->writeData(dataPtrs[i].get(), constantBuffers[frameIndex][i]->size);
+		constantBuffers[frameIndex][i]->writeData(dataPtrs[i], constantBuffers[frameIndex][i]->size);
+	}
+}
+
+Root32bitConstantMaterial::~Root32bitConstantMaterial(){
+	for (auto&& data : dataPtrs) {
+		delete data;
 	}
 }
 
@@ -66,7 +76,7 @@ void Root32bitConstantMaterial::create(RefPtr<ID3D12Device> device, const Vector
 	dataPtrs.resize(bufferSizes.size());
 
 	for (size_t i = 0; i < bufferSizes.size(); ++i) {
-		dataPtrs[i] = UniquePtr<byte[]>(new byte[bufferSizes[i]]);
+		dataPtrs[i] = new byte[bufferSizes[i]];
 	}
 }
 
@@ -79,13 +89,16 @@ SharedMaterial::~SharedMaterial() {
 	if (srvPixel != nullptr) {
 		manager.discardShaderResourceView(srvPixel);
 	}
+
+	delete rootSignature;
+	delete pipelineState;
 }
 
 void SharedMaterial::create(RefPtr<ID3D12Device> device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader) {
-	rootSignature = makeUnique<RootSignature>();
-	pipelineState = makeUnique<PipelineState>();
+	rootSignature = new RootSignature();
+	pipelineState = new PipelineState();
 	rootSignature->create(device, *vertexShader, *pixelShader);
-	pipelineState->create(device, rootSignature.get(), *vertexShader, *pixelShader);
+	pipelineState->create(device, rootSignature, *vertexShader, *pixelShader);
 
 	this->vertexShader = vertexShader;
 	this->pixelShader = pixelShader;
@@ -124,10 +137,10 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 			ptr = settings.pixelRoot32bitConstants[i];
 		}
 		else {
-			ptr = pixelRoot32bitConstant.dataPtrs[i].get();
+			ptr = pixelRoot32bitConstant.dataPtrs[i];
 		}
 
-		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, pixelShaderResult.getRoot32bitConstantNum(i), ptr, 0);
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, pixelShaderResult.getRoot32bitConstantNum(static_cast<uint32>(i)), ptr, 0);
 		descriptorTableIndex++;
 	}
 
@@ -148,10 +161,10 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 			ptr = settings.vertexRoot32bitConstants[i];
 		}
 		else {
-			ptr = vertexRoot32bitConstant.dataPtrs[i].get();
+			ptr = vertexRoot32bitConstant.dataPtrs[i];
 		}
 
-		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, vertexShaderResult.getRoot32bitConstantNum(i), ptr, 0);
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, vertexShaderResult.getRoot32bitConstantNum(static_cast<uint32>(i)), ptr, 0);
 		descriptorTableIndex++;
 	}
 

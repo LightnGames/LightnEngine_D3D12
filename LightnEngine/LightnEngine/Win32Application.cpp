@@ -57,6 +57,7 @@ int Win32Application::run() {
 	}
 
 	_tmpCore->onDestroy();
+	_tmpCore.reset();
 
 #ifdef DEBUG
 	//メモリリークしているComオブジェクトを表示

@@ -4,8 +4,7 @@
 #include <LMath.h>
 struct RenderSettings;
 class SharedMaterial;
-class VertexBuffer;
-class IndexBuffer;
+#include <GpuResource.h>
 
 //マテリアルごとのインデックス範囲データ
 struct MaterialSlot {
@@ -17,11 +16,9 @@ struct MaterialSlot {
 class MeshRenderSet {
 public:
 	MeshRenderSet(
-		UniquePtr<VertexBuffer> vertexBuffer, 
-		UniquePtr<IndexBuffer> indexBuffer, 
 		const VectorArray<MaterialSlot>& materialSlots);
 
-	~MeshRenderSet() {}
+	~MeshRenderSet();
 
 	void setupRenderCommand(RenderSettings& settings) const;
 
@@ -29,8 +26,9 @@ public:
 	void setMaterial(uint32 index, RefPtr<SharedMaterial> material);
 	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
 
+	VertexBuffer* _vertexBuffer;
+	IndexBuffer* _indexBuffer;
+
 private:
-	UniquePtr<VertexBuffer> _vertexBuffer;
-	UniquePtr<IndexBuffer> _indexBuffer;
 	VectorArray<MaterialSlot> _materialSlots;
 };

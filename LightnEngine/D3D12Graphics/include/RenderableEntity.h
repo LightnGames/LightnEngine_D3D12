@@ -8,11 +8,13 @@ class MeshRenderSet;
 class SharedMaterial;
 
 struct IRenderableEntity {
+	virtual ~IRenderableEntity() {}
 	virtual	void setupRenderCommand(RenderSettings& settings) const = 0;
 };
 
 class StaticSingleMeshRender :public IRenderableEntity {
 public:
+	~StaticSingleMeshRender(){}
 	StaticSingleMeshRender(RefPtr<MeshRenderSet> renderSet);
 
 	void setupRenderCommand(RenderSettings& settings) const override;

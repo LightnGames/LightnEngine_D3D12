@@ -3,12 +3,17 @@
 #include "GpuResource.h"
 #include "include\RenderableEntity.h"
 
-MeshRenderSet::MeshRenderSet(UniquePtr<VertexBuffer> vertexBuffer, UniquePtr<IndexBuffer> indexBuffer, const VectorArray<MaterialSlot>& materialSlots) :
-	_vertexBuffer(std::move(vertexBuffer)), _indexBuffer(std::move(indexBuffer)), _materialSlots(materialSlots) {
+MeshRenderSet::MeshRenderSet(const VectorArray<MaterialSlot>& materialSlots) : _materialSlots(materialSlots) {
+}
+
+MeshRenderSet::~MeshRenderSet() {
+	delete _vertexBuffer;
+	delete _indexBuffer;
+	_materialSlots.clear();
 }
 
 void MeshRenderSet::setupRenderCommand(RenderSettings & settings) const{
-	ID3D12GraphicsCommandList* commandList = settings.commandList;
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	for (auto&& material : _materialSlots) {
 		material.material->setupRenderCommand(settings);
 		commandList->IASetVertexBuffers(0, 1, &_vertexBuffer->_vertexBufferView);

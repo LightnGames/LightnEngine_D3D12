@@ -3,11 +3,10 @@
 #include "stdafx.h"
 #include "D3D12Helper.h"
 #include "D3D12Util.h"
-#include <vector>
 #include "CommandContext.h"
-
-//class CommandContext;
 #include "ThirdParty/DirectXTex/DDSTextureLoader12.h"
+
+#include <Utility.h>
 using namespace Microsoft::WRL;
 
 class GpuResource {

@@ -99,6 +99,9 @@
     <ClInclude Include="include\RenderableEntity.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="include\GpuResourceDataPool.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SharedMaterial.cpp">

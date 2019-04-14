@@ -7,9 +7,6 @@ StaticSingleMeshRender::StaticSingleMeshRender(RefPtr<MeshRenderSet> renderSet) 
 	_renderSet(renderSet), _worldMatrix(Matrix4::identity) {
 }
 
-void StaticSingleMeshRender::init(){
-}
-
 void StaticSingleMeshRender::setupRenderCommand(RenderSettings& settings) const {
 	settings.vertexRoot32bitConstants.emplace_back((void*)&_worldMatrix);
 	_renderSet->setupRenderCommand(settings);

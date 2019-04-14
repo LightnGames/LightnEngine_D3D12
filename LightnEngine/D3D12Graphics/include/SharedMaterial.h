@@ -28,16 +28,18 @@ struct ConstantBufferMaterial {
 	//現在設定されている定数バッファのデータを指定フレームの定数バッファに更新
 	void flashBufferData(uint32 frameIndex);
 
-	VectorArray<UniquePtr<byte[]>> dataPtrs;
-	VectorArray<UniquePtr<ConstantBuffer>> constantBuffers[FrameCount];
+	VectorArray<byte*> dataPtrs;
+	VectorArray<ConstantBuffer*> constantBuffers[FrameCount];
 	RefPtr<BufferView> constantBufferViews[FrameCount];
 };
 
 struct Root32bitConstantMaterial {
+	~Root32bitConstantMaterial();
+
 	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);
 	bool isEnableConstant() const;
 
-	VectorArray<UniquePtr<byte[]>> dataPtrs;
+	VectorArray<byte*> dataPtrs;
 };
 
 struct RenderSettings {
@@ -80,7 +82,7 @@ public:
 		for (size_t i = 0; i < vsReflection.constantBuffers.size(); ++i) {
 			const auto variable = vsReflection.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexConstantBuffer.dataPtrs[i].get()) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexConstantBuffer.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
@@ -88,7 +90,7 @@ public:
 		for (size_t i = 0; i < vsReflection.root32bitConstants.size(); ++i) {
 			const auto variable = vsReflection.root32bitConstants[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexRoot32bitConstant.dataPtrs[i].get()) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
@@ -99,7 +101,7 @@ public:
 		for (size_t i = 0; i < psReflection.constantBuffers.size(); ++i) {
 			const auto variable = psReflection.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelConstantBuffer.dataPtrs[i].get()) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelConstantBuffer.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
@@ -107,15 +109,15 @@ public:
 		for (size_t i = 0; i < psReflection.root32bitConstants.size(); ++i) {
 			const auto variable = psReflection.root32bitConstants[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelRoot32bitConstant.dataPtrs[i].get()) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
 		return nullptr;
 	}
 
-	UniquePtr<PipelineState> pipelineState;
-	UniquePtr<RootSignature> rootSignature;
+	PipelineState* pipelineState;
+	RootSignature* rootSignature;
 
 	RefPtr<VertexShader> vertexShader;
 	RefPtr<PixelShader> pixelShader;

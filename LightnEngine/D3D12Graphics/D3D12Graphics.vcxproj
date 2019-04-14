@@ -28,6 +28,7 @@
     <ClInclude Include="include\DescriptorHeap.h" />
     <ClInclude Include="include\FrameResource.h" />
     <ClInclude Include="include\GpuResource.h" />
+    <ClInclude Include="include\GpuResourceDataPool.h" />
     <ClInclude Include="include\GpuResourceManager.h" />
     <ClInclude Include="include\GraphicsConstantSettings.h" />
     <ClInclude Include="include\GraphicsCore.h" />
