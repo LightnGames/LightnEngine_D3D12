@@ -147,10 +147,10 @@ void GraphicsCore::onRender() {
 	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//ƒƒbƒVƒ…‚ð•`‰æ
-	RenderSettings renderSettings = { commandList, _frameIndex };
+	RenderSettings renderSettings(commandList, _frameIndex);
 	auto& meshes = _gpuResourceManager->getMeshes();
 	for (const auto& mesh : meshes) {
-		mesh.second->setupRenderCommand(renderSettings);
+		mesh->setupRenderCommand(renderSettings);
 	}
 
 	//ImguiWindow•`‰æ

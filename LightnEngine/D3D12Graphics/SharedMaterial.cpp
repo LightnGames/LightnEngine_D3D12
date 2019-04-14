@@ -3,10 +3,10 @@
 #include "DescriptorHeap.h"
 #include "GpuResource.h"
 
-ConstantBufferMaterial::ConstantBufferMaterial(){
+ConstantBufferMaterial::ConstantBufferMaterial() {
 }
 
-ConstantBufferMaterial::~ConstantBufferMaterial(){
+ConstantBufferMaterial::~ConstantBufferMaterial() {
 	shutdown();
 }
 
@@ -35,7 +35,7 @@ void ConstantBufferMaterial::create(RefPtr<ID3D12Device> device, const VectorArr
 	for (int i = 0; i < FrameCount; ++i) {
 		constantBuffers[i].resize(constantBufferCount);
 
-		UniquePtr<ID3D12Resource*[]> constantBufferPtrs = makeUnique<ID3D12Resource*[]>(constantBufferCount);
+		UniquePtr<ID3D12Resource* []> constantBufferPtrs = makeUnique<ID3D12Resource * []>(constantBufferCount);
 		for (uint32 j = 0; j < constantBufferCount; ++j) {
 			constantBuffers[i][j] = makeUnique<ConstantBuffer>();
 			constantBuffers[i][j]->create(device, bufferSizes[j]);
@@ -52,7 +52,7 @@ void ConstantBufferMaterial::create(RefPtr<ID3D12Device> device, const VectorArr
 	}
 }
 
-bool ConstantBufferMaterial::isEnableBuffer() const{
+bool ConstantBufferMaterial::isEnableBuffer() const {
 	return !constantBuffers[0].empty();
 }
 
@@ -70,7 +70,7 @@ void Root32bitConstantMaterial::create(RefPtr<ID3D12Device> device, const Vector
 	}
 }
 
-bool Root32bitConstantMaterial::isEnableConstant() const{
+bool Root32bitConstantMaterial::isEnableConstant() const {
 	return !dataPtrs.empty();
 }
 
@@ -81,7 +81,7 @@ SharedMaterial::~SharedMaterial() {
 	}
 }
 
-void SharedMaterial::create(ID3D12Device * device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader) {
+void SharedMaterial::create(RefPtr<ID3D12Device> device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader) {
 	rootSignature = makeUnique<RootSignature>();
 	pipelineState = makeUnique<PipelineState>();
 	rootSignature->create(device, *vertexShader, *pixelShader);
@@ -91,9 +91,9 @@ void SharedMaterial::create(ID3D12Device * device, RefPtr<VertexShader> vertexSh
 	this->pixelShader = pixelShader;
 }
 
-void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
+void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-	uint32 frameIndex = settings.frameIndex;
+	const uint32 frameIndex = settings.frameIndex;
 
 	commandList->SetPipelineState(pipelineState->_pipelineState.Get());
 	commandList->SetGraphicsRootSignature(rootSignature->_rootSignature.Get());
@@ -101,6 +101,9 @@ void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
 	//定数バッファデータを現在のフレームで使用する定数バッファにコピー
 	vertexConstantBuffer.flashBufferData(frameIndex);
 	pixelConstantBuffer.flashBufferData(frameIndex);
+
+	const ShaderReflectionResult& pixelShaderResult = pixelShader->shaderReflectionResult;
+	const ShaderReflectionResult& vertexShaderResult = vertexShader->shaderReflectionResult;
 
 	//このマテリアルで有効なリソースビューをセットする
 	UINT descriptorTableIndex = 0;
@@ -114,8 +117,17 @@ void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
 		descriptorTableIndex++;
 	}
 
-	if (pixelRoot32bitConstant.isEnableConstant()) {
-		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, pixelShader->shaderReflectionResult.root32bitConstants[0].getBufferSize() / 4, pixelRoot32bitConstant.dataPtrs[0].get(), 0);
+	bool isPixelRoot32bitOverride = !settings.pixelRoot32bitConstants.empty();
+	for (size_t i = 0; i < pixelShaderResult.root32bitConstants.size(); ++i) {
+		void* ptr = nullptr;
+		if (isPixelRoot32bitOverride) {
+			ptr = settings.pixelRoot32bitConstants[i];
+		}
+		else {
+			ptr = pixelRoot32bitConstant.dataPtrs[i].get();
+		}
+
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, pixelShaderResult.getRoot32bitConstantNum(i), ptr, 0);
 		descriptorTableIndex++;
 	}
 
@@ -129,10 +141,22 @@ void SharedMaterial::setupRenderCommand(RenderSettings & settings) {
 		descriptorTableIndex++;
 	}
 
-	if (vertexRoot32bitConstant.isEnableConstant()) {
-		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, vertexShader->shaderReflectionResult.root32bitConstants[0].getBufferSize() / 4, vertexRoot32bitConstant.dataPtrs[0].get(), 0);
+	bool isVertexRoot32bitOverride = !settings.vertexRoot32bitConstants.empty();
+	for (size_t i = 0; i < vertexShaderResult.root32bitConstants.size(); ++i) {
+		void* ptr = nullptr;
+		if (isVertexRoot32bitOverride) {
+			ptr = settings.vertexRoot32bitConstants[i];
+		}
+		else {
+			ptr = vertexRoot32bitConstant.dataPtrs[i].get();
+		}
+
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, vertexShaderResult.getRoot32bitConstantNum(i), ptr, 0);
 		descriptorTableIndex++;
 	}
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	settings.pixelRoot32bitConstants.clear();
+	settings.vertexRoot32bitConstants.clear();
 }

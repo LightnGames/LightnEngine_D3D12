@@ -15,7 +15,7 @@ Texture2D t_albedo : register(t3);
 Texture2D t_normal : register(t4);
 Texture2D t_metallic : register(t5);
 Texture2D t_roughness : register(t6);
-SamplerState _sampler : register(s0);
+SamplerState t_sampler : register(s0);
 
 #define PI 3.1415926535897
 #define EPSILON 1e-6
@@ -24,7 +24,11 @@ cbuffer DirectionalLightBuffer : register(b0)
 {
     float intensity;
     float3 direction;
-    float4 color;
+};
+
+cbuffer ROOT_32BIT_CONSTANTS_DirectionalLight : register(b1)
+{
+	float4 color;
 };
 
 //ŠgŽU”½ŽËBRDF
@@ -92,10 +96,10 @@ float3 FresnelSchlickRoughness(in float cosTheta, in float3 F0, in float roughne
 
 float4 PSMain(PSInput input) : SV_Target
 {
-    float3 albedo = t_albedo.Sample(_sampler, input.uv).rgb;
-    float2 normal = t_normal.Sample(_sampler, input.uv).rg;
-    float metallic = t_metallic.Sample(_sampler, input.uv).r;
-    float roughness = t_roughness.Sample(_sampler, input.uv).r;
+    float3 albedo = t_albedo.Sample(t_sampler, input.uv).rgb;
+    float2 normal = t_normal.Sample(t_sampler, input.uv).rg;
+    float metallic = t_metallic.Sample(t_sampler, input.uv).r;
+    float roughness = t_roughness.Sample(t_sampler, input.uv).r;
 
     albedo = pow(albedo, 2.2);
 
@@ -139,12 +143,12 @@ float4 PSMain(PSInput input) : SV_Target
     kD *= 1.0 - metallic;
 
     //Diffuse
-    float3 irradiance = irradianceMap.SampleLevel(_sampler, N, maxMipLevels-1).rgb;
+    float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels-1).rgb;
     float3 envDiffuse = irradiance * albedo;
 
     //Specular
-    float3 prefilteredEnvColor = prefilterMap.SampleLevel(_sampler, R, roughness * maxMipLevels).rgb;
-    float2 envBRDF = brdfLUT.Sample(_sampler, float2(max(dot(N, V), 0.0), roughness)).rg;
+    float3 prefilteredEnvColor = prefilterMap.SampleLevel(t_sampler, R, roughness * maxMipLevels).rgb;
+    float2 envBRDF = brdfLUT.Sample(t_sampler, float2(max(dot(N, V), 0.0), roughness)).rg;
     float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y);
 
     float3 ambient = (kD * envDiffuse + envSpecular); // * ao;

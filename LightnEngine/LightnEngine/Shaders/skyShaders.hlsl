@@ -15,18 +15,13 @@ SamplerState _sampler : register(s0);
 
 cbuffer Constant1 : register(b0)
 {
-    float4 offset2;
-    float2 offset3;
-    float4x4 mtxWorld;
-    float4x4 mtxView;
-    float4x4 mtxProj;
-    float dummy2[10];
+	float4x4 mtxView;
+	float4x4 mtxProj;
 }
 
-cbuffer Constant2 : register(b1)
+cbuffer ROOT_32BIT_CONSTANTS_MtxWorld : register(b1)
 {
-    float2 offset2_2;
-    float dummy2_2[62];
+	float4x4 mtxWorld;
 }
 
 cbuffer ConstantPS : register(b2)

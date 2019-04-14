@@ -4,6 +4,7 @@
 #include <ThirdParty/Imgui/imgui.h>
 #include <ImguiWindow.h>
 #include <MeshRenderSet.h>
+#include <RenderableEntity.h>
 #include <SharedMaterial.h>
 #include <GpuResource.h>
 #include <Scene.h>
@@ -16,6 +17,7 @@ public:
 		GFXInterface& gfx = GFXInterface::instance();
 
 		String meshName("Cerberus/Cerberus.fbx");
+		String skyName("skySphere.fbx");
 		String diffuseEnv("cubemapEnvHDR.dds");
 		String specularEnv("cubemapSpecularHDR.dds");
 		String specularBrdf("cubemapBrdf.dds");
@@ -44,9 +46,10 @@ public:
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
-		gfx.createMeshSets({ meshName,"skySphere.fbx" });
-		gfx.loadMeshSets(meshName, _mesh);
-		gfx.loadMeshSets("skySphere.fbx", _sky);
+		gfx.createMeshSets({ meshName,skyName });
+		_mesh = gfx.createStaticSingleMeshRender(meshName);
+		_mesh2 = gfx.createStaticSingleMeshRender(meshName);
+		_sky = gfx.createStaticSingleMeshRender(skyName);
 
 		RefPtr<SharedMaterial> m1;
 		RefPtr<SharedMaterial> m2;
@@ -54,8 +57,10 @@ public:
 		gfx.loadSharedMaterial("TestS", m2);
 
 		_mesh->setMaterial(0, m1);
+		_mesh2->setMaterial(0, m1);
 		_sky->setMaterial(0, m2);
 	}
+
 	void onUpdate() override {
 		Scene::onUpdate();
 
@@ -93,15 +98,25 @@ public:
 		Matrix4 mtxProj = Matrix4::perspectiveFovLH(radianFromDegree(50), gfx.getWidth() / static_cast<float>(gfx.getHeight()), 0.01f, 1000);
 		//mtxProj = Matrix4::identity;
 
-		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxWorld", mtxWorld.transpose());
+		_mesh->updateWorldMatrix(mtxWorld.transpose());
 		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
 		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 		_mesh->getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
 		_mesh->getMaterial(0)->setParameter<Vector3>("color", color);
 		_mesh->getMaterial(0)->setParameter<float>("intensity", intensity);
 
+		Matrix4 mtxWorld2 = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ z + 2, 0, 10.5f }));
+		_mesh2->updateWorldMatrix(mtxWorld2.transpose());
+		
+		_mesh2->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+		_mesh2->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+		_mesh2->getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
+		_mesh2->getMaterial(0)->setParameter<Vector3>("color", color);
+		_mesh2->getMaterial(0)->setParameter<float>("intensity", intensity);
+
+
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxWorld", skyMtxWorld.transpose());
+		_sky->updateWorldMatrix(skyMtxWorld.transpose());
 		_sky->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
 		_sky->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 	}
@@ -109,8 +124,9 @@ public:
 		Scene::onDestroy();
 	}
 
-	RefPtr<MeshRenderSet> _sky;
-	RefPtr<MeshRenderSet> _mesh;
+	RefPtr<StaticSingleMeshRender> _sky;
+	RefPtr<StaticSingleMeshRender> _mesh;
+	RefPtr<StaticSingleMeshRender> _mesh2;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {

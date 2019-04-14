@@ -302,6 +302,17 @@ void GpuResourceManager::loadMeshSets(const String & meshName, RefPtr<MeshRender
 	dstMeshSet = _meshes.at(meshName).get();
 }
 
+RefPtr<StaticSingleMeshRender> GpuResourceManager::createStaticSingleMeshRender(const String& name){
+	RefPtr<MeshRenderSet> renderSet;
+	loadMeshSets(name, renderSet);
+	StaticSingleMeshRender* render = new StaticSingleMeshRender(renderSet);
+	_renderList.emplace_back(UniquePtr<StaticSingleMeshRender>(render));
+	return render;
+}
+
+void GpuResourceManager::removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRender> render){
+}
+
 void GpuResourceManager::shutdown() {
 	for (auto&& material : _sharedMaterials) {
 		material.second.reset();
@@ -315,6 +326,6 @@ void GpuResourceManager::shutdown() {
 	_textures.clear();
 }
 
-const UnorderedMap<String, UniquePtr<MeshRenderSet>>& GpuResourceManager::getMeshes() const{
-	return _meshes;
+const ListArray<UniquePtr<IRenderableEntity>>& GpuResourceManager::getMeshes() const{
+	return _renderList;
 }

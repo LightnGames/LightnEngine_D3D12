@@ -65,6 +65,11 @@ struct ShaderReflectionCB {
 };
 
 struct ShaderReflectionResult {
+	//Root32bitConstant‚ÉŠÜ‚Ü‚ê‚é’l‚Ì”‚ğæ“¾(4byte•Ï”‚ª‚¢‚­‚Â‚ ‚é‚©)
+	uint32 getRoot32bitConstantNum(uint32 index) const{
+		return root32bitConstants[index].getBufferSize() / 4;
+	}
+
 	VectorArray<ShaderReflectionCB> constantBuffers;
 	VectorArray<ShaderReflectionCB> root32bitConstants;
 	VectorArray<D3D12_DESCRIPTOR_RANGE1> cbvRangeDescs;

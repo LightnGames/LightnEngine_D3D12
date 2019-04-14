@@ -3,6 +3,7 @@
 #include <GpuResourceManager.h>
 #include <MeshRenderSet.h>
 #include <GpuResource.h>
+#include <RenderableEntity.h>
 
 GFXInterface* Singleton<GFXInterface>::_singleton = 0;
 
@@ -68,6 +69,10 @@ void GFXInterface::loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& d
 #ifdef D3D12
 	_graphicsCore->getGpuResourceManager()->loadMeshSets(meshName, dstMeshSet);
 #endif
+}
+
+RefPtr<StaticSingleMeshRender> GFXInterface::createStaticSingleMeshRender(const String& name){
+	return _graphicsCore->getGpuResourceManager()->createStaticSingleMeshRender(name);
 }
 
 uint32 GFXInterface::getWidth() const{

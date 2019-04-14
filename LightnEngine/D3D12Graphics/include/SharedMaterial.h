@@ -41,7 +41,12 @@ struct Root32bitConstantMaterial {
 };
 
 struct RenderSettings {
+	RenderSettings(RefPtr<ID3D12GraphicsCommandList> commandList, uint32 frameIndex) :
+		commandList(commandList), frameIndex(frameIndex) {}
+
 	RefPtr<ID3D12GraphicsCommandList> commandList;
+	VectorArray<void*> vertexRoot32bitConstants;
+	VectorArray<void*> pixelRoot32bitConstants;
 	const uint32 frameIndex;
 };
 
@@ -50,7 +55,7 @@ public:
 	SharedMaterial() :srvVertex(nullptr), srvPixel(nullptr) {}
 	~SharedMaterial();
 
-	void create(ID3D12Device* device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader);
+	void create(RefPtr<ID3D12Device> device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader);
 
 	//このマテリアルを描画するための描画コマンドを積み込む
 	void setupRenderCommand(RenderSettings& settings);

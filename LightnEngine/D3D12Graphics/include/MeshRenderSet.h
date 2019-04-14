@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Utility.h>
+#include <LMath.h>
 struct RenderSettings;
 class SharedMaterial;
 class VertexBuffer;
@@ -26,8 +27,7 @@ public:
 
 	//インデックス番号のスロットに新しいマテリアルをセットする
 	void setMaterial(uint32 index, RefPtr<SharedMaterial> material);
-	RefPtr<SharedMaterial> getMaterial(uint32 index);
-	RefPtr<MaterialSlot> getMaterialSlot(uint32 index);
+	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
 
 private:
 	UniquePtr<VertexBuffer> _vertexBuffer;
