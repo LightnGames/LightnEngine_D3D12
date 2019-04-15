@@ -16,8 +16,7 @@ struct MaterialSlot {
 
 class MeshRenderSet {
 public:
-	MeshRenderSet(
-		const VectorArray<MaterialSlot>& materialSlots);
+	MeshRenderSet(const VectorArray<MaterialSlot>& materialSlots);
 
 	~MeshRenderSet();
 

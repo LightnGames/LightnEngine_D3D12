@@ -20,16 +20,16 @@ public:
 	DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type);
 	~DescriptorHeap();
 
-	void create(ID3D12Device* device, uint32 maxDescriptorCount = MAX_HEAP_NUM);
+	void create(RefPtr<ID3D12Device> device, uint32 maxDescriptorCount = MAX_HEAP_NUM);
 	void shutdown();
 
-	BufferView* allocateBufferView(uint32 descriptorCount);
-	void discardBufferView(BufferView* bufferView);
+	RefPtr<BufferView> allocateBufferView(uint32 descriptorCount);
+	void discardBufferView(RefPtr<BufferView> bufferView);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle(ulong2 bufferViewLocation) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle(ulong2 bufferViewLocation) const;
 
-	ID3D12DescriptorHeap* descriptorHeap() { return _descriptorHeap.Get(); }
+	RefPtr<ID3D12DescriptorHeap> descriptorHeap() { return _descriptorHeap.Get(); }
 	UINT incrimentSize() const { return _incrimentSize; }
 
 private:
@@ -49,7 +49,7 @@ public:
 	DescriptorHeapManager();
 	~DescriptorHeapManager();
 
-	void create(ID3D12Device* device);
+	void create(RefPtr<ID3D12Device> device);
 	void shutdown();
 
 	void createRenderTargetView(ID3D12Resource** textureBuffers, BufferView** dstView, uint32 viewCount);
@@ -68,7 +68,7 @@ public:
 
 private:
 
-	DescriptorHeap* _rtvHeap;
-	DescriptorHeap* _dsvHeap;
-	DescriptorHeap* _cbvSrvHeap;
+	DescriptorHeap _rtvHeap;
+	DescriptorHeap _dsvHeap;
+	DescriptorHeap _cbvSrvHeap;
 };

@@ -7,8 +7,6 @@ struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
 struct BufferView;
 class ConstantBuffer;
-class RootSignature;
-class PipelineState;
 class VertexShader;
 class PixelShader;
 
@@ -116,8 +114,8 @@ public:
 		return nullptr;
 	}
 
-	PipelineState* pipelineState;
-	RootSignature* rootSignature;
+	PipelineState pipelineState;
+	RootSignature rootSignature;
 
 	RefPtr<VertexShader> vertexShader;
 	RefPtr<PixelShader> pixelShader;

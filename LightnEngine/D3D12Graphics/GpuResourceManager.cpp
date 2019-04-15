@@ -43,12 +43,16 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		PixelShader newPixelShader;
 		String fullPath = "Shaders/" + settings.pixelShaderName;
 		newPixelShader.create(fullPath);
-		_resourcePool->_pixelShaders.emplace(settings.pixelShaderName, std::move(newPixelShader));
+		_resourcePool->_pixelShaders.emplace(settings.pixelShaderName, newPixelShader);
 		pixelShader = &(_resourcePool->_pixelShaders.at(settings.pixelShaderName));
 	}
 
-	SharedMaterial* p = new SharedMaterial();
-	SharedMaterial& material = *p;
+	//生成したマテリアルをキャッシュに登録
+	auto itr = _resourcePool->_sharedMaterials.emplace(std::piecewise_construct,
+		std::make_tuple(settings.name),
+		std::make_tuple());
+
+	SharedMaterial& material = (*itr.first).second;
 	material.create(device, vertexShader, pixelShader);
 
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
@@ -107,9 +111,6 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 	if (!pixelRoot32bitSizes.empty()) {
 		material.pixelRoot32bitConstant.create(device, pixelRoot32bitSizes);
 	}
-
-	//生成したマテリアルをキャッシュに登録
-	_resourcePool->_sharedMaterials.emplace(settings.name, std::move(material));
 }
 
 //テクスチャをまとめて生成する。まとめて送るのでCPUオーバーヘッドが少ない
@@ -121,11 +122,12 @@ void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandCont
 	for (size_t i = 0; i < settings.size(); ++i) {
 		String fullPath = "Resources/" + settings[i];
 
-		_resourcePool->_textures.emplace(std::piecewise_construct,
+		//テクスチャをキャッシュに生成
+		auto itr =_resourcePool->_textures.emplace(std::piecewise_construct,
 			std::make_tuple(settings[i]),
 			std::make_tuple());
 
-		Texture2D& tex = _resourcePool->_textures.at(settings[i]);
+		Texture2D& tex = (*itr.first).second;
 		tex.createDeferred2(device, commandList, &uploadHeaps[i], fullPath);
 	}
 
@@ -275,20 +277,18 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 		slot.indexCount = indexCount;
 		slot.indexOffset = 0;
 
-		//MeshRenderSet* meshSet = new MeshRenderSet({ slot });
+		//キャッシュにインスタンスを生成
 		const VectorArray<MaterialSlot> materialSlots = { slot };
-		_resourcePool->_meshes.emplace(std::piecewise_construct,
+		auto itr = _resourcePool->_meshes.emplace(std::piecewise_construct,
 			std::make_tuple(fileName),
 			std::make_tuple(materialSlots));
 
-		MeshRenderSet& renderSet = _resourcePool->_meshes.at(fileName);
+		MeshRenderSet& renderSet = (*itr.first).second;
 
 		//頂点バッファ生成
-		//meshSet->_vertexBuffer = new VertexBuffer();
 		renderSet._vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
 
 		//インデックスバッファ
-		//meshSet->_indexBuffer = new IndexBuffer();
 		renderSet._indexBuffer.createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter++], indices);
 	}
 
@@ -327,13 +327,12 @@ void GpuResourceManager::removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRen
 }
 
 void GpuResourceManager::shutdown() {
-	_resourcePool->shutdown();
-
 	for (auto&& renderList : _renderList) {
 		renderList.reset();
 	}
 
 	_renderList.clear();
+	_resourcePool.reset();
 }
 
 const ListArray<UniquePtr<IRenderableEntity>>& GpuResourceManager::getMeshes() const{
