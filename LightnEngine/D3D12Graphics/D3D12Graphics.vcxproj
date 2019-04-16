@@ -59,9 +59,9 @@
     <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="ImguiWindow.cpp" />
-    <ClCompile Include="include\RenderableEntity.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MeshRenderSet.cpp" />
+    <ClCompile Include="RenderableEntity.cpp" />
     <ClCompile Include="SharedMaterial.cpp" />
     <ClCompile Include="ThirdParty\DirectXTex\DDSTextureLoader12.cpp" />
     <ClCompile Include="ThirdParty\Imgui\imgui.cpp" />

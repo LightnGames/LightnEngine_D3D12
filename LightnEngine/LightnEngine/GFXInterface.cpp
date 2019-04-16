@@ -71,8 +71,8 @@ void GFXInterface::loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& d
 #endif
 }
 
-RefPtr<StaticSingleMeshRender> GFXInterface::createStaticSingleMeshRender(const String& name){
-	return _graphicsCore->getGpuResourceManager()->createStaticSingleMeshRender(name);
+RefPtr<StaticSingleMeshRender> GFXInterface::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) {
+	return _graphicsCore->getGpuResourceManager()->createStaticSingleMeshRender(name, materialNames);
 }
 
 uint32 GFXInterface::getWidth() const{

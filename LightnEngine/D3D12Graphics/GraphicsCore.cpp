@@ -13,6 +13,7 @@
 #include "SharedMaterial.h"
 #include "MeshRenderSet.h"
 #include "ImguiWindow.h"
+#include "RenderableEntity.h"
 
 #include "ThirdParty/Imgui/imgui.h"
 
@@ -62,19 +63,13 @@ void GraphicsCore::onInit(HWND hwnd) {
 	throwIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device)));
 
 	//デスクリプタヒープマネージャー
-	_descriptorHeapManager = makeUnique<DescriptorHeapManager>();
-	_descriptorHeapManager->create(_device.Get());
+	_descriptorHeapManager.create(_device.Get());
 
 	//コマンドキュー生成
-	_commandContext = makeUnique<CommandContext>(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	_commandContext->create(_device.Get());
-
-	//リソースマネージャー
-	_gpuResourceManager = makeUnique<GpuResourceManager>();
+	_commandContext.create(_device.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 	//Imgui初期化
-	_imguiWindow = makeUnique<ImguiWindow>();
-	_imguiWindow->init(hwnd, _device.Get());
+	_imguiWindow.init(hwnd, _device.Get());
 
 	//スワップチェーン生成
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -87,7 +82,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	swapChainDesc.SampleDesc.Count = 1;
 
 	ComPtr<IDXGISwapChain1> swapChain;
-	throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext->commandQueue()->commandQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
+	throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext.commandQueue()->commandQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
 
 	//フルスクリーンサポートをオフ
 	throwIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
@@ -106,28 +101,28 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_depthStencil = makeUnique<Texture2D>();
 		_depthStencil->createDepth(_device.Get(), depthInfo);
 
-		_descriptorHeapManager->createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
+		_descriptorHeapManager.createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
 	}
 
 	//フレームリソース
 	for (int i = 0; i < FrameCount; ++i) {
-		_frameResources[i] = makeUnique<FrameResource>(_device.Get(), _swapChain.Get(), i);
+		_frameResources[i].create(_device.Get(), _swapChain.Get(), i);
 	}
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
-	_currentFrameResource = _frameResources[_frameIndex].get();
+	_currentFrameResource = &_frameResources[_frameIndex];
 }
 
 void GraphicsCore::onUpdate() {
-	_imguiWindow->startFrame();
+	_imguiWindow.startFrame();
 }
 
 void GraphicsCore::onRender() {
-	auto commandListSet = _commandContext->requestCommandListSet();
+	auto commandListSet = _commandContext.requestCommandListSet();
 	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
 
 	//デスクリプタヒープをセット
-	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager->getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
+	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
 	commandList->SetDescriptorHeaps(1, ppHeap);
 
 	//ビューポート設定
@@ -148,20 +143,20 @@ void GraphicsCore::onRender() {
 
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);
-	auto& meshes = _gpuResourceManager->getMeshes();
+	auto& meshes = _gpuResourceManager.getMeshes();
 	for (const auto& mesh : meshes) {
-		mesh->setupRenderCommand(renderSettings);
+		mesh.setupRenderCommand(renderSettings);
 	}
 
 	//ImguiWindow描画
-	_imguiWindow->renderFrame(commandList);
+	_imguiWindow.renderFrame(commandList);
 
 	//描画用リソースバリアを展開
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	//コマンドキューにコマンドリストを渡して実行
-	_commandContext->executeCommandList(commandListSet);
-	_commandContext->discardCommandListSet(commandListSet);
+	_commandContext.executeCommandList(commandListSet);
+	_commandContext.discardCommandListSet(commandListSet);
 
 	//画面表示
 	throwIfFailed(_swapChain->Present(1, 0));
@@ -172,16 +167,17 @@ void GraphicsCore::onRender() {
 
 void GraphicsCore::onDestroy() {
 	//描画中に破棄してしまうと困るので待つ
-	_commandContext->waitForIdle();
+	_commandContext.waitForIdle();
 
 	for (int i = 0; i < FrameCount; ++i) {
-		_frameResources[i].reset();
+		_frameResources[i].shutdown();
 	}
 
-	_imguiWindow.reset();
-	_commandContext.reset();
-	_gpuResourceManager.reset();
-	_descriptorHeapManager.reset();
+	_imguiWindow.shutdown();
+	_gpuResourceManager.shutdown();
+
+	_commandContext.shutdown();
+	_descriptorHeapManager.shutdown();
 	_depthStencil.reset();
 
 	_swapChain = nullptr;
@@ -189,29 +185,29 @@ void GraphicsCore::onDestroy() {
 }
 
 void GraphicsCore::createTextures(const VectorArray<String>& textureNames){
-	_gpuResourceManager->createTextures(_device.Get(), *_commandContext, textureNames);
+	_gpuResourceManager.createTextures(_device.Get(), _commandContext, textureNames);
 }
 
 void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames){
-	_gpuResourceManager->createMeshSets(_device.Get(), *_commandContext, fileNames);
+	_gpuResourceManager.createMeshSets(_device.Get(), _commandContext, fileNames);
 }
 
 void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings){
-	_gpuResourceManager->createSharedMaterial(_device.Get(), settings);
+	_gpuResourceManager.createSharedMaterial(_device.Get(), settings);
 }
 
 RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager(){
-	return _gpuResourceManager.get();
+	return &_gpuResourceManager;
 }
 
 void GraphicsCore::moveToNextFrame() {
-	RefPtr<CommandQueue> commandQueue = _commandContext->commandQueue();
-	const UINT64 currentFenceValue = _frameResources[_frameIndex]->_fenceValue;
+	RefPtr<CommandQueue> commandQueue = _commandContext.commandQueue();
+	const UINT64 currentFenceValue = _frameResources[_frameIndex]._fenceValue;
 	commandQueue->waitForFence(currentFenceValue);
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
-	_currentFrameResource = _frameResources[_frameIndex].get();
+	_currentFrameResource = &_frameResources[_frameIndex];
 
 	const UINT64 fenceValue = commandQueue->incrementFence();
-	_frameResources[_frameIndex]->_fenceValue = fenceValue;
+	_frameResources[_frameIndex]._fenceValue = fenceValue;
 }

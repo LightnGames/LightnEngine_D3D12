@@ -17,10 +17,10 @@ struct CommandListSet {
 
 class CommandContext :private NonCopyable{
 public:
-	CommandContext(D3D12_COMMAND_LIST_TYPE type) :_commandListType(type) {}
+	CommandContext();
 	virtual ~CommandContext();
 
-	void create(ID3D12Device* device);
+	void create(RefPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type);
 	void shutdown();
 
 	//コマンド発効に必要なコマンドリスト、アロケーター等のデータを取得
@@ -41,7 +41,7 @@ public:
 	void waitForIdle();
 
 protected:
-	const D3D12_COMMAND_LIST_TYPE _commandListType;
+	D3D12_COMMAND_LIST_TYPE _commandListType;
 
 	CommandListPool* _commandListPool;
 	CommandAllocatorPool* _commandAllocatorPool;

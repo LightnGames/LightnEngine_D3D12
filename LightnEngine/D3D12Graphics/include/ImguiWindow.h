@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Utility.h"
-
 #include <Windows.h>
 
 struct BufferView;

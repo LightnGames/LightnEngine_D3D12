@@ -7,6 +7,7 @@
 #include "MeshRenderSet.h"
 #include "stdafx.h"
 #include "GpuResourceDataPool.h"
+#include <RenderableEntity.h>
 #include <cassert>
 #include <LMath.h>
 
@@ -17,7 +18,6 @@ GpuResourceManager::GpuResourceManager(){
 }
 
 GpuResourceManager::~GpuResourceManager() {
-	shutdown();
 }
 
 void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const SharedMaterialCreateSettings& settings) {
@@ -300,41 +300,47 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 	commandContext.waitForIdle();
 }
 
-void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) {
+void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) const{
 	assert(_resourcePool->_sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
-	dstMaterial = &(_resourcePool->_sharedMaterials.at(materialName));
+	dstMaterial = &_resourcePool->_sharedMaterials.at(materialName);
 }
 
-void GpuResourceManager::loadTexture(const String & textureName, RefPtr<Texture2D>& dstTexture) {
+void GpuResourceManager::loadTexture(const String & textureName, RefPtr<Texture2D>& dstTexture) const{
 	assert(_resourcePool->_textures.count(textureName) > 0 && "テクスチャが見つかりません");
-	dstTexture = &(_resourcePool->_textures.at(textureName));
+	dstTexture = &_resourcePool->_textures.at(textureName);
 }
 
-void GpuResourceManager::loadMeshSets(const String & meshName, RefPtr<MeshRenderSet>& dstMeshSet) {
+void GpuResourceManager::loadMeshSets(const String & meshName, RefPtr<MeshRenderSet>& dstMeshSet) const{
 	assert(_resourcePool->_meshes.count(meshName) > 0 && "メッシュが見つかりません");
-	dstMeshSet = &(_resourcePool->_meshes.at(meshName));
+	dstMeshSet = &_resourcePool->_meshes.at(meshName);
 }
 
-RefPtr<StaticSingleMeshRender> GpuResourceManager::createStaticSingleMeshRender(const String& name){
+RefPtr<StaticSingleMeshRender> GpuResourceManager::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const{
+	//メッシュインスタンス生成
 	RefPtr<MeshRenderSet> renderSet;
 	loadMeshSets(name, renderSet);
-	StaticSingleMeshRender* render = new StaticSingleMeshRender(renderSet);
-	_renderList.emplace_back(UniquePtr<StaticSingleMeshRender>(render));
-	return render;
+	StaticSingleMeshRender render(renderSet);
+
+	//マテリアルスロットにマテリアルをセット
+	for (size_t i = 0; i < materialNames.size(); ++i) {
+		RefPtr<SharedMaterial> material;
+		loadSharedMaterial(materialNames[i], material);
+		render.setMaterial(static_cast<uint32>(i), material);
+	}
+
+	auto& renderList = _resourcePool->_renderList;
+	renderList.emplace_back(std::move(render));
+
+	return &renderList.back();
 }
 
 void GpuResourceManager::removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRender> render){
 }
 
 void GpuResourceManager::shutdown() {
-	for (auto&& renderList : _renderList) {
-		renderList.reset();
-	}
-
-	_renderList.clear();
 	_resourcePool.reset();
 }
 
-const ListArray<UniquePtr<IRenderableEntity>>& GpuResourceManager::getMeshes() const{
-	return _renderList;
+const ListArray<StaticSingleMeshRender>& GpuResourceManager::getMeshes() const{
+	return _resourcePool->_renderList;
 }

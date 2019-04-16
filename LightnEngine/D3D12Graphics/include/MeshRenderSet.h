@@ -9,6 +9,7 @@ class SharedMaterial;
 
 //マテリアルごとのインデックス範囲データ
 struct MaterialSlot {
+	MaterialSlot() :indexCount(0), indexOffset(0), material(nullptr){}
 	uint32 indexCount;
 	uint32 indexOffset;
 	RefPtr<SharedMaterial> material;

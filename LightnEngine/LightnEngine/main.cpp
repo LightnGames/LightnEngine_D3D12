@@ -47,18 +47,9 @@ public:
 
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ meshName,skyName });
-		_mesh = gfx.createStaticSingleMeshRender(meshName);
-		_mesh2 = gfx.createStaticSingleMeshRender(meshName);
-		_sky = gfx.createStaticSingleMeshRender(skyName);
-
-		RefPtr<SharedMaterial> m1;
-		RefPtr<SharedMaterial> m2;
-		gfx.loadSharedMaterial("TestM", m1);
-		gfx.loadSharedMaterial("TestS", m2);
-
-		_mesh->setMaterial(0, m1);
-		_mesh2->setMaterial(0, m1);
-		_sky->setMaterial(0, m2);
+		_mesh = gfx.createStaticSingleMeshRender(meshName, { "TestM" });
+		_mesh2 = gfx.createStaticSingleMeshRender(meshName, { "TestM" });
+		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {

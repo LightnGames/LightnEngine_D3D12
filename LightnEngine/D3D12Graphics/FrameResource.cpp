@@ -4,7 +4,14 @@
 #include "DescriptorHeap.h"
 #include "GpuResource.h"
 
-FrameResource::FrameResource(ID3D12Device* device, IDXGISwapChain3* swapChain, UINT frameResourceIndex){
+FrameResource::FrameResource(){
+}
+
+
+FrameResource::~FrameResource() {
+}
+
+void FrameResource::create(RefPtr<ID3D12Device> device, RefPtr<IDXGISwapChain3> swapChain, UINT frameResourceIndex){
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 
 	//レンダーターゲット
@@ -13,8 +20,7 @@ FrameResource::FrameResource(ID3D12Device* device, IDXGISwapChain3* swapChain, U
 	descriptorHeapManager.createRenderTargetView(_renderTarget->getAdressOf(), &_rtv, 1);
 }
 
-
-FrameResource::~FrameResource() {
+void FrameResource::shutdown(){
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	descriptorHeapManager.discardRenderTargetView(_rtv);
 

@@ -8,7 +8,6 @@
 #include "ThirdParty/Imgui/imgui_impl_dx12.h"
 
 ImguiWindow::~ImguiWindow() {
-	shutdown();
 }
 
 void ImguiWindow::init(HWND& hwnd, ID3D12Device* device) {

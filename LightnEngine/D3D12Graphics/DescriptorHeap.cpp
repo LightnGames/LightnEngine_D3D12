@@ -74,7 +74,6 @@ DescriptorHeapManager::DescriptorHeapManager():
 }
 
 DescriptorHeapManager::~DescriptorHeapManager() {
-	shutdown();
 }
 
 void DescriptorHeapManager::create(RefPtr<ID3D12Device> device) {

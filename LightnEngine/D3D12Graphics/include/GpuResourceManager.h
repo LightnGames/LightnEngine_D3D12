@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Utility.h>
-#include <RenderableEntity.h>
 
 struct ID3D12Device;
 struct BufferView;
@@ -24,18 +23,17 @@ public:
 	void createTextures(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& settings);
 	void createMeshSets(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& fileName);
 
-	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial);
-	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture);
-	void loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet);
+	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) const;
+	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture) const;
+	void loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet) const;
 
-	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name);
+	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const;
 	void removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRender> render);
 
 	void shutdown();
 
-	const ListArray<UniquePtr<IRenderableEntity>>& getMeshes() const;
+	const ListArray<StaticSingleMeshRender>& getMeshes() const;
 
 private:
 	UniquePtr<GpuResourceDataPool> _resourcePool;
-	ListArray<UniquePtr<IRenderableEntity>> _renderList;
 };

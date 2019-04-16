@@ -4,13 +4,14 @@
 #include "CommandQueue.h"
 #include "D3D12Helper.h"
 
-CommandContext::~CommandContext() {
-	delete _commandQueue;
-	delete _commandAllocatorPool;
-	delete _commandListPool;
+CommandContext::CommandContext(){
 }
 
-void CommandContext::create(ID3D12Device * device) {
+CommandContext::~CommandContext() {
+}
+
+void CommandContext::create(RefPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type) {
+	_commandListType = type;
 	_commandListPool = new CommandListPool(_commandListType);
 	_commandAllocatorPool = new CommandAllocatorPool(_commandListType);
 	_commandQueue = new CommandQueue(_commandListType);

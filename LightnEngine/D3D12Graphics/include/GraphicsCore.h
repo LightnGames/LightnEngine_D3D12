@@ -3,23 +3,22 @@
 #include "stdafx.h"
 #include "GraphicsConstantSettings.h"
 
+#include "GpuResourceManager.h"
+#include "DescriptorHeap.h"
+#include "FrameResource.h"
+#include "CommandContext.h"
+#include "ImguiWindow.h"
+
 #define DEBUG
 
 using namespace Microsoft::WRL;
 
 struct ID3D12Device;
 struct IDXGISwapChain3;
-struct BufferView;
-class DescriptorHeapManager;
-class GpuResourceManager;
-class ImguiWindow;
-class FrameResource;
-class CommandQueue;
-class CommandContext;
 class Texture2D;
 class MeshRenderSet;
 
-class GraphicsCore {
+class GraphicsCore :private NonCopyable {
 public:
 	GraphicsCore();
 	~GraphicsCore();
@@ -55,11 +54,11 @@ private:
 	UniquePtr<Texture2D> _depthStencil;
 	RefPtr<BufferView> _dsv;
 
-	UniquePtr<CommandContext> _commandContext;
-	UniquePtr<FrameResource> _frameResources[FrameCount];
-	UniquePtr<DescriptorHeapManager> _descriptorHeapManager;
-	UniquePtr<GpuResourceManager> _gpuResourceManager;
-	UniquePtr<ImguiWindow> _imguiWindow;
+	CommandContext _commandContext;
+	FrameResource _frameResources[FrameCount];
+	DescriptorHeapManager _descriptorHeapManager;
+	GpuResourceManager _gpuResourceManager;
+	ImguiWindow _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
 };

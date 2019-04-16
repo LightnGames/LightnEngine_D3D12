@@ -3,6 +3,7 @@
 #include <SharedMaterial.h>
 #include <GpuResource.h>
 #include <MeshRenderSet.h>
+#include <RenderableEntity.h>
 
 struct GpuResourceDataPool {
 	~GpuResourceDataPool() {
@@ -15,6 +16,7 @@ struct GpuResourceDataPool {
 		_sharedMaterials.clear();
 		_textures.clear();
 		_meshes.clear();
+		_renderList.clear();
 	}
 
 	UnorderedMap<String, VertexShader> _vertexShaders;
@@ -22,4 +24,6 @@ struct GpuResourceDataPool {
 	UnorderedMap<String, SharedMaterial> _sharedMaterials;
 	UnorderedMap<String, Texture2D> _textures;
 	UnorderedMap<String, MeshRenderSet> _meshes;
+
+	ListArray<StaticSingleMeshRender> _renderList;
 };

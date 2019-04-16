@@ -28,7 +28,7 @@ public:
 	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture);
 	void loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet);
 
-	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name);
+	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 
 	uint32 getWidth() const;
 	uint32 getHeight() const;
