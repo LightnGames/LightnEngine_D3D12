@@ -1,31 +1,30 @@
 #pragma once
 
 #include "stdafx.h"
-#include "Utility.h"
-
-class CommandAllocatorPool;
+#include "CommandAllocatorPool.h"
+#include <Utility.h>
 class GpuResource;
 
 using namespace Microsoft::WRL;
 class CommandQueue :private NonCopyable {
 public:
-	CommandQueue(D3D12_COMMAND_LIST_TYPE type);
+	CommandQueue();
 	virtual ~CommandQueue();
 
-	void create(ID3D12Device* device);
+	void create(RefPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type);
 
 	void waitForFence(UINT64 fenceValue);
 	void waitForIdle();
 	bool isFenceComplete(UINT64 fenceValue);
 	UINT64 incrementFence();
-	UINT64 executeCommandList(ID3D12CommandList* commandList);
+	UINT64 executeCommandList(RefPtr<ID3D12CommandList> commandList);
 
-	UINT64 fenceValue() { return _fence->GetCompletedValue(); }
+	UINT64 fenceValue() const;
 
 	void shutdown();
 
 private:
-	GETSET(CommandAllocatorPool*, commandAllocatorPool);
+	CommandAllocatorPool _commandAllocatorPool;
 	GETSET(ID3D12CommandQueue*, commandQueue);
 	GETSET(UINT64, nextFenceValue);
 

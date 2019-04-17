@@ -12,9 +12,6 @@
 #define DEBUG
 
 using namespace Microsoft::WRL;
-
-struct ID3D12Device;
-struct IDXGISwapChain3;
 class Texture2D;
 class MeshRenderSet;
 

@@ -2,14 +2,16 @@
 #include "D3D12Helper.h"
 #include "CommandAllocatorPool.h"
 
-CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE type):_commandListType(type) {
+CommandQueue::CommandQueue():_commandListType() {
 }
 
 CommandQueue::~CommandQueue() {
 	shutdown();
 }
 
-void CommandQueue::create(ID3D12Device * device) {
+void CommandQueue::create(RefPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type) {
+	_commandListType = type;
+
 	//コマンドキュー生成
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -23,8 +25,7 @@ void CommandQueue::create(ID3D12Device * device) {
 		throwIfFailed(HRESULT_FROM_WIN32(GetLastError()));
 	}
 
-	_commandAllocatorPool = new CommandAllocatorPool(_commandListType);
-	_commandAllocatorPool->create(device);
+	_commandAllocatorPool.create(device, _commandListType);
 }
 
 void CommandQueue::waitForFence(UINT64 fenceValue) {
@@ -60,14 +61,18 @@ UINT64 CommandQueue::incrementFence() {
 	return _nextFenceValue++;
 }
 
-UINT64 CommandQueue::executeCommandList(ID3D12CommandList * commandList) {
+UINT64 CommandQueue::executeCommandList(RefPtr<ID3D12CommandList> commandList) {
 	//描画コマンドを積み終えたのでコマンドリストを閉じる
-	throwIfFailed(((ID3D12GraphicsCommandList*)commandList)->Close());
+	throwIfFailed((static_cast<ID3D12GraphicsCommandList*>(commandList))->Close());
 
 	//コマンドキューにコマンドリストを渡して実行
 	_commandQueue->ExecuteCommandLists(1, &commandList);
 
 	return incrementFence();
+}
+
+UINT64 CommandQueue::fenceValue() const{
+	return _fence->GetCompletedValue();
 }
 
 void CommandQueue::shutdown() {
@@ -76,7 +81,4 @@ void CommandQueue::shutdown() {
 	_commandQueue->Release();
 	_fence = nullptr;
 	_commandQueue = nullptr;
-
-	delete _commandAllocatorPool;
-	_commandAllocatorPool = nullptr;
 }

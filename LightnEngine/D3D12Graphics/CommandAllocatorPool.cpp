@@ -1,14 +1,15 @@
 #include "CommandAllocatorPool.h"
 #include "D3D12Helper.h"
 
-CommandAllocatorPool::CommandAllocatorPool(D3D12_COMMAND_LIST_TYPE type) :_commandListType(type), _device(nullptr) {
+CommandAllocatorPool::CommandAllocatorPool() :_commandListType(), _device(nullptr) {
 }
 
 CommandAllocatorPool::~CommandAllocatorPool() {
 	shutdown();
 }
 
-void CommandAllocatorPool::create(ID3D12Device * device) {
+void CommandAllocatorPool::create(RefPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type) {
+	_commandListType = type;
 	_device = device;
 }
 
@@ -20,8 +21,8 @@ void CommandAllocatorPool::shutdown() {
 	_commandAllocatorPool.clear();
 }
 
-ID3D12CommandAllocator * CommandAllocatorPool::requestAllocator(UINT64 completedFenceValue) {
-	ID3D12CommandAllocator* allocator = nullptr;
+RefPtr<ID3D12CommandAllocator> CommandAllocatorPool::requestAllocator(UINT64 completedFenceValue) {
+	RefPtr<ID3D12CommandAllocator> allocator = nullptr;
 
 	//返却済みアロケーターがあればそちらを使う
 	if (!_readyAllocators.empty()) {
@@ -43,6 +44,6 @@ ID3D12CommandAllocator * CommandAllocatorPool::requestAllocator(UINT64 completed
 	return allocator;
 }
 
-void CommandAllocatorPool::discardAllocator(UINT64 fenceValue, ID3D12CommandAllocator * allocator) {
+void CommandAllocatorPool::discardAllocator(UINT64 fenceValue, RefPtr<ID3D12CommandAllocator> allocator) {
 	_readyAllocators.push(std::make_pair(fenceValue, allocator));
 }

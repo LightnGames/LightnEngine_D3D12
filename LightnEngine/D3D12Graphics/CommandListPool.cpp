@@ -1,14 +1,15 @@
 #include "CommandListPool.h"
 #include "D3D12Helper.h"
 
-CommandListPool::CommandListPool(D3D12_COMMAND_LIST_TYPE type) :_commandListType(type), _device(nullptr) {
+CommandListPool::CommandListPool():_commandListType(), _device(nullptr) {
 }
 
 CommandListPool::~CommandListPool() {
 	shutdown();
 }
 
-void CommandListPool::create(ID3D12Device * device) {
+void CommandListPool::create(RefPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type) {
+	_commandListType = type;
 	_device = device;
 }
 
@@ -20,8 +21,8 @@ void CommandListPool::shutdown() {
 	_commandListPool.clear();
 }
 
-ID3D12GraphicsCommandList * CommandListPool::requestCommandList(UINT64 completedFenceValue, ID3D12CommandAllocator* allocator) {
-	ID3D12GraphicsCommandList* list = nullptr;
+RefPtr<ID3D12GraphicsCommandList> CommandListPool::requestCommandList(UINT64 completedFenceValue, RefPtr<ID3D12CommandAllocator> allocator) {
+	RefPtr<ID3D12GraphicsCommandList> list = nullptr;
 
 	//返却済みコマンドリストがあればそちらを使う
 	if (!_readyCommandLists.empty()) {
@@ -43,6 +44,10 @@ ID3D12GraphicsCommandList * CommandListPool::requestCommandList(UINT64 completed
 	return list;
 }
 
-void CommandListPool::discardCommandList(UINT64 fenceValue, ID3D12GraphicsCommandList * list) {
+void CommandListPool::discardCommandList(UINT64 fenceValue, RefPtr<ID3D12GraphicsCommandList> list) {
 	_readyCommandLists.push(std::make_pair(fenceValue, list));
+}
+
+inline size_t CommandListPool::getSize() const{
+	return _commandListPool.size();
 }

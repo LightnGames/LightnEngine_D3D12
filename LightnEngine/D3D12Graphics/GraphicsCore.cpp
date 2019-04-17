@@ -82,7 +82,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	swapChainDesc.SampleDesc.Count = 1;
 
 	ComPtr<IDXGISwapChain1> swapChain;
-	throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext.commandQueue()->commandQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
+	throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext.getDirectQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
 
 	//フルスクリーンサポートをオフ
 	throwIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
@@ -201,7 +201,7 @@ RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager(){
 }
 
 void GraphicsCore::moveToNextFrame() {
-	RefPtr<CommandQueue> commandQueue = _commandContext.commandQueue();
+	RefPtr<CommandQueue> commandQueue = _commandContext.getCommandQueue();
 	const UINT64 currentFenceValue = _frameResources[_frameIndex]._fenceValue;
 	commandQueue->waitForFence(currentFenceValue);
 
