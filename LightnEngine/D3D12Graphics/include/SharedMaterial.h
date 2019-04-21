@@ -129,3 +129,26 @@ public:
 	ConstantBufferMaterial _vertexConstantBuffer;
 	ConstantBufferMaterial _pixelConstantBuffer;
 };
+
+//struct RefSharedMaterial{
+//	RefSharedMaterial(
+//		const RefPipelineState& pipelineState,
+//		const RefRootsignature& rootSignature,
+//		const BufferView& srvPixel,
+//		const BufferView& srvVertex,
+//		const BufferView vertexConstantBuffer[FrameCount],
+//		const BufferView pixelConstantBuffer[FrameCount]):
+//	_pipelineState(pipelineState),
+//	_rootSignature(rootSignature),
+//	_srvPixel(srvPixel),
+//	_srvVertex(srvVertex),
+//	_vertexConstantBuffer(vertexConstantBuffer),
+//	_pixelConstantBuffer(pixelConstantBuffer){}
+//	const RefPipelineState _pipelineState;
+//	const RefRootsignature _rootSignature;
+//
+//	const BufferView _srvPixel;
+//	const BufferView _srvVertex;
+//	const BufferView _vertexConstantBuffer[FrameCount];
+//	const BufferView _pixelConstantBuffer[FrameCount];
+//};

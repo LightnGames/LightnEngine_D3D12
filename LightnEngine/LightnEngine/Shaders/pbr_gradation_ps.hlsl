@@ -21,17 +21,9 @@ cbuffer DirectionalLightBuffer : register(b0)
     float intensity;
     float3 direction;
 	float4 color;
-};
-
-cbuffer ROOT_32BIT_CONSTANTS_PBR : register(b1)
-{
 	float p_metallic;
 	float p_roughness;
 };
-//cbuffer ROOT_32BIT_CONSTANTS_DirectionalLight : register(b1)
-//{
-//
-//};
 
 //ŠgŽU”½ŽËBRDF
 float3 DiffuseBRDF(float3 diffuseColor)

@@ -25,10 +25,6 @@ cbuffer DirectionalLightBuffer : register(b0)
 {
     float intensity;
     float3 direction;
-};
-
-cbuffer ROOT_32BIT_CONSTANTS_DirectionalLight : register(b1)
-{
 	float4 color;
 };
 
