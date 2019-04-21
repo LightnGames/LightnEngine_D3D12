@@ -1,18 +1,9 @@
 #include "GraphicsCore.h"
 #include <stdexcept>
-#include <LMath.h>
 
 #include "D3D12Util.h"
 #include "D3D12Helper.h"
-#include "FrameResource.h"
-#include "GpuResource.h"
-#include "CommandQueue.h"
-#include "CommandContext.h"
-#include "DescriptorHeap.h"
-#include "GpuResourceManager.h"
 #include "SharedMaterial.h"
-#include "MeshRenderSet.h"
-#include "ImguiWindow.h"
 #include "RenderableEntity.h"
 
 #include "ThirdParty/Imgui/imgui.h"
@@ -72,21 +63,24 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_imguiWindow.init(hwnd, _device.Get());
 
 	//スワップチェーン生成
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-	swapChainDesc.BufferCount = FrameCount;
-	swapChainDesc.Width = _width;
-	swapChainDesc.Height = _height;
-	swapChainDesc.Format = RenderTargetFormat;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.SampleDesc.Count = 1;
+	{
+		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+		swapChainDesc.BufferCount = FrameCount;
+		swapChainDesc.Width = _width;
+		swapChainDesc.Height = _height;
+		swapChainDesc.Format = RenderTargetFormat;
+		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		swapChainDesc.SampleDesc.Count = 1;
 
-	ComPtr<IDXGISwapChain1> swapChain;
-	throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext.getDirectQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
+		ComPtr<IDXGISwapChain1> swapChain;
+		throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext.getDirectQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
 
-	//フルスクリーンサポートをオフ
-	throwIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
-	throwIfFailed(swapChain.As(&_swapChain));
+
+		//フルスクリーンサポートをオフ
+		throwIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
+		throwIfFailed(swapChain.As(&_swapChain)); 
+	}
 
 	//ビューポート初期化
 	_viewPort = { 0.0f, 0.0f, static_cast<float>(_width), static_cast<float>(_height), 0.0f, 1.0f };
@@ -98,10 +92,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 		depthInfo.width = _width;
 		depthInfo.height = _height;
 		depthInfo.format = DepthStencilFormat;
-		_depthStencil = makeUnique<Texture2D>();
-		_depthStencil->createDepth(_device.Get(), depthInfo);
+		_depthStencil.createDepth(_device.Get(), depthInfo);
 
-		_descriptorHeapManager.createDepthStencilView(_depthStencil->getAdressOf(), &_dsv, 1);
+		_descriptorHeapManager.createDepthStencilView(_depthStencil.getAdressOf(), &_dsv, 1);
 	}
 
 	//フレームリソース
@@ -119,10 +112,10 @@ void GraphicsCore::onUpdate() {
 
 void GraphicsCore::onRender() {
 	auto commandListSet = _commandContext.requestCommandListSet();
-	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 	//デスクリプタヒープをセット
-	ID3D12DescriptorHeap* ppHeap[] = { _descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
+	RefPtr<ID3D12DescriptorHeap> ppHeap[] = { _descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
 	commandList->SetDescriptorHeaps(1, ppHeap);
 
 	//ビューポート設定
@@ -143,7 +136,7 @@ void GraphicsCore::onRender() {
 
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);
-	auto& meshes = _gpuResourceManager.getMeshes();
+	const auto& meshes = _gpuResourceManager.getMeshes();
 	for (const auto& mesh : meshes) {
 		mesh.setupRenderCommand(renderSettings);
 	}
@@ -178,7 +171,6 @@ void GraphicsCore::onDestroy() {
 
 	_commandContext.shutdown();
 	_descriptorHeapManager.shutdown();
-	_depthStencil.reset();
 
 	_swapChain = nullptr;
 	_device = nullptr;

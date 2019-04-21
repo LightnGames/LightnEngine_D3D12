@@ -53,12 +53,12 @@ struct Vertex {
 class Texture2D :public GpuResource {
 public:
 	//バックバッファからテクスチャを生成
-	void createFromBackBuffer(IDXGISwapChain3* swapChain, uint32 index) {
+	void createFromBackBuffer(RefPtr<IDXGISwapChain3> swapChain, uint32 index) {
 		throwIfFailed(swapChain->GetBuffer(index, IID_PPV_ARGS(&_resource)));
 	}
 
 	//デプステクスチャとして生成
-	void createDepth(ID3D12Device* device, const DepthTextureInfo& info) {
+	void createDepth(RefPtr<ID3D12Device> device, const DepthTextureInfo& info) {
 		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
 		depthOptimizedClearValue.Format = info.format;
 		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
@@ -87,10 +87,10 @@ public:
 	}
 
 	//直ちにテクスチャを生成し、操作が完了するまでスレッドを停止する
-	void createDirect(ID3D12Device* device, CommandContext* commandContext, const TextureInfo& info) {
+	void createDirect(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const TextureInfo& info) {
 		//テクスチャコピーコマンドを発行する用のアロケーターとリスト
 		auto commandListSet = commandContext->requestCommandListSet();
-		ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 		ComPtr<ID3D12Resource> textureUploadHeap;
 
@@ -105,8 +105,8 @@ public:
 	}
 
 	//コマンドリストにテクスチャ生成コマンドを発行(発行のみで実行はしない)
-	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const TextureInfo& info) {
-		UINT texturePixelSize = 4;
+	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const TextureInfo& info) {
+		const uint32 texturePixelSize = 4;
 
 		//GPU読み出し専用テクスチャ本体を生成
 		D3D12_RESOURCE_DESC textureDesc = {};
@@ -152,9 +152,9 @@ public:
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 	}
 
-	void createDeferred2(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const String& textureName) {
-		std::unique_ptr<uint8_t[]> ddsData;
-		std::vector<D3D12_SUBRESOURCE_DATA> subresouceData;
+	void createDeferred2(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const String& textureName) {
+		UniquePtr<uint8_t[]> ddsData;
+		VectorArray<D3D12_SUBRESOURCE_DATA> subresouceData;
 		throwIfFailed(DirectX::LoadDDSTextureFromFile(device, convertWString(textureName).c_str(), _resource.ReleaseAndGetAddressOf(), ddsData, subresouceData));
 
 		const UINT subresouceSize = static_cast<UINT>(subresouceData.size());
@@ -179,15 +179,25 @@ public:
 	}
 };
 
+//バッファービューの参照(扱いは実体)を持った構造体。寿命の管理はしない
+struct RefVertexBufferView {
+	RefVertexBufferView(D3D12_VERTEX_BUFFER_VIEW view) :view(view) {}
+	D3D12_VERTEX_BUFFER_VIEW view;
+};
+
+struct RefIndexBufferView {
+	RefIndexBufferView(D3D12_INDEX_BUFFER_VIEW view) :view(view) {}
+	D3D12_INDEX_BUFFER_VIEW view;
+};
+
 class VertexBuffer :public GpuResource{
 public:
-
 	//直ちに頂点バッファを生成し、操作が完了するまでスレッドを停止する
 	template <typename T>
-	void createDirect(ID3D12Device* device, CommandContext* commandContext, const VectorArray<T>& vertices) {
+	void createDirect(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<T>& vertices) {
 		ComPtr<ID3D12Resource> vertexUploadHeap;
 		auto commandListSet = commandContext->requestCommandListSet();
-		ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 		createDeferred<T>(device, commandList, vertexUploadHeap.ReleaseAndGetAddressOf(), vertices);
 
@@ -201,7 +211,7 @@ public:
 
 	//コマンドリストに頂点バッファ生成コマンドを発行(発行のみで実行はしない)
 	template <typename T>
-	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const VectorArray<T>& vertices) {
+	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const VectorArray<T>& vertices) {
 		const UINT64 vertexBufferSize = static_cast<UINT64>(sizeof(T)*vertices.size());
 
 		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
@@ -248,16 +258,20 @@ public:
 		_vertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
 	}
 
+	RefVertexBufferView getRefVertexBufferView() const {
+		return RefVertexBufferView(_vertexBufferView);
+	}
+
 	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
 };
 
 class IndexBuffer :public GpuResource {
 public:
-	void createDirect(ID3D12Device* device, CommandContext* commandContext, const VectorArray<UINT32>& indices) {
+	void createDirect(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<UINT32>& indices) {
 		ComPtr<ID3D12Resource> indexUploadHeap;
 
 		auto commandListSet = commandContext->requestCommandListSet();
-		ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 		createDeferred(device, commandList, indexUploadHeap.ReleaseAndGetAddressOf(), indices);
 
@@ -270,7 +284,7 @@ public:
 	}
 
 	//コマンドリストにインデックスバッファ生成コマンドを発行(発行のみで実行はしない)
-	void createDeferred(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, ID3D12Resource** uploadHeap, const VectorArray<UINT32>& indices) {
+	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const VectorArray<UINT32>& indices) {
 		const UINT64 indexBufferSize = static_cast<UINT64>(sizeof(UINT32)*indices.size());
 
 		D3D12_HEAP_PROPERTIES indexHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
@@ -317,14 +331,17 @@ public:
 		_indexCount = static_cast<uint32>(indices.size());
 	}
 
+	RefIndexBufferView getRefIndexBufferView() const {
+		return RefIndexBufferView(_indexBufferView);
+	}
+
 	uint32 _indexCount;
 	D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 };
 
 class ConstantBuffer :public GpuResource {
 public:
-
-	void create(ID3D12Device* device, uint32 size) {
+	void create(RefPtr<ID3D12Device> device, uint32 size) {
 		D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 
 		//256バイトでアライン
@@ -347,7 +364,9 @@ public:
 		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&dataPtr)));
 	}
 
-	void writeData(const void* bufferPtr, uint32 size, uint32 startOffset = 0) {
+
+	//マップされた領域にに書き込み
+	void writeData(const void* bufferPtr, uint32 size, uint32 startOffset = 0) const{
 		memcpy(dataPtr, reinterpret_cast<const byte*>(bufferPtr) + startOffset, size);
 	}
 

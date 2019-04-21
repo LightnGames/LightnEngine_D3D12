@@ -2,6 +2,8 @@
 
 #include <LMath.h>
 #include <Utility.h>
+#include "stdafx.h"
+#include "GpuResource.h"
 
 struct RenderSettings;
 class MeshRenderSet;
@@ -23,7 +25,11 @@ public:
 	void setMaterial(uint32 index, RefPtr<SharedMaterial> material);
 	RefPtr<SharedMaterial> getMaterial(uint32 index);
 
-private:
 	RefPtr<MeshRenderSet> _renderSet;
+
+	//RefVertexBufferView _vertexBufferView;
+	//RefIndexBufferView _indexBufferView;
+private:
+
 	Matrix4 _worldMatrix;
 };

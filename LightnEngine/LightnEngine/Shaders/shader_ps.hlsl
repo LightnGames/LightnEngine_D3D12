@@ -15,6 +15,7 @@ Texture2D t_albedo : register(t3);
 Texture2D t_normal : register(t4);
 Texture2D t_metallic : register(t5);
 Texture2D t_roughness : register(t6);
+Texture2D t_ao : register(t7);
 SamplerState t_sampler : register(s0);
 
 #define PI 3.1415926535897
@@ -100,8 +101,12 @@ float4 PSMain(PSInput input) : SV_Target
     float2 normal = t_normal.Sample(t_sampler, input.uv).rg;
     float metallic = t_metallic.Sample(t_sampler, input.uv).r;
     float roughness = t_roughness.Sample(t_sampler, input.uv).r;
+	float ao = t_ao.Sample(t_sampler, input.uv).r;
 
     albedo = pow(albedo, 2.2);
+
+	//roughness = pow(roughness, 2.2);
+	normal.g = 1.0 - normal.g;
 
     // Expand the range of the normal value from (0, +1) to (-1, +1).
     float3 bumpMap = float3(normal, 1.0);
@@ -151,10 +156,10 @@ float4 PSMain(PSInput input) : SV_Target
     float2 envBRDF = brdfLUT.Sample(t_sampler, float2(max(dot(N, V), 0.0), roughness)).rg;
     float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y);
 
-    float3 ambient = (kD * envDiffuse + envSpecular); // * ao;
+    float3 ambient = (kD * envDiffuse + envSpecular) * ao;
     ambient = ambient + directDiffuse + directSpecular;
 
-    float3 color = lerp(ambient + directSpecular, ambient, 0.001);
+    float3 color = lerp(ambient, ambient, 0.001);
     color = color / (color + float3(1.0,1.0,1.0)); //ToneMapping
     color = pow(color, 1.0 / 2.2); //linear work fllow;
     return float4(color.rgb, 1.0);

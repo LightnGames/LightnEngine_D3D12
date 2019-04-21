@@ -407,7 +407,6 @@ public:
 
 class PipelineState {
 public:
-
 	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature, const VertexShader& vertexShader, const PixelShader& pixelShader) {
 		D3D12_RASTERIZER_DESC rasterizerDesc = {};
 		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;

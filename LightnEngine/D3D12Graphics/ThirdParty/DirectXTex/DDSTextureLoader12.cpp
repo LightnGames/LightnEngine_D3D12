@@ -20,8 +20,6 @@
 #include <algorithm>
 #include <memory>
 
-//#include "d3dx12.h"
-
 inline UINT8 D3D12GetFormatPlaneCount(
 	_In_ ID3D12Device* pDevice,
 	DXGI_FORMAT Format
@@ -161,7 +159,7 @@ namespace
     //--------------------------------------------------------------------------------------
     HRESULT LoadTextureDataFromFile(
         _In_z_ const wchar_t* fileName,
-        std::unique_ptr<uint8_t[]>& ddsData,
+        UniquePtr<uint8_t[]>& ddsData,
         const DDS_HEADER** header,
         const uint8_t** bitData,
         size_t* bitSize)
@@ -912,7 +910,7 @@ namespace
         _Out_ size_t& theight,
         _Out_ size_t& tdepth,
         _Out_ size_t& skipMip,
-        std::vector<D3D12_SUBRESOURCE_DATA>& initData)
+        VectorArray<D3D12_SUBRESOURCE_DATA>& initData)
     {
         if (!bitData)
         {
@@ -1007,7 +1005,7 @@ namespace
 
     //--------------------------------------------------------------------------------------
 	HRESULT CreateTextureResource(
-		_In_ ID3D12Device* d3dDevice,
+		_In_ RefPtr<ID3D12Device> d3dDevice,
 		D3D12_RESOURCE_DIMENSION resDim,
 		size_t width,
 		size_t height,
@@ -1067,7 +1065,7 @@ namespace
         D3D12_RESOURCE_FLAGS resFlags,
         unsigned int loadFlags,
         _Outptr_ ID3D12Resource** texture,
-        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
         _Out_opt_ bool* outIsCubeMap)
     {
         HRESULT hr = S_OK;
@@ -1345,11 +1343,11 @@ namespace
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
 HRESULT DirectX::LoadDDSTextureFromMemory(
-    ID3D12Device* d3dDevice,
+    RefPtr<ID3D12Device> d3dDevice,
     const uint8_t* ddsData,
     size_t ddsDataSize,
     ID3D12Resource** texture,
-    std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+    VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
     size_t maxsize,
     DDS_ALPHA_MODE* alphaMode,
     bool* isCubeMap)
@@ -1370,14 +1368,14 @@ HRESULT DirectX::LoadDDSTextureFromMemory(
 
 _Use_decl_annotations_
 HRESULT DirectX::LoadDDSTextureFromMemoryEx(
-    ID3D12Device* d3dDevice,
+    RefPtr<ID3D12Device> d3dDevice,
     const uint8_t* ddsData,
     size_t ddsDataSize,
     size_t maxsize,
     D3D12_RESOURCE_FLAGS resFlags,
     unsigned int loadFlags,
     ID3D12Resource** texture,
-    std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+    VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
     DDS_ALPHA_MODE* alphaMode,
     bool* isCubeMap)
 {
@@ -1460,11 +1458,11 @@ HRESULT DirectX::LoadDDSTextureFromMemoryEx(
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
 HRESULT DirectX::LoadDDSTextureFromFile(
-    ID3D12Device* d3dDevice,
+    RefPtr<ID3D12Device> d3dDevice,
     const wchar_t* fileName,
     ID3D12Resource** texture,
-    std::unique_ptr<uint8_t[]>& ddsData,
-    std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+    UniquePtr<uint8_t[]>& ddsData,
+	VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
     size_t maxsize,
     DDS_ALPHA_MODE* alphaMode,
     bool* isCubeMap)
@@ -1484,14 +1482,14 @@ HRESULT DirectX::LoadDDSTextureFromFile(
 
 _Use_decl_annotations_
 HRESULT DirectX::LoadDDSTextureFromFileEx(
-    ID3D12Device* d3dDevice,
+	RefPtr<ID3D12Device> d3dDevice,
     const wchar_t* fileName,
     size_t maxsize,
     D3D12_RESOURCE_FLAGS resFlags,
     unsigned int loadFlags,
     ID3D12Resource** texture,
-    std::unique_ptr<uint8_t[]>& ddsData,
-    std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+    UniquePtr<uint8_t[]>& ddsData,
+    VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
     DDS_ALPHA_MODE* alphaMode,
     bool* isCubeMap)
 {

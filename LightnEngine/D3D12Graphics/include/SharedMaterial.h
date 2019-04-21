@@ -52,10 +52,8 @@ struct RenderSettings {
 
 class SharedMaterial {
 public:
-	SharedMaterial() :srvVertex(nullptr), srvPixel(nullptr) {}
+	SharedMaterial(RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader, RefPtr<PipelineState> pipelineState, RefPtr<RootSignature> rootSignature);
 	~SharedMaterial();
-
-	void create(RefPtr<ID3D12Device> device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader);
 
 	//このマテリアルを描画するための描画コマンドを積み込む
 	void setupRenderCommand(RenderSettings& settings);
@@ -114,8 +112,8 @@ public:
 		return nullptr;
 	}
 
-	PipelineState pipelineState;
-	RootSignature rootSignature;
+	RefPtr<PipelineState> pipelineState;
+	RefPtr<RootSignature> rootSignature;
 
 	RefPtr<VertexShader> vertexShader;
 	RefPtr<PixelShader> pixelShader;

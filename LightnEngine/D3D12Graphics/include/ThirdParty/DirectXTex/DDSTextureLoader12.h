@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 #include <stdint.h>
-
+#include <Utility.h>
 
 namespace DirectX
 {
@@ -43,47 +43,47 @@ namespace DirectX
 
     // Standard version
     HRESULT __cdecl LoadDDSTextureFromMemory(
-        _In_ ID3D12Device* d3dDevice,
+        _In_ RefPtr<ID3D12Device> d3dDevice,
         _In_reads_bytes_(ddsDataSize) const uint8_t* ddsData,
         size_t ddsDataSize,
         _Outptr_ ID3D12Resource** texture,
-        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
         size_t maxsize = 0,
         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
         _Out_opt_ bool* isCubeMap = nullptr);
 
     HRESULT __cdecl LoadDDSTextureFromFile(
-        _In_ ID3D12Device* d3dDevice,
+        _In_ RefPtr<ID3D12Device> d3dDevice,
         _In_z_ const wchar_t* szFileName,
         _Outptr_ ID3D12Resource** texture,
-        std::unique_ptr<uint8_t[]>& ddsData,
-        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        UniquePtr<uint8_t[]>& ddsData,
+        VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
         size_t maxsize = 0,
         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
         _Out_opt_ bool* isCubeMap = nullptr);
 
     // Extended version
     HRESULT __cdecl LoadDDSTextureFromMemoryEx(
-        _In_ ID3D12Device* d3dDevice,
+        _In_ RefPtr<ID3D12Device> d3dDevice,
         _In_reads_bytes_(ddsDataSize) const uint8_t* ddsData,
         size_t ddsDataSize,
         size_t maxsize,
         D3D12_RESOURCE_FLAGS resFlags,
         unsigned int loadFlags,
         _Outptr_ ID3D12Resource** texture,
-        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
         _Out_opt_ bool* isCubeMap = nullptr);
 
     HRESULT __cdecl LoadDDSTextureFromFileEx(
-        _In_ ID3D12Device* d3dDevice,
+        _In_ RefPtr<ID3D12Device> d3dDevice,
         _In_z_ const wchar_t* szFileName,
         size_t maxsize,
         D3D12_RESOURCE_FLAGS resFlags,
         unsigned int loadFlags,
         _Outptr_ ID3D12Resource** texture,
-        std::unique_ptr<uint8_t[]>& ddsData,
-        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        UniquePtr<uint8_t[]>& ddsData,
+        VectorArray<D3D12_SUBRESOURCE_DATA>& subresources,
         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
         _Out_opt_ bool* isCubeMap = nullptr);
 }

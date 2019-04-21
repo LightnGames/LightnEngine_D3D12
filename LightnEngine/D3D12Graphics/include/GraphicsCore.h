@@ -4,6 +4,7 @@
 #include "GraphicsConstantSettings.h"
 
 #include "GpuResourceManager.h"
+#include "GpuResource.h"
 #include "DescriptorHeap.h"
 #include "FrameResource.h"
 #include "CommandContext.h"
@@ -12,8 +13,6 @@
 #define DEBUG
 
 using namespace Microsoft::WRL;
-class Texture2D;
-class MeshRenderSet;
 
 class GraphicsCore :private NonCopyable {
 public:
@@ -48,7 +47,7 @@ private:
 	ComPtr<IDXGISwapChain3> _swapChain;
 	ComPtr<ID3D12Device> _device;
 
-	UniquePtr<Texture2D> _depthStencil;
+	Texture2D _depthStencil;
 	RefPtr<BufferView> _dsv;
 
 	CommandContext _commandContext;

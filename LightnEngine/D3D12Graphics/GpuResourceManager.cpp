@@ -30,8 +30,8 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		VertexShader newVertexShader;
 		String fullPath = "Shaders/" + settings.vertexShaderName;
 		newVertexShader.create(fullPath);
-		_resourcePool->_vertexShaders.emplace(settings.vertexShaderName, newVertexShader);
-		vertexShader = &(_resourcePool->_vertexShaders.at(settings.vertexShaderName));
+		auto itr = _resourcePool->_vertexShaders.emplace(settings.vertexShaderName, std::move(newVertexShader));
+		vertexShader = &(*itr.first).second;
 	}
 
 	//ピクセルシェーダーキャッシュがあればそれを使う。なければ新規生成
@@ -43,17 +43,44 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		PixelShader newPixelShader;
 		String fullPath = "Shaders/" + settings.pixelShaderName;
 		newPixelShader.create(fullPath);
-		_resourcePool->_pixelShaders.emplace(settings.pixelShaderName, newPixelShader);
-		pixelShader = &(_resourcePool->_pixelShaders.at(settings.pixelShaderName));
+		auto itr = _resourcePool->_pixelShaders.emplace(settings.pixelShaderName, std::move(newPixelShader));
+		pixelShader = &(*itr.first).second;
+	}
+
+	//ルートシグネチャキャッシュがあればそれを使う。なければ新規生成
+	RefPtr<RootSignature> rootSignature = nullptr;
+	if (_resourcePool->_rootSignatures.count(settings.name) > 0) {
+		rootSignature = &_resourcePool->_rootSignatures.at(settings.name);
+	}
+	else {
+		RootSignature newRootSignature;
+		newRootSignature.create(device, *vertexShader, *pixelShader);
+
+		String copyName(settings.name.c_str(), settings.name.length());//ここで明示的コピーを作成してemplace時にMoveコンストラクタで構築させる
+		auto itr = _resourcePool->_rootSignatures.emplace(copyName, newRootSignature);
+		rootSignature = &(*itr.first).second;
+	}
+
+	//パイプラインステートキャッシュがあればそれを使う。なければ新規生成
+	RefPtr<PipelineState> pipelineState = nullptr;
+	if (_resourcePool->_pipelineStates.count(settings.name) > 0) {
+		pipelineState = &_resourcePool->_pipelineStates.at(settings.name);
+	}
+	else {
+		PipelineState newPipelineState;
+		newPipelineState.create(device, rootSignature, *vertexShader, *pixelShader);
+
+		String copyName(settings.name.c_str(), settings.name.length());//ここで明示的コピーを作成してemplace時にMoveコンストラクタで構築させる
+		auto itr = _resourcePool->_pipelineStates.emplace(copyName, newPipelineState);
+		pipelineState = &(*itr.first).second;
 	}
 
 	//生成したマテリアルをキャッシュに登録
 	auto itr = _resourcePool->_sharedMaterials.emplace(std::piecewise_construct,
 		std::make_tuple(settings.name),
-		std::make_tuple());
+		std::make_tuple(vertexShader, pixelShader, pipelineState, rootSignature));
 
 	SharedMaterial& material = (*itr.first).second;
-	material.create(device, vertexShader, pixelShader);
 
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 

@@ -13,8 +13,8 @@ struct CommandListSet {
 	CommandListSet(ID3D12GraphicsCommandList* list, ID3D12CommandAllocator* allocator, UINT64 fenceValue) :
 		commandList(list), allocator(allocator), fenceValue(fenceValue){ }
 
-	ID3D12GraphicsCommandList* commandList;
-	ID3D12CommandAllocator* allocator;
+	RefPtr<ID3D12GraphicsCommandList> commandList;
+	RefPtr<ID3D12CommandAllocator> allocator;
 	UINT64 fenceValue;
 };
 

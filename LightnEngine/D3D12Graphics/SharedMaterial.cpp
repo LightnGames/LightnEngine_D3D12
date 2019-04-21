@@ -84,6 +84,10 @@ bool Root32bitConstantMaterial::isEnableConstant() const {
 	return !dataPtrs.empty();
 }
 
+SharedMaterial::SharedMaterial(RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader, RefPtr<PipelineState> pipelineState, RefPtr<RootSignature> rootSignature)
+	:vertexShader(vertexShader), pixelShader(pixelShader), pipelineState(pipelineState), rootSignature(rootSignature), srvVertex(nullptr), srvPixel(nullptr) {
+}
+
 SharedMaterial::~SharedMaterial() {
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 	if (srvPixel != nullptr) {
@@ -95,20 +99,12 @@ SharedMaterial::~SharedMaterial() {
 	}
 }
 
-void SharedMaterial::create(RefPtr<ID3D12Device> device, RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader) {
-	rootSignature.create(device, *vertexShader, *pixelShader);
-	pipelineState.create(device, &rootSignature, *vertexShader, *pixelShader);
-
-	this->vertexShader = vertexShader;
-	this->pixelShader = pixelShader;
-}
-
 void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 
-	commandList->SetPipelineState(pipelineState._pipelineState.Get());
-	commandList->SetGraphicsRootSignature(rootSignature._rootSignature.Get());
+	commandList->SetPipelineState(pipelineState->_pipelineState.Get());
+	commandList->SetGraphicsRootSignature(rootSignature->_rootSignature.Get());
 
 	//定数バッファデータを現在のフレームで使用する定数バッファにコピー
 	vertexConstantBuffer.flashBufferData(frameIndex);
