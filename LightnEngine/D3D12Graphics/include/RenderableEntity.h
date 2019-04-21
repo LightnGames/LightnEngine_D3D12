@@ -26,6 +26,7 @@ public:
 	RefPtr<SharedMaterial> getMaterial(uint32 index);
 
 	RefPtr<MeshRenderSet> _renderSet;
+	UnorderedMap<uint32, RefPtr<SharedMaterial>> _materialOverrides;
 
 	//RefVertexBufferView _vertexBufferView;
 	//RefIndexBufferView _indexBufferView;

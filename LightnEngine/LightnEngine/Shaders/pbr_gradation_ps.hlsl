@@ -11,11 +11,6 @@ struct PSInput
 TextureCube irradianceMap : register(t0);
 TextureCube prefilterMap : register(t1);
 Texture2D brdfLUT : register(t2);
-Texture2D t_albedo : register(t3);
-Texture2D t_normal : register(t4);
-Texture2D t_metallic : register(t5);
-Texture2D t_roughness : register(t6);
-Texture2D t_ao : register(t7);
 SamplerState t_sampler : register(s0);
 
 #define PI 3.1415926535897
@@ -25,12 +20,18 @@ cbuffer DirectionalLightBuffer : register(b0)
 {
     float intensity;
     float3 direction;
-};
-
-cbuffer ROOT_32BIT_CONSTANTS_DirectionalLight : register(b1)
-{
 	float4 color;
 };
+
+cbuffer ROOT_32BIT_CONSTANTS_PBR : register(b1)
+{
+	float p_metallic;
+	float p_roughness;
+};
+//cbuffer ROOT_32BIT_CONSTANTS_DirectionalLight : register(b1)
+//{
+//
+//};
 
 //ŠgŽU”½ŽËBRDF
 float3 DiffuseBRDF(float3 diffuseColor)
@@ -97,25 +98,10 @@ float3 FresnelSchlickRoughness(in float cosTheta, in float3 F0, in float roughne
 
 float4 PSMain(PSInput input) : SV_Target
 {
-    float3 albedo = t_albedo.Sample(t_sampler, input.uv).rgb;
-    float2 normal = t_normal.Sample(t_sampler, input.uv).rg;
-    float metallic = t_metallic.Sample(t_sampler, input.uv).r;
-    float roughness = t_roughness.Sample(t_sampler, input.uv).r;
-	float ao = t_ao.Sample(t_sampler, input.uv).r;
-
-    albedo = pow(albedo, 2.2);
-
-	//roughness = pow(roughness, 2.2);
-	normal.g = 1.0 - normal.g;
-
-    // Expand the range of the normal value from (0, +1) to (-1, +1).
-    float3 bumpMap = float3(normal, 1.0);
-    bumpMap = (bumpMap * 2.0f) - 1.0f;
-
-    // Calculate the normal from the data in the bump map.
-    float3 N = (bumpMap.x * input.tangent) + (bumpMap.y * input.binormal) + (bumpMap.z * input.normal);
-    N = normalize(N);
-    //N = input.normal;
+	float3 albedo = float3(1, 0, 0);
+	float roughness = p_roughness;
+	float metallic = p_metallic;
+    float3 N = input.normal;
 
     float3 diffuseColor = lerp(albedo.rgb, float3(0.04, 0.04, 0.04), metallic);
     float3 specularColor = lerp(float3(0.04, 0.04, 0.04), albedo.rgb, metallic);
@@ -156,10 +142,10 @@ float4 PSMain(PSInput input) : SV_Target
     float2 envBRDF = brdfLUT.Sample(t_sampler, float2(max(dot(N, V), 0.0), roughness)).rg;
     float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y);
 
-    float3 ambient = (kD * envDiffuse + envSpecular) * ao;
+	float3 ambient = (kD * envDiffuse + envSpecular);
     ambient = ambient + directDiffuse + directSpecular;
-
-    float3 color = lerp(float3(ao,ao,ao), ambient, 0.001);
+	
+    float3 color = lerp(ambient, ambient, 0.001);
     color = color / (color + float3(1.0,1.0,1.0)); //ToneMapping
     color = pow(color, 1.0 / 2.2); //linear work fllow;
     return float4(color.rgb, 1.0);

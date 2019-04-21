@@ -29,7 +29,7 @@ public:
 
 	VertexBuffer _vertexBuffer;
 	IndexBuffer _indexBuffer;
+	VectorArray<MaterialSlot> _materialSlots;
 
 private:
-	VectorArray<MaterialSlot> _materialSlots;
 };
