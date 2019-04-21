@@ -53,12 +53,12 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		rootSignature = &_resourcePool->_rootSignatures.at(settings.name);
 	}
 	else {
-		RootSignature newRootSignature;
-		newRootSignature.create(device, *vertexShader, *pixelShader);
+		auto itr = _resourcePool->_rootSignatures.emplace(std::piecewise_construct,
+			std::make_tuple(settings.name),
+			std::make_tuple());
 
-		String copyName(settings.name.c_str(), settings.name.length());//ここで明示的コピーを作成してemplace時にMoveコンストラクタで構築させる
-		auto itr = _resourcePool->_rootSignatures.emplace(copyName, newRootSignature);
 		rootSignature = &(*itr.first).second;
+		rootSignature->create(device, *vertexShader, *pixelShader);
 	}
 
 	//パイプラインステートキャッシュがあればそれを使う。なければ新規生成
@@ -67,25 +67,27 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		pipelineState = &_resourcePool->_pipelineStates.at(settings.name);
 	}
 	else {
-		PipelineState newPipelineState;
-		newPipelineState.create(device, rootSignature, *vertexShader, *pixelShader);
+		auto itr = _resourcePool->_pipelineStates.emplace(std::piecewise_construct,
+			std::make_tuple(settings.name),
+			std::make_tuple());
 
-		String copyName(settings.name.c_str(), settings.name.length());//ここで明示的コピーを作成してemplace時にMoveコンストラクタで構築させる
-		auto itr = _resourcePool->_pipelineStates.emplace(copyName, newPipelineState);
 		pipelineState = &(*itr.first).second;
+		pipelineState->create(device, rootSignature, *vertexShader, *pixelShader);
 	}
 
 	//生成したマテリアルをキャッシュに登録
+	const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
+	const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
 	auto itr = _resourcePool->_sharedMaterials.emplace(std::piecewise_construct,
 		std::make_tuple(settings.name),
-		std::make_tuple(vertexShader, pixelShader, pipelineState, rootSignature));
+		std::make_tuple(vsReflection, psReflection, pipelineState->getRefPipelineState(), rootSignature->getRefRootSignature()));
 
 	SharedMaterial& material = (*itr.first).second;
 
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 
 	//頂点シェーダーテクスチャSRV生成
-	if (vertexShader->shaderReflectionResult.srvRangeDescs.size() > 0) {
+	if (vsReflection.srvRangeDescs.size() > 0) {
 		VectorArray<RefPtr<ID3D12Resource>> textures(settings.vsTextures.size());
 
 		for (size_t i = 0; i < settings.vsTextures.size(); ++i) {
@@ -95,12 +97,12 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			textures[i] = texturePtr->get();
 		}
 		//settings.vsTextures.size()
-		manager.createShaderResourceView(textures.data(), &material.srvVertex, static_cast<uint32>(settings.vsTextures.size()));
+		manager.createShaderResourceView(textures.data(), &material._srvVertex, static_cast<uint32>(settings.vsTextures.size()));
 	}
 	//assert(vertexShader->shaderReflectionResult.srvRangeDescs.size()== settings.vsTextures.size() && "頂点シェーダー定義と指定したテクスチャ枚数が異なります！");
 
 	//ピクセルシェーダーテクスチャSRV生成
-	if (pixelShader->shaderReflectionResult.srvRangeDescs.size() > 0) {
+	if (psReflection.srvRangeDescs.size() > 0) {
 		VectorArray<RefPtr<ID3D12Resource>> textures(settings.psTextures.size());
 
 		for (size_t i = 0; i < settings.psTextures.size(); ++i) {
@@ -110,7 +112,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			textures[i] = texturePtr->get();
 		}
 
-		manager.createShaderResourceView(textures.data(), &material.srvPixel, static_cast<uint32>(settings.psTextures.size()));
+		manager.createShaderResourceView(textures.data(), &material._srvPixel, static_cast<uint32>(settings.psTextures.size()));
 	}
 	//assert(pixelShader->shaderReflectionResult.srvRangeDescs.size() == settings.psTextures.size() && "ピクセルシェーダー定義と指定したテクスチャ枚数が異なります！");
 
@@ -118,25 +120,25 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 	//頂点シェーダーの定数バッファサイズを取得して定数バッファ本体を生成
 	VectorArray<uint32> vertexCbSizes = vertexShader->getConstantBufferSizes();
 	if (!vertexCbSizes.empty()) {
-		material.vertexConstantBuffer.create(device, vertexCbSizes);
+		material._vertexConstantBuffer.create(device, vertexCbSizes);
 	}
 
 	//頂点シェーダーのルート32bit定数サイズを取得して初期化
 	VectorArray<uint32> vertexRoot32bitSizes = vertexShader->getRoot32bitConstantSizes();
 	if (!vertexRoot32bitSizes.empty()) {
-		material.vertexRoot32bitConstant.create(device, vertexRoot32bitSizes);
+		material._vertexRoot32bitConstant.create(vertexRoot32bitSizes);
 	}
 
 	//ピクセルシェーダーの定数バッファサイズを取得して定数バッファ本体を生成
 	VectorArray<uint32> pixelCbSizes = pixelShader->getConstantBufferSizes();
 	if (!pixelCbSizes.empty()) {
-		material.pixelConstantBuffer.create(device, pixelCbSizes);
+		material._pixelConstantBuffer.create(device, pixelCbSizes);
 	}
 
 	//ピクセルシェーダーのルート32bit定数サイズを取得して初期化
 	VectorArray<uint32> pixelRoot32bitSizes = pixelShader->getRoot32bitConstantSizes();
 	if (!pixelRoot32bitSizes.empty()) {
-		material.pixelRoot32bitConstant.create(device, pixelRoot32bitSizes);
+		material._pixelRoot32bitConstant.create(pixelRoot32bitSizes);
 	}
 }
 

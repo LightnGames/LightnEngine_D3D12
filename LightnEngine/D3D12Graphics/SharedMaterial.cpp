@@ -72,7 +72,7 @@ Root32bitConstantMaterial::~Root32bitConstantMaterial(){
 	}
 }
 
-void Root32bitConstantMaterial::create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes) {
+void Root32bitConstantMaterial::create(const VectorArray<uint32>& bufferSizes) {
 	dataPtrs.resize(bufferSizes.size());
 
 	for (size_t i = 0; i < bufferSizes.size(); ++i) {
@@ -84,18 +84,22 @@ bool Root32bitConstantMaterial::isEnableConstant() const {
 	return !dataPtrs.empty();
 }
 
-SharedMaterial::SharedMaterial(RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader, RefPtr<PipelineState> pipelineState, RefPtr<RootSignature> rootSignature)
-	:vertexShader(vertexShader), pixelShader(pixelShader), pipelineState(pipelineState), rootSignature(rootSignature), srvVertex(), srvPixel() {
+SharedMaterial::SharedMaterial(
+	const ShaderReflectionResult& vsReflection,
+	const ShaderReflectionResult& psReflection,
+	const RefPipelineState& pipelineState,
+	const RefRootsignature& rootSignature)
+	:_vsReflection(vsReflection), _psReflection(psReflection), _pipelineState(pipelineState), _rootSignature(rootSignature), _srvVertex(), _srvPixel() {
 }
 
 SharedMaterial::~SharedMaterial() {
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-	if (srvPixel.isEnable()) {
-		manager.discardShaderResourceView(srvPixel);
+	if (_srvPixel.isEnable()) {
+		manager.discardShaderResourceView(_srvPixel);
 	}
 
-	if (srvVertex.isEnable()) {
-		manager.discardShaderResourceView(srvVertex);
+	if (_srvVertex.isEnable()) {
+		manager.discardShaderResourceView(_srvVertex);
 	}
 }
 
@@ -103,63 +107,60 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 
-	commandList->SetPipelineState(pipelineState->_pipelineState.Get());
-	commandList->SetGraphicsRootSignature(rootSignature->_rootSignature.Get());
+	commandList->SetPipelineState(_pipelineState.pipelineState);
+	commandList->SetGraphicsRootSignature(_rootSignature.rootSignature);
 
 	//定数バッファデータを現在のフレームで使用する定数バッファにコピー
-	vertexConstantBuffer.flashBufferData(frameIndex);
-	pixelConstantBuffer.flashBufferData(frameIndex);
-
-	const ShaderReflectionResult& pixelShaderResult = pixelShader->shaderReflectionResult;
-	const ShaderReflectionResult& vertexShaderResult = vertexShader->shaderReflectionResult;
+	_vertexConstantBuffer.flashBufferData(frameIndex);
+	_pixelConstantBuffer.flashBufferData(frameIndex);
 
 	//このマテリアルで有効なリソースビューをセットする
 	UINT descriptorTableIndex = 0;
-	if (srvPixel.isEnable()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvPixel.gpuHandle);
+	if (_srvPixel.isEnable()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvPixel.gpuHandle);
 		descriptorTableIndex++;
 	}
 
-	if (pixelConstantBuffer.isEnableBuffer()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, pixelConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
+	if (_pixelConstantBuffer.isEnableBuffer()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _pixelConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
 		descriptorTableIndex++;
 	}
 
 	bool isPixelRoot32bitOverride = !settings.pixelRoot32bitConstants.empty();
-	for (size_t i = 0; i < pixelShaderResult.root32bitConstants.size(); ++i) {
+	for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
 		void* ptr = nullptr;
 		if (isPixelRoot32bitOverride) {
 			ptr = settings.pixelRoot32bitConstants[i];
 		}
 		else {
-			ptr = pixelRoot32bitConstant.dataPtrs[i];
+			ptr = _pixelRoot32bitConstant.dataPtrs[i];
 		}
 
-		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, pixelShaderResult.getRoot32bitConstantNum(static_cast<uint32>(i)), ptr, 0);
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, _psReflection.getRoot32bitConstantNum(static_cast<uint32>(i)), ptr, 0);
 		descriptorTableIndex++;
 	}
 
-	if (srvVertex.isEnable()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvVertex.gpuHandle);
+	if (_srvVertex.isEnable()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvVertex.gpuHandle);
 		descriptorTableIndex++;
 	}
 
-	if (vertexConstantBuffer.isEnableBuffer()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, vertexConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
+	if (_vertexConstantBuffer.isEnableBuffer()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _vertexConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
 		descriptorTableIndex++;
 	}
 
 	bool isVertexRoot32bitOverride = !settings.vertexRoot32bitConstants.empty();
-	for (size_t i = 0; i < vertexShaderResult.root32bitConstants.size(); ++i) {
+	for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
 		void* ptr = nullptr;
 		if (isVertexRoot32bitOverride) {
 			ptr = settings.vertexRoot32bitConstants[i];
 		}
 		else {
-			ptr = vertexRoot32bitConstant.dataPtrs[i];
+			ptr = _vertexRoot32bitConstant.dataPtrs[i];
 		}
 
-		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, vertexShaderResult.getRoot32bitConstantNum(static_cast<uint32>(i)), ptr, 0);
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, _vsReflection.getRoot32bitConstantNum(static_cast<uint32>(i)), ptr, 0);
 		descriptorTableIndex++;
 	}
 

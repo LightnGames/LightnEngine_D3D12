@@ -10,6 +10,17 @@
 #include "D3D12Helper.h"
 #include "GraphicsConstantSettings.h"
 
+//参照のみのオブジェクト
+struct RefRootsignature {
+	RefRootsignature(RefPtr<ID3D12RootSignature> rootSignature) :rootSignature(rootSignature) {}
+	RefPtr<ID3D12RootSignature> rootSignature;
+};
+
+struct RefPipelineState {
+	RefPipelineState(RefPtr<ID3D12PipelineState> pipelineState) :pipelineState(pipelineState) {}
+	RefPtr<ID3D12PipelineState> pipelineState;
+};
+
 struct ShaderReflectionCBV {
 	String name;
 	String type;
@@ -322,7 +333,7 @@ public:
 	}
 };
 
-class RootSignature {
+class RootSignature :private NonCopyable{
 public:
 
 	RootSignature() {}
@@ -402,10 +413,15 @@ public:
 		NAME_D3D12_OBJECT(_rootSignature);
 	}
 
+	//参照のみのコピーオブジェクトを取得
+	RefRootsignature getRefRootSignature() const {
+		return RefRootsignature(_rootSignature.Get());
+	}
+
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootSignature;
 };
 
-class PipelineState {
+class PipelineState :private NonCopyable {
 public:
 	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature, const VertexShader& vertexShader, const PixelShader& pixelShader) {
 		D3D12_RASTERIZER_DESC rasterizerDesc = {};
@@ -474,6 +490,11 @@ public:
 		psoDesc.SampleDesc.Count = 1;
 		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
 		NAME_D3D12_OBJECT(_pipelineState);
+	}
+
+	//参照のみのコピーオブジェクトを取得
+	RefPipelineState getRefPipelineState() const {
+		return RefPipelineState(_pipelineState.Get());
 	}
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState;

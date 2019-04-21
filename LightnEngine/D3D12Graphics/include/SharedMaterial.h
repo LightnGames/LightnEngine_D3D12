@@ -34,7 +34,7 @@ struct ConstantBufferMaterial {
 struct Root32bitConstantMaterial {
 	~Root32bitConstantMaterial();
 
-	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);
+	void create(const VectorArray<uint32>& bufferSizes);
 	bool isEnableConstant() const;
 
 	VectorArray<byte*> dataPtrs;
@@ -52,7 +52,12 @@ struct RenderSettings {
 
 class SharedMaterial {
 public:
-	SharedMaterial(RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader, RefPtr<PipelineState> pipelineState, RefPtr<RootSignature> rootSignature);
+	SharedMaterial(
+		const ShaderReflectionResult& vsReflection,
+		const ShaderReflectionResult& psReflection,
+		const RefPipelineState& pipelineState,
+		const RefRootsignature& rootSignature);
+
 	~SharedMaterial();
 
 	//このマテリアルを描画するための描画コマンドを積み込む
@@ -72,57 +77,55 @@ public:
 	template <class T>
 	RefPtr<T> getParameter(const String& name) {
 		//頂点シェーダー定義からパラメータを検索
-		const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
 
 		//定数バッファ
-		for (size_t i = 0; i < vsReflection.constantBuffers.size(); ++i) {
-			const auto variable = vsReflection.constantBuffers[i].getVariable(name);
+		for (size_t i = 0; i < _vsReflection.constantBuffers.size(); ++i) {
+			const auto variable = _vsReflection.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexConstantBuffer.dataPtrs[i]) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_vertexConstantBuffer.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
 		//ルート32bit定数
-		for (size_t i = 0; i < vsReflection.root32bitConstants.size(); ++i) {
-			const auto variable = vsReflection.root32bitConstants[i].getVariable(name);
+		for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
+			const auto variable = _vsReflection.root32bitConstants[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(vertexRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_vertexRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
 		//ピクセルシェーダー定義からパラメータを検索
-		const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
 
 		//定数バッファ
-		for (size_t i = 0; i < psReflection.constantBuffers.size(); ++i) {
-			const auto variable = psReflection.constantBuffers[i].getVariable(name);
+		for (size_t i = 0; i < _psReflection.constantBuffers.size(); ++i) {
+			const auto variable = _psReflection.constantBuffers[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelConstantBuffer.dataPtrs[i]) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_pixelConstantBuffer.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
 		//ルート32bit定数
-		for (size_t i = 0; i < psReflection.root32bitConstants.size(); ++i) {
-			const auto variable = psReflection.root32bitConstants[i].getVariable(name);
+		for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
+			const auto variable = _psReflection.root32bitConstants[i].getVariable(name);
 			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(pixelRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
+				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_pixelRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
 			}
 		}
 
 		return nullptr;
 	}
 
-	RefPtr<PipelineState> pipelineState;
-	RefPtr<RootSignature> rootSignature;
+	const RefPipelineState _pipelineState;
+	const RefRootsignature _rootSignature;
 
-	RefPtr<VertexShader> vertexShader;
-	RefPtr<PixelShader> pixelShader;
+	const ShaderReflectionResult _vsReflection;
+	const ShaderReflectionResult _psReflection;
 
-	BufferView srvPixel;
-	BufferView srvVertex;
+	BufferView _srvPixel;
+	BufferView _srvVertex;
 
-	Root32bitConstantMaterial vertexRoot32bitConstant;
-	Root32bitConstantMaterial pixelRoot32bitConstant;
-	ConstantBufferMaterial vertexConstantBuffer;
-	ConstantBufferMaterial pixelConstantBuffer;
+	Root32bitConstantMaterial _vertexRoot32bitConstant;
+	Root32bitConstantMaterial _pixelRoot32bitConstant;
+	ConstantBufferMaterial _vertexConstantBuffer;
+	ConstantBufferMaterial _pixelConstantBuffer;
 };
