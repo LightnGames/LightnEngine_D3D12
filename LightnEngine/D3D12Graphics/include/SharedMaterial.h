@@ -12,6 +12,17 @@ class PixelShader;
 
 #include "PipelineState.h"
 
+using Root32bitConstantInfo = std::pair<const void*, uint32>;//データポインタ、サイズ
+
+struct RefConstantBufferViews {
+	RefBufferView views[FrameCount];
+
+	//このコンスタントバッファーたちが有効か？
+	inline bool isEnableBuffers() const {
+		return views[0].isEnable();//有効であればフレームカウントずつ生成するので０番だけ見ればよい
+	}
+};
+
 struct ConstantBufferMaterial {
 	ConstantBufferMaterial();
 	~ConstantBufferMaterial();
@@ -25,6 +36,15 @@ struct ConstantBufferMaterial {
 
 	//現在設定されている定数バッファのデータを指定フレームの定数バッファに更新
 	void flashBufferData(uint32 frameIndex);
+
+	//バッファビューの参照用コピーをフレームバッファリングする数分取得
+	RefConstantBufferViews getRefBufferViews() const{
+		return RefConstantBufferViews{
+			constantBufferViews[0].getRefBufferView(),
+			constantBufferViews[1].getRefBufferView(),
+			constantBufferViews[2].getRefBufferView()
+		};
+	}
 
 	VectorArray<byte*> dataPtrs;
 	VectorArray<ConstantBuffer*> constantBuffers[FrameCount];
@@ -45,9 +65,36 @@ struct RenderSettings {
 		commandList(commandList), frameIndex(frameIndex) {}
 
 	RefPtr<ID3D12GraphicsCommandList> commandList;
-	VectorArray<void*> vertexRoot32bitConstants;
-	VectorArray<void*> pixelRoot32bitConstants;
+	VectorArray<Root32bitConstantInfo> vertexRoot32bitConstants;
+	VectorArray<Root32bitConstantInfo> pixelRoot32bitConstants;
 	const uint32 frameIndex;
+};
+
+//描画コマンド構築のみに必要な最小限のデータをパックした構造体
+struct RefSharedMaterial {
+	RefSharedMaterial(
+		const RefPipelineState& pipelineState,
+		const RefRootsignature& rootSignature,
+		const RefBufferView& srvPixel,
+		const RefBufferView& srvVertex,
+		const RefConstantBufferViews& vertexConstantViews,
+		const RefConstantBufferViews& pixelConstantViews) :
+		_pipelineState(pipelineState),
+		_rootSignature(rootSignature),
+		_srvPixel(srvPixel),
+		_srvVertex(srvVertex),
+		_vertexConstantViews(vertexConstantViews),
+		_pixelConstantViews(pixelConstantViews) {}
+
+	//描画コマンド構築
+	void setupRenderCommand(RenderSettings& settings) const;
+
+	const RefPipelineState _pipelineState;
+	const RefRootsignature _rootSignature;
+	const RefBufferView _srvPixel;
+	const RefBufferView _srvVertex;
+	const RefConstantBufferViews _vertexConstantViews;
+	const RefConstantBufferViews _pixelConstantViews;
 };
 
 class SharedMaterial {
@@ -115,6 +162,15 @@ public:
 		return nullptr;
 	}
 
+	//コマンド構築データのみのマテリアルデータ構造体を取得
+	RefSharedMaterial getRefSharedMaterial() const {
+		return RefSharedMaterial(_pipelineState,_rootSignature,
+			_srvPixel.getRefBufferView(),
+			_srvVertex.getRefBufferView(),
+			_vertexConstantBuffer.getRefBufferViews(),
+			_pixelConstantBuffer.getRefBufferViews());
+	}
+
 	const RefPipelineState _pipelineState;
 	const RefRootsignature _rootSignature;
 
@@ -129,26 +185,3 @@ public:
 	ConstantBufferMaterial _vertexConstantBuffer;
 	ConstantBufferMaterial _pixelConstantBuffer;
 };
-
-//struct RefSharedMaterial{
-//	RefSharedMaterial(
-//		const RefPipelineState& pipelineState,
-//		const RefRootsignature& rootSignature,
-//		const BufferView& srvPixel,
-//		const BufferView& srvVertex,
-//		const BufferView vertexConstantBuffer[FrameCount],
-//		const BufferView pixelConstantBuffer[FrameCount]):
-//	_pipelineState(pipelineState),
-//	_rootSignature(rootSignature),
-//	_srvPixel(srvPixel),
-//	_srvVertex(srvVertex),
-//	_vertexConstantBuffer(vertexConstantBuffer),
-//	_pixelConstantBuffer(pixelConstantBuffer){}
-//	const RefPipelineState _pipelineState;
-//	const RefRootsignature _rootSignature;
-//
-//	const BufferView _srvPixel;
-//	const BufferView _srvVertex;
-//	const BufferView _vertexConstantBuffer[FrameCount];
-//	const BufferView _pixelConstantBuffer[FrameCount];
-//};

@@ -188,7 +188,7 @@ void GraphicsCore::createTextures(const VectorArray<String>& textureNames){
 }
 
 void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames){
-	_gpuResourceManager.createMeshSets(_device.Get(), _commandContext, fileNames);
+	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _commandContext, fileNames);
 }
 
 void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings){

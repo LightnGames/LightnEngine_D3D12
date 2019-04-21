@@ -127,9 +127,9 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 
 	bool isPixelRoot32bitOverride = !pixelRoot32bitConstants.empty();
 	for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
-		void* ptr = nullptr;
+		const void* ptr = nullptr;
 		if (isPixelRoot32bitOverride) {
-			ptr = pixelRoot32bitConstants[i];
+			ptr = pixelRoot32bitConstants[i].first;
 		}
 		else {
 			ptr = _pixelRoot32bitConstant.dataPtrs[i];
@@ -151,9 +151,9 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 
 	bool isVertexRoot32bitOverride = !vertexRoot32bitConstants.empty();
 	for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
-		void* ptr = nullptr;
+		const void* ptr = nullptr;
 		if (isVertexRoot32bitOverride) {
-			ptr = vertexRoot32bitConstants[i];
+			ptr = vertexRoot32bitConstants[i].first;
 		}
 		else {
 			ptr = _vertexRoot32bitConstant.dataPtrs[i];
@@ -167,4 +167,49 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 
 	pixelRoot32bitConstants.clear();
 	vertexRoot32bitConstants.clear();
+}
+
+void RefSharedMaterial::setupRenderCommand(RenderSettings& settings) const{
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+	const uint32 frameIndex = settings.frameIndex;
+
+	commandList->SetPipelineState(_pipelineState.pipelineState);
+	commandList->SetGraphicsRootSignature(_rootSignature.rootSignature);
+
+	//このマテリアルで有効なリソースビューをセットする
+	UINT descriptorTableIndex = 0;
+	if (_srvPixel.isEnable()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvPixel.gpuHandle);
+		descriptorTableIndex++;
+	}
+
+	if (_pixelConstantViews.isEnableBuffers()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _pixelConstantViews.views[frameIndex].gpuHandle);
+		descriptorTableIndex++;
+	}
+
+	for (const auto& root32bitConstantInfo : settings.pixelRoot32bitConstants) {
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, root32bitConstantInfo.second / 4, root32bitConstantInfo.first, 0);
+		descriptorTableIndex++;
+	}
+
+	if (_srvVertex.isEnable()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvVertex.gpuHandle);
+		descriptorTableIndex++;
+	}
+
+	if (_vertexConstantViews.isEnableBuffers()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _vertexConstantViews.views[frameIndex].gpuHandle);
+		descriptorTableIndex++;
+	}
+
+	for (const auto& root32bitConstantInfo : settings.vertexRoot32bitConstants) {
+		commandList->SetGraphicsRoot32BitConstants(descriptorTableIndex, root32bitConstantInfo.second / 4, root32bitConstantInfo.first, 0);
+		descriptorTableIndex++;
+	}
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	settings.vertexRoot32bitConstants.clear();
+	settings.pixelRoot32bitConstants.clear();
 }

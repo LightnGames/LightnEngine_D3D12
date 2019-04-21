@@ -4,16 +4,22 @@
 #include <Utility.h>
 #include "stdafx.h"
 #include "GpuResource.h"
+#include "SharedMaterial.h"
 
-struct RenderSettings;
-class SharedMaterial;
+//マテリアルの描画範囲定義
+struct MaterialDrawRange {
+	MaterialDrawRange(uint32 indexCount, uint32 indexOffset) :indexCount(indexCount), indexOffset(indexOffset) {}
+
+	uint32 indexCount;
+	uint32 indexOffset;
+};
 
 //マテリアルごとのインデックス範囲データ
 struct MaterialSlot {
-	MaterialSlot() :indexCount(0), indexOffset(0), material(nullptr) {}
-	uint32 indexCount;
-	uint32 indexOffset;
-	RefPtr<SharedMaterial> material;
+	MaterialSlot(const MaterialDrawRange& range, const RefSharedMaterial& material) :range(range), material(material) {}
+
+	const MaterialDrawRange range;
+	const RefSharedMaterial material;
 };
 
 struct IRenderableEntity {
@@ -21,32 +27,40 @@ struct IRenderableEntity {
 	virtual	void setupRenderCommand(RenderSettings& settings) = 0;
 };
 
-class StaticSingleMeshRender{
+//RCG...RenderCommandGroup
+class StaticSingleMeshRCG{
 public:
-	StaticSingleMeshRender(
+	StaticSingleMeshRCG(
 		const RefVertexBufferView& _vertexBufferView,
 		const RefIndexBufferView& _indexBufferView,
 		const VectorArray<MaterialSlot>& materialSlots);
 	
-	~StaticSingleMeshRender(){}
+	~StaticSingleMeshRCG(){}
 
 	void setupRenderCommand(RenderSettings& settings) const;
 	void updateWorldMatrix(const Matrix4& worldMatrix);
 
-	void setMaterial(uint32 index, RefPtr<SharedMaterial> material);
-	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
-
 private:
+	Matrix4 _worldMatrix;
 	const RefVertexBufferView _vertexBufferView;
 	const RefIndexBufferView _indexBufferView;
 	VectorArray<MaterialSlot> _materialSlots;
-	Matrix4 _worldMatrix;
 };
 
+class StaticSingleMeshRender {
+public:
+	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
+	void updateWorldMatrix(const Matrix4& worldMatrix);
+
+	VectorArray<RefPtr<SharedMaterial>> _materials;
+	RefPtr<StaticSingleMeshRCG> _rcg;
+};
+
+//頂点バッファとインデックスバッファのリソース管理
 struct VertexAndIndexBuffer {
-	VertexAndIndexBuffer(const VectorArray<MaterialSlot>& materialSlots) :materialSlots(materialSlots) {}
+	VertexAndIndexBuffer(const VectorArray<MaterialDrawRange>& materialDrawRanges) :materialDrawRanges(materialDrawRanges) {}
 
 	VertexBuffer vertexBuffer;
 	IndexBuffer indexBuffer;
-	VectorArray<MaterialSlot> materialSlots;
+	VectorArray<MaterialDrawRange> materialDrawRanges;
 };

@@ -93,24 +93,24 @@ public:
 		Matrix4 mtxProj = Matrix4::perspectiveFovLH(radianFromDegree(60), gfx.getWidth() / static_cast<float>(gfx.getHeight()), 0.01f, 1000);
 		//mtxProj = Matrix4::identity;
 
-		_mesh->updateWorldMatrix(mtxWorld.transpose());
-		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
-		_mesh->getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
-		_mesh->getMaterial(0)->setParameter<Vector3>("color", color);
-		_mesh->getMaterial(0)->setParameter<float>("intensity", intensity);
+		_mesh.updateWorldMatrix(mtxWorld.transpose());
+		_mesh.getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+		_mesh.getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
+		_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
+		_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky->updateWorldMatrix(skyMtxWorld.transpose());
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+		_sky.getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	RefPtr<StaticSingleMeshRender> _sky;
-	RefPtr<StaticSingleMeshRender> _mesh;
+	StaticSingleMeshRender _sky;
+	StaticSingleMeshRender _mesh;
 };
 
 
@@ -201,24 +201,24 @@ public:
 		Matrix4 mtxProj = Matrix4::perspectiveFovLH(radianFromDegree(60), gfx.getWidth() / static_cast<float>(gfx.getHeight()), 0.01f, 1000);
 		//mtxProj = Matrix4::identity;
 
-		_mesh->updateWorldMatrix(mtxWorld.transpose());
-		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-		_mesh->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
-		_mesh->getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
-		_mesh->getMaterial(0)->setParameter<Vector3>("color", color);
-		_mesh->getMaterial(0)->setParameter<float>("intensity", intensity);
+		_mesh.updateWorldMatrix(mtxWorld.transpose());
+		_mesh.getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+		_mesh.getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
+		_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
+		_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky->updateWorldMatrix(skyMtxWorld.transpose());
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+		_sky.getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	RefPtr<StaticSingleMeshRender> _sky;
-	RefPtr<StaticSingleMeshRender> _mesh;
+	StaticSingleMeshRender _sky;
+	StaticSingleMeshRender _mesh;
 };
 
 
@@ -321,31 +321,31 @@ public:
 				uint32 index = x * xNum + y;
 				float metallic = y / (float)(yNum-1);
 				float roughness = x / (float)(xNum-1);
-				_meshes[index]->updateWorldMatrix(mtxWorld.multiply(Matrix4::translateXYZ(offset)).transpose());
-				_meshes[index]->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-				_meshes[index]->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
-				_meshes[index]->getMaterial(0)->setParameter<Vector3>("direction", lightDir);
-				_meshes[index]->getMaterial(0)->setParameter<Vector3>("color", color);
-				_meshes[index]->getMaterial(0)->setParameter<float>("intensity", intensity);
-				_meshes[index]->getMaterial(0)->setParameter<float>("p_metallic", metallic);
-				_meshes[index]->getMaterial(0)->setParameter<float>("p_roughness", roughness);
+				_meshes[index].updateWorldMatrix(mtxWorld.multiply(Matrix4::translateXYZ(offset)).transpose());
+				_meshes[index].getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+				_meshes[index].getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+				_meshes[index].getMaterial(0)->setParameter<Vector3>("direction", lightDir);
+				_meshes[index].getMaterial(0)->setParameter<Vector3>("color", color);
+				_meshes[index].getMaterial(0)->setParameter<float>("intensity", intensity);
+				_meshes[index].getMaterial(0)->setParameter<float>("p_metallic", metallic);
+				_meshes[index].getMaterial(0)->setParameter<float>("p_roughness", roughness);
 			}
 		}
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky->updateWorldMatrix(skyMtxWorld.transpose());
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
-		_sky->getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.getMaterial(0)->setParameter<Matrix4>("mtxView", mtxView.transpose());
+		_sky.getMaterial(0)->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	RefPtr<StaticSingleMeshRender> _sky;
+	StaticSingleMeshRender _sky;
 	
 	const uint32 xNum = 7;
 	const uint32 yNum = 7;
-	VectorArray<RefPtr<StaticSingleMeshRender>> _meshes;
+	VectorArray<StaticSingleMeshRender> _meshes;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {

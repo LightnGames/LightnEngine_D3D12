@@ -8,7 +8,8 @@
 class GraphicsCore;
 class SharedMaterial;
 class Texture2D;
-class StaticSingleMeshRender;
+
+#include <RenderableEntity.h>
 
 class GFXInterface :public Singleton<GFXInterface>{
 public:
@@ -26,7 +27,7 @@ public:
 	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial);
 	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture);
 
-	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
+	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 
 	uint32 getWidth() const;
 	uint32 getHeight() const;

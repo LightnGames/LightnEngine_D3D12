@@ -7,6 +7,8 @@ struct RefBufferView {
 	RefBufferView(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) :
 		cpuHandle(cpuHandle), gpuHandle(gpuHandle) {}
 
+	inline bool isEnable() const { return !(cpuHandle.ptr == 0 && gpuHandle.ptr == 0); }
+
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
 };

@@ -2,7 +2,7 @@
 #include "SharedMaterial.h"
 #include "GpuResource.h"
 
-StaticSingleMeshRender::StaticSingleMeshRender(
+StaticSingleMeshRCG::StaticSingleMeshRCG(
 	const RefVertexBufferView& vertexBufferView,
 	const RefIndexBufferView& indexBufferView,
 	const VectorArray<MaterialSlot>& materialSlots) :
@@ -12,27 +12,27 @@ StaticSingleMeshRender::StaticSingleMeshRender(
 	_worldMatrix(Matrix4::identity) {
 }
 
-void StaticSingleMeshRender::setupRenderCommand(RenderSettings& settings) const{
-	settings.vertexRoot32bitConstants.emplace_back((void*)&_worldMatrix);
+void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
+	settings.vertexRoot32bitConstants.emplace_back(static_cast<const void*>(&_worldMatrix), static_cast<uint32>(sizeof(_worldMatrix)));
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 
 	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView.view);
 	commandList->IASetIndexBuffer(&_indexBufferView.view);
 
-	for (auto&& material : _materialSlots) {
-		material.material->setupRenderCommand(settings);
-		commandList->DrawIndexedInstanced(material.indexCount, 1, material.indexOffset, 0, 0);
+	for (const auto& material : _materialSlots) {
+		material.material.setupRenderCommand(settings);
+		commandList->DrawIndexedInstanced(material.range.indexCount, 1, material.range.indexOffset, 0, 0);
 	}
 }
 
-void StaticSingleMeshRender::updateWorldMatrix(const Matrix4& worldMatrix) {
+void StaticSingleMeshRCG::updateWorldMatrix(const Matrix4& worldMatrix) {
 	_worldMatrix = worldMatrix;
 }
 
-void StaticSingleMeshRender::setMaterial(uint32 index, RefPtr<SharedMaterial> material) {
-	_materialSlots[index].material = material;
+RefPtr<SharedMaterial> StaticSingleMeshRender::getMaterial(uint32 index) const{
+	return _materials[index];
 }
 
-RefPtr<SharedMaterial> StaticSingleMeshRender::getMaterial(uint32 index) const{
-	return _materialSlots[index].material;
+void StaticSingleMeshRender::updateWorldMatrix(const Matrix4& worldMatrix){
+	_rcg->updateWorldMatrix(worldMatrix);
 }

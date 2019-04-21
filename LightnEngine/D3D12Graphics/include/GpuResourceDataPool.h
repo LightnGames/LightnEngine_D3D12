@@ -28,5 +28,5 @@ struct GpuResourceDataPool {
 	UnorderedMap<String, Texture2D> textures;
 	UnorderedMap<String, VertexAndIndexBuffer> vertexAndIndexBuffers;
 
-	ListArray<StaticSingleMeshRender> renderLists;
+	ListArray<StaticSingleMeshRCG> renderLists;
 };

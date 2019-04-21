@@ -203,10 +203,10 @@ namespace std {
 
 #include <fbxsdk.h>
 using namespace fbxsdk;
-void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandContext & commandContext, const VectorArray<String>& fileNames) {
+void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device, CommandContext & commandContext, const VectorArray<String>& fileNames) {
 	VectorArray<ComPtr<ID3D12Resource>> uploadHeaps(fileNames.size() * 2);//読み込むファイル数×(頂点バッファ＋インデックスバッファ)
 	auto commandListSet = commandContext.requestCommandListSet();
-	ID3D12GraphicsCommandList* commandList = commandListSet.commandList;
+	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 	
 	uint32 uploadHeapCounter = 0;
 	for (const auto& fileName : fileNames) {
@@ -300,13 +300,11 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 
 		manager->Destroy();
 
-		//マテリアルスロット
-		MaterialSlot slot;
-		slot.indexCount = indexCount;
-		slot.indexOffset = 0;
+		//マテリアルの描画範囲
+		MaterialDrawRange slot(indexCount, 0);
 
 		//キャッシュにインスタンスを生成
-		const VectorArray<MaterialSlot> materialSlots = { slot };
+		const VectorArray<MaterialDrawRange> materialSlots = { slot };
 		auto itr = _resourcePool->vertexAndIndexBuffers.emplace(std::piecewise_construct,
 			std::make_tuple(fileName),
 			std::make_tuple(materialSlots));
@@ -343,30 +341,42 @@ void GpuResourceManager::loadVertexAndIndexBuffer(const String& meshName, RefPtr
 	dstBuffers = &_resourcePool->vertexAndIndexBuffers.at(meshName);
 }
 
-RefPtr<StaticSingleMeshRender> GpuResourceManager::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const{
+StaticSingleMeshRender GpuResourceManager::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const{
 	//メッシュインスタンス生成
 	RefPtr<VertexAndIndexBuffer> buffers;
 	loadVertexAndIndexBuffer(name, buffers);
 
-	StaticSingleMeshRender render(
-		buffers->vertexBuffer.getRefVertexBufferView(),
-		buffers->indexBuffer.getRefIndexBufferView(),
-		buffers->materialSlots);
+	const size_t materialCount = buffers->materialDrawRanges.size();
+	VectorArray<MaterialSlot> slots;
+	VectorArray<RefPtr<SharedMaterial>> materials;
+	materials.reserve(materialCount);
+	slots.reserve(materialCount);
 
 	//マテリアルスロットにマテリアルをセット
 	for (size_t i = 0; i < materialNames.size(); ++i) {
 		RefPtr<SharedMaterial> material;
 		loadSharedMaterial(materialNames[i], material);
-		render.setMaterial(static_cast<uint32>(i), material);
+
+		slots.emplace_back(buffers->materialDrawRanges[i], material->getRefSharedMaterial());
+		materials.emplace_back(material);
 	}
+
+	StaticSingleMeshRCG render(
+		buffers->vertexBuffer.getRefVertexBufferView(),
+		buffers->indexBuffer.getRefIndexBufferView(),
+		slots);
 
 	auto& renderList = _resourcePool->renderLists;
 	renderList.emplace_back(std::move(render));
 
-	return &renderList.back();
+	StaticSingleMeshRender object;
+	object._materials = materials;
+	object._rcg = &renderList.back();
+
+	return object;
 }
 
-void GpuResourceManager::removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRender> render){
+void GpuResourceManager::removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRCG> render){
 }
 
 void GpuResourceManager::shutdown() {
@@ -377,6 +387,6 @@ UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const{
 	return _resourcePool->sharedMaterials;
 }
 
-const ListArray<StaticSingleMeshRender>& GpuResourceManager::getMeshes() const{
+const ListArray<StaticSingleMeshRCG>& GpuResourceManager::getMeshes() const{
 	return _resourcePool->renderLists;
 }
