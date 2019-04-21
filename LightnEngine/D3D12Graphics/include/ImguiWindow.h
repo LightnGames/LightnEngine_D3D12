@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Utility.h"
+#include <Utility.h>
 #include <Windows.h>
+#include "BufferView.h"
 
-struct BufferView;
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
 
@@ -24,5 +24,5 @@ public:
 	void shutdown();
 
 private:
-	RefPtr<BufferView> _imguiView;
+	BufferView _imguiView;
 };

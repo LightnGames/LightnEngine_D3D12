@@ -12,8 +12,8 @@ ConstantBufferMaterial::~ConstantBufferMaterial() {
 
 void ConstantBufferMaterial::shutdown() {
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
-	for (auto&& cbv : constantBufferViews) {
-		if (cbv != nullptr) {
+	for (const auto& cbv : constantBufferViews) {
+		if (cbv.isEnable()) {
 			descriptorHeapManager.discardConstantBufferView(cbv);
 		}
 	}
@@ -85,16 +85,16 @@ bool Root32bitConstantMaterial::isEnableConstant() const {
 }
 
 SharedMaterial::SharedMaterial(RefPtr<VertexShader> vertexShader, RefPtr<PixelShader> pixelShader, RefPtr<PipelineState> pipelineState, RefPtr<RootSignature> rootSignature)
-	:vertexShader(vertexShader), pixelShader(pixelShader), pipelineState(pipelineState), rootSignature(rootSignature), srvVertex(nullptr), srvPixel(nullptr) {
+	:vertexShader(vertexShader), pixelShader(pixelShader), pipelineState(pipelineState), rootSignature(rootSignature), srvVertex(), srvPixel() {
 }
 
 SharedMaterial::~SharedMaterial() {
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-	if (srvPixel != nullptr) {
+	if (srvPixel.isEnable()) {
 		manager.discardShaderResourceView(srvPixel);
 	}
 
-	if (srvVertex != nullptr) {
+	if (srvVertex.isEnable()) {
 		manager.discardShaderResourceView(srvVertex);
 	}
 }
@@ -115,13 +115,13 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 
 	//このマテリアルで有効なリソースビューをセットする
 	UINT descriptorTableIndex = 0;
-	if (srvPixel != nullptr) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvPixel->gpuHandle);
+	if (srvPixel.isEnable()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvPixel.gpuHandle);
 		descriptorTableIndex++;
 	}
 
 	if (pixelConstantBuffer.isEnableBuffer()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, pixelConstantBuffer.constantBufferViews[frameIndex]->gpuHandle);
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, pixelConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
 		descriptorTableIndex++;
 	}
 
@@ -139,13 +139,13 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 		descriptorTableIndex++;
 	}
 
-	if (srvVertex != nullptr) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvVertex->gpuHandle);
+	if (srvVertex.isEnable()) {
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, srvVertex.gpuHandle);
 		descriptorTableIndex++;
 	}
 
 	if (vertexConstantBuffer.isEnableBuffer()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, vertexConstantBuffer.constantBufferViews[frameIndex]->gpuHandle);
+		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, vertexConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
 		descriptorTableIndex++;
 	}
 

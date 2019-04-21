@@ -48,7 +48,7 @@ private:
 	ComPtr<ID3D12Device> _device;
 
 	Texture2D _depthStencil;
-	RefPtr<BufferView> _dsv;
+	BufferView _dsv;
 
 	CommandContext _commandContext;
 	FrameResource _frameResources[FrameCount];

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "stdafx.h"
-#include "Utility.h"
+#include "BufferView.h"
+#include <Utility.h>
 
 struct BufferView;
 class ConstantBuffer;
@@ -19,6 +20,6 @@ public:
 	UINT64 _fenceValue;
 
 	Texture2D* _renderTarget;
-	RefPtr<BufferView> _rtv;
+	BufferView _rtv;
 };
 

@@ -20,14 +20,14 @@ void ImguiWindow::init(HWND& hwnd, ID3D12Device* device) {
 	ImGui::StyleColorsDark();
 
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-	_imguiView = manager.getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->allocateBufferView(1);
+	manager.getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->allocateBufferView(&_imguiView,1);
 
 	// Setup Platform/Renderer bindings
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(device, FrameCount,
 		RenderTargetFormat,
-		_imguiView->cpuHandle,
-		_imguiView->gpuHandle);
+		_imguiView.cpuHandle,
+		_imguiView.gpuHandle);
 }
 
 void ImguiWindow::startFrame() {

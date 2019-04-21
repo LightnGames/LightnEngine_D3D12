@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Utility.h"
+#include <Utility.h>
 #include "GraphicsConstantSettings.h"
+#include "BufferView.h"
 
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
-struct BufferView;
 class ConstantBuffer;
 class VertexShader;
 class PixelShader;
@@ -28,7 +28,7 @@ struct ConstantBufferMaterial {
 
 	VectorArray<byte*> dataPtrs;
 	VectorArray<ConstantBuffer*> constantBuffers[FrameCount];
-	RefPtr<BufferView> constantBufferViews[FrameCount];
+	BufferView constantBufferViews[FrameCount];
 };
 
 struct Root32bitConstantMaterial {
@@ -118,8 +118,8 @@ public:
 	RefPtr<VertexShader> vertexShader;
 	RefPtr<PixelShader> pixelShader;
 
-	RefPtr<BufferView> srvPixel;
-	RefPtr<BufferView> srvVertex;
+	BufferView srvPixel;
+	BufferView srvVertex;
 
 	Root32bitConstantMaterial vertexRoot32bitConstant;
 	Root32bitConstantMaterial pixelRoot32bitConstant;

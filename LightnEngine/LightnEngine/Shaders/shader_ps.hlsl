@@ -159,7 +159,7 @@ float4 PSMain(PSInput input) : SV_Target
     float3 ambient = (kD * envDiffuse + envSpecular) * ao;
     ambient = ambient + directDiffuse + directSpecular;
 
-    float3 color = lerp(float3(ao,ao,ao), ambient, 0.001);
+    float3 color = lerp(ambient, ambient, 0.001);
     color = color / (color + float3(1.0,1.0,1.0)); //ToneMapping
     color = pow(color, 1.0 / 2.2); //linear work fllow;
     return float4(color.rgb, 1.0);

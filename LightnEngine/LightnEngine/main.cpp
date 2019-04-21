@@ -352,7 +352,7 @@ public:
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 	Win32Application app;
 	app.init(hInstance, nCmdShow);
-	app._sceneManager->changeScene<TestScene_PBRBalls>();
+	app._sceneManager->changeScene<TestScene_Gun>();
 
 	return app.run();
 }

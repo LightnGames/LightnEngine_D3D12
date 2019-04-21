@@ -40,19 +40,20 @@ void DescriptorHeap::shutdown() {
 	_descriptorHeap = nullptr;
 }
 
-RefPtr<BufferView> DescriptorHeap::allocateBufferView(uint32 descriptorCount) {
-	BufferView* bufferView = static_cast<BufferView*>(_allocator->divideMemory(descriptorCount));
-	Block* block = _allocator->getBlockFromDataPtr(bufferView);
+void DescriptorHeap::allocateBufferView(RefPtr<BufferView> bufferView, uint32 descriptorCount) {
+	void* bufferViewPtr = _allocator->divideMemory(descriptorCount);
+	Block* block = _allocator->getBlockFromDataPtr(bufferViewPtr);
+
 	bufferView->location = _allocator->blockLocalIndex(block);
 	bufferView->size = block->size;
 	bufferView->gpuHandle = gpuHandle(bufferView->location);
 	bufferView->cpuHandle = cpuHandle(bufferView->location);
-
-	return bufferView;
 }
 
-void DescriptorHeap::discardBufferView(RefPtr<BufferView> bufferView) {
-	_allocator->releaseMemory(bufferView);
+void DescriptorHeap::discardBufferView(const BufferView& bufferView) {
+	//デスクリプターのインデックスからメモリアロケーターの管理するデータポインタを復元
+	void* bufferViewPtr = _allocator->getDataPtrFromBlockLocation(bufferView.location);
+	_allocator->releaseMemory(bufferViewPtr);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::gpuHandle(ulong2 bufferViewLocation) const {
@@ -65,6 +66,14 @@ D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::cpuHandle(ulong2 bufferViewLocation)
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _cpuHandleStart;
 	rtvHandle.ptr += _incrimentSize * static_cast<SIZE_T>(bufferViewLocation);
 	return rtvHandle;
+}
+
+RefPtr<ID3D12DescriptorHeap> DescriptorHeap::descriptorHeap() const{
+	return _descriptorHeap.Get();
+}
+
+UINT DescriptorHeap::incrimentSize() const{
+	return _incrimentSize;
 }
 
 DescriptorHeapManager::DescriptorHeapManager():
@@ -85,14 +94,14 @@ void DescriptorHeapManager::create(RefPtr<ID3D12Device> device) {
 void DescriptorHeapManager::shutdown() {
 }
 
-void DescriptorHeapManager::createRenderTargetView(ID3D12Resource ** textureBuffers, BufferView ** dstView, uint32 viewCount) {
+void DescriptorHeapManager::createRenderTargetView(ID3D12Resource ** textureBuffers, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request RenderTarget View 0");
-	RefPtr<BufferView> rtv = _rtvHeap.allocateBufferView(viewCount);
+	_rtvHeap.allocateBufferView(dstView, viewCount);
 
 	ID3D12Device* device = nullptr;
 	textureBuffers[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtv->cpuHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = dstView->cpuHandle;
 
 	D3D12_RENDER_TARGET_VIEW_DESC rtvViewDesc = {};
 	for (uint32 i = 0; i < viewCount; ++i) {
@@ -108,18 +117,16 @@ void DescriptorHeapManager::createRenderTargetView(ID3D12Resource ** textureBuff
 	}
 
 	device->Release();
-
-	*dstView = rtv;
 }
 
-void DescriptorHeapManager::createConstantBufferView(ID3D12Resource ** constantBuffers, BufferView ** dstView, uint32 viewCount) {
+void DescriptorHeapManager::createConstantBufferView(ID3D12Resource ** constantBuffers, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request ConstantBuffer View 0");
-	RefPtr<BufferView> cbv = _cbvSrvHeap.allocateBufferView(viewCount);
+	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
 	ID3D12Device* device = nullptr;
 	constantBuffers[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
 
-	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = cbv->cpuHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = dstView->cpuHandle;
 	D3D12_CONSTANT_BUFFER_VIEW_DESC constantDesc = {};
 	for (uint32 i = 0; i < viewCount; ++i) {
 		auto desc = constantBuffers[i]->GetDesc();
@@ -131,17 +138,16 @@ void DescriptorHeapManager::createConstantBufferView(ID3D12Resource ** constantB
 	}
 
 	device->Release();
-	*dstView = cbv;
 }
 
-void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderResources, BufferView ** dstView, uint32 viewCount) {
+void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderResources, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request ShaderResource View 0");
-	RefPtr<BufferView> srv = _cbvSrvHeap.allocateBufferView(viewCount);
+	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
 	ID3D12Device* device = nullptr;
 	shaderResources[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
 
-	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = srv->cpuHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = dstView->cpuHandle;
 	for (uint32 i = 0; i < viewCount; ++i) {
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		auto desc = shaderResources[i]->GetDesc();
@@ -163,18 +169,16 @@ void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderRes
 	}
 
 	device->Release();
-
-	*dstView = srv;
 }
 
-void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStencils, BufferView ** dstView, uint32 viewCount) {
+void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStencils, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request DepthStencil View 0");
-	RefPtr<BufferView> dsv = _dsvHeap.allocateBufferView(viewCount);
+	_dsvHeap.allocateBufferView(dstView, viewCount);
 
 	ID3D12Device* device = nullptr;
 	depthStencils[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
 
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsv->cpuHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dstView->cpuHandle;
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	for (uint32 i = 0; i < viewCount; ++i) {
@@ -188,23 +192,21 @@ void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStenci
 	}
 
 	device->Release();
-
-	*dstView = dsv;
 }
 
-void DescriptorHeapManager::discardRenderTargetView(BufferView * bufferView) {
+void DescriptorHeapManager::discardRenderTargetView(const BufferView& bufferView) {
 	_rtvHeap.discardBufferView(bufferView);
 }
 
-void DescriptorHeapManager::discardConstantBufferView(BufferView * bufferView) {
+void DescriptorHeapManager::discardConstantBufferView(const BufferView& bufferView) {
 	_cbvSrvHeap.discardBufferView(bufferView);
 }
 
-void DescriptorHeapManager::discardShaderResourceView(BufferView * bufferView) {
+void DescriptorHeapManager::discardShaderResourceView(const BufferView& bufferView) {
 	_cbvSrvHeap.discardBufferView(bufferView);
 }
 
-void DescriptorHeapManager::discardDepthStencilView(BufferView * bufferView) {
+void DescriptorHeapManager::discardDepthStencilView(const BufferView& bufferView) {
 	_dsvHeap.discardBufferView(bufferView);
 }
 

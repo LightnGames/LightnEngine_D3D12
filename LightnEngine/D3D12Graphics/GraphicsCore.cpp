@@ -14,7 +14,7 @@ GraphicsCore::GraphicsCore() :
 	_frameIndex(0),
 	_viewPort({}),
 	_scissorRect({}),
-	_dsv(nullptr), 
+	_dsv(), 
 	_currentFrameResource(nullptr){
 }
 
@@ -126,13 +126,13 @@ void GraphicsCore::onRender() {
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	//レンダーターゲット・デプスステンシルバッファをセット
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv->cpuHandle;
-	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &_dsv->cpuHandle);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv.cpuHandle;
+	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &_dsv.cpuHandle);
 
 	//レンダーターゲットクリア
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	commandList->ClearDepthStencilView(_dsv->cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);

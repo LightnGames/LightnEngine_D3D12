@@ -105,6 +105,9 @@
     <ClInclude Include="include\ThirdParty\DirectXTex\DDSTextureLoader12.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="include\BufferView.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SharedMaterial.cpp">

@@ -186,9 +186,9 @@ public:
 		return dataPtr + blockLocalIndex(newBlock) * BLOCK_DATA_SIZE;
 	}
 
-	void releaseMemory(void* ptr) {
+	void releaseMemory(void* dataPtr) {
 		//データポインタのローカルオフセットを計算してブロックポインタを求める
-		ulong2 blockIndex = dataLocalIndex(ptr);
+		ulong2 blockIndex = dataLocalIndex(dataPtr);
 		Block* block = (Block*)(blockPtr + blockIndex * BLOCK_AND_HEADER_SIZE);
 
 		//前後左右のブロックポインタ
@@ -290,6 +290,12 @@ public:
 	inline ulong2 blockLocalIndex(void* blockPtr) {
 		ulong2 localPtr = reinterpret_cast<ulong2>(blockPtr) - reinterpret_cast<ulong2>(this->blockPtr);
 		return localPtr / BLOCK_AND_HEADER_SIZE;
+	}
+
+	//ブロックローカルインデックスからアロケーターのデータポインタを求める
+	void* getDataPtrFromBlockLocation(ulong2 blockLocation) {
+		ulong2 localPtr = blockLocation * BLOCK_DATA_SIZE;
+		return dataPtr + localPtr;
 	}
 
 	template<typename T>
