@@ -134,6 +134,13 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+	//マテリアルの定数バッファをGPUへアップロード
+	auto& materials = _gpuResourceManager.getMaterials();
+	for (auto& material : materials) {
+		material.second._vertexConstantBuffer.flashBufferData(_frameIndex);
+		material.second._pixelConstantBuffer.flashBufferData(_frameIndex);
+	}
+
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);
 	const auto& meshes = _gpuResourceManager.getMeshes();

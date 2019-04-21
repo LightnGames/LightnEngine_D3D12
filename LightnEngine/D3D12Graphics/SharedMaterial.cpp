@@ -103,16 +103,15 @@ SharedMaterial::~SharedMaterial() {
 	}
 }
 
-void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
+void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 
+	auto& pixelRoot32bitConstants = settings.pixelRoot32bitConstants;
+	auto& vertexRoot32bitConstants = settings.vertexRoot32bitConstants;
+
 	commandList->SetPipelineState(_pipelineState.pipelineState);
 	commandList->SetGraphicsRootSignature(_rootSignature.rootSignature);
-
-	//定数バッファデータを現在のフレームで使用する定数バッファにコピー
-	_vertexConstantBuffer.flashBufferData(frameIndex);
-	_pixelConstantBuffer.flashBufferData(frameIndex);
 
 	//このマテリアルで有効なリソースビューをセットする
 	UINT descriptorTableIndex = 0;
@@ -126,11 +125,11 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 		descriptorTableIndex++;
 	}
 
-	bool isPixelRoot32bitOverride = !settings.pixelRoot32bitConstants.empty();
+	bool isPixelRoot32bitOverride = !pixelRoot32bitConstants.empty();
 	for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
 		void* ptr = nullptr;
 		if (isPixelRoot32bitOverride) {
-			ptr = settings.pixelRoot32bitConstants[i];
+			ptr = pixelRoot32bitConstants[i];
 		}
 		else {
 			ptr = _pixelRoot32bitConstant.dataPtrs[i];
@@ -150,11 +149,11 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 		descriptorTableIndex++;
 	}
 
-	bool isVertexRoot32bitOverride = !settings.vertexRoot32bitConstants.empty();
+	bool isVertexRoot32bitOverride = !vertexRoot32bitConstants.empty();
 	for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
 		void* ptr = nullptr;
 		if (isVertexRoot32bitOverride) {
-			ptr = settings.vertexRoot32bitConstants[i];
+			ptr = vertexRoot32bitConstants[i];
 		}
 		else {
 			ptr = _vertexRoot32bitConstant.dataPtrs[i];
@@ -166,6 +165,6 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) {
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	settings.pixelRoot32bitConstants.clear();
-	settings.vertexRoot32bitConstants.clear();
+	pixelRoot32bitConstants.clear();
+	vertexRoot32bitConstants.clear();
 }

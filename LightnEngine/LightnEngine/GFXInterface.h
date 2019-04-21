@@ -8,7 +8,6 @@
 class GraphicsCore;
 class SharedMaterial;
 class Texture2D;
-class MeshRenderSet;
 class StaticSingleMeshRender;
 
 class GFXInterface :public Singleton<GFXInterface>{
@@ -26,7 +25,6 @@ public:
 
 	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial);
 	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture);
-	void loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet);
 
 	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 

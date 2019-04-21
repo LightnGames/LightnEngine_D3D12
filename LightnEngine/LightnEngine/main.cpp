@@ -3,7 +3,6 @@
 #include <LMath.h>
 #include <ThirdParty/Imgui/imgui.h>
 #include <ImguiWindow.h>
-#include <MeshRenderSet.h>
 #include <RenderableEntity.h>
 #include <SharedMaterial.h>
 #include <GpuResource.h>

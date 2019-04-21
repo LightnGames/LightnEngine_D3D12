@@ -84,9 +84,6 @@
     <ClInclude Include="include\Mesh.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="include\MeshRenderSet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="include\PipelineState.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -111,9 +108,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SharedMaterial.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="MeshRenderSet.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">

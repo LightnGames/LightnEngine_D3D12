@@ -61,7 +61,7 @@ public:
 	~SharedMaterial();
 
 	//このマテリアルを描画するための描画コマンドを積み込む
-	void setupRenderCommand(RenderSettings& settings);
+	void setupRenderCommand(RenderSettings& settings) const;
 
 	//パラメータ名と値から直接更新
 	template <class T>

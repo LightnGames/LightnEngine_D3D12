@@ -6,7 +6,7 @@ struct ID3D12Device;
 struct BufferView;
 struct IRenderableEntity;
 struct GpuResourceDataPool;
-class MeshRenderSet;
+struct VertexAndIndexBuffer;
 class VertexShader;
 class PixelShader;
 class Texture2D;
@@ -25,13 +25,14 @@ public:
 
 	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) const;
 	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture) const;
-	void loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet) const;
+	void loadVertexAndIndexBuffer(const String& meshName, RefPtr<VertexAndIndexBuffer>& dstBuffers) const;
 
 	RefPtr<StaticSingleMeshRender> createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const;
 	void removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRender> render);
 
 	void shutdown();
 
+	UnorderedMap<String, SharedMaterial>& getMaterials() const;
 	const ListArray<StaticSingleMeshRender>& getMeshes() const;
 
 private:

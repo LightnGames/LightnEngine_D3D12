@@ -2,7 +2,6 @@
 #include <PipelineState.h>
 #include <SharedMaterial.h>
 #include <GpuResource.h>
-#include <MeshRenderSet.h>
 #include <RenderableEntity.h>
 
 struct GpuResourceDataPool {
@@ -11,23 +10,23 @@ struct GpuResourceDataPool {
 	}
 
 	void shutdown() {
-		_vertexShaders.clear();
-		_pixelShaders.clear();
-		_pipelineStates.clear();
-		_rootSignatures.clear();
-		_sharedMaterials.clear();
-		_textures.clear();
-		_meshes.clear();
-		_renderList.clear();
+		vertexShaders.clear();
+		pixelShaders.clear();
+		pipelineStates.clear();
+		rootSignatures.clear();
+		sharedMaterials.clear();
+		textures.clear();
+		vertexAndIndexBuffers.clear();
+		renderLists.clear();
 	}
 
-	UnorderedMap<String, VertexShader> _vertexShaders;
-	UnorderedMap<String, PixelShader> _pixelShaders;
-	UnorderedMap<String, PipelineState> _pipelineStates;
-	UnorderedMap<String, RootSignature> _rootSignatures;
-	UnorderedMap<String, SharedMaterial> _sharedMaterials;
-	UnorderedMap<String, Texture2D> _textures;
-	UnorderedMap<String, MeshRenderSet> _meshes;
+	UnorderedMap<String, VertexShader> vertexShaders;
+	UnorderedMap<String, PixelShader> pixelShaders;
+	UnorderedMap<String, PipelineState> pipelineStates;
+	UnorderedMap<String, RootSignature> rootSignatures;
+	UnorderedMap<String, SharedMaterial> sharedMaterials;
+	UnorderedMap<String, Texture2D> textures;
+	UnorderedMap<String, VertexAndIndexBuffer> vertexAndIndexBuffers;
 
-	ListArray<StaticSingleMeshRender> _renderList;
+	ListArray<StaticSingleMeshRender> renderLists;
 };

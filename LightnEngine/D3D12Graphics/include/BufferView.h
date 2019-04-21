@@ -2,7 +2,7 @@
 #include <d3d12.h>
 #include <Utility.h>
 
-struct BufferView :private NonCopyable{
+struct BufferView :private NonCopyable {
 	BufferView() :cpuHandle(), gpuHandle(), location(0), size(0) {}
 	virtual ~BufferView() {}
 

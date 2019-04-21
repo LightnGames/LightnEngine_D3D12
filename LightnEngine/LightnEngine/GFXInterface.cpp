@@ -1,7 +1,6 @@
 #include "GFXInterface.h"
 #include <GraphicsCore.h>
 #include <GpuResourceManager.h>
-#include <MeshRenderSet.h>
 #include <GpuResource.h>
 #include <RenderableEntity.h>
 
@@ -62,12 +61,6 @@ void GFXInterface::loadSharedMaterial(const String& materialName, RefPtr<SharedM
 void GFXInterface::loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture){
 #ifdef D3D12
 	_graphicsCore->getGpuResourceManager()->loadTexture(textureName, dstTexture);
-#endif
-}
-
-void GFXInterface::loadMeshSets(const String& meshName, RefPtr<MeshRenderSet>& dstMeshSet){
-#ifdef D3D12
-	_graphicsCore->getGpuResourceManager()->loadMeshSets(meshName, dstMeshSet);
 #endif
 }
 

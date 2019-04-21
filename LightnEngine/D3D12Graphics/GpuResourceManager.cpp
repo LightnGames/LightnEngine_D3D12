@@ -4,7 +4,6 @@
 #include "GpuResource.h"
 #include "CommandContext.h"
 #include "SharedMaterial.h"
-#include "MeshRenderSet.h"
 #include "stdafx.h"
 #include "GpuResourceDataPool.h"
 #include <RenderableEntity.h>
@@ -23,37 +22,37 @@ GpuResourceManager::~GpuResourceManager() {
 void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const SharedMaterialCreateSettings& settings) {
 	//頂点シェーダーキャッシュがあればそれを使う。なければ新規生成
 	RefPtr<VertexShader> vertexShader = nullptr;
-	if (_resourcePool->_vertexShaders.count(settings.vertexShaderName) > 0) {
-		vertexShader = &(_resourcePool->_vertexShaders.at(settings.vertexShaderName));
+	if (_resourcePool->vertexShaders.count(settings.vertexShaderName) > 0) {
+		vertexShader = &(_resourcePool->vertexShaders.at(settings.vertexShaderName));
 	}
 	else {
 		VertexShader newVertexShader;
 		String fullPath = "Shaders/" + settings.vertexShaderName;
 		newVertexShader.create(fullPath);
-		auto itr = _resourcePool->_vertexShaders.emplace(settings.vertexShaderName, std::move(newVertexShader));
+		auto itr = _resourcePool->vertexShaders.emplace(settings.vertexShaderName, std::move(newVertexShader));
 		vertexShader = &(*itr.first).second;
 	}
 
 	//ピクセルシェーダーキャッシュがあればそれを使う。なければ新規生成
 	RefPtr<PixelShader> pixelShader = nullptr;
-	if (_resourcePool->_pixelShaders.count(settings.pixelShaderName) > 0) {
-		pixelShader = &(_resourcePool->_pixelShaders.at(settings.pixelShaderName));
+	if (_resourcePool->pixelShaders.count(settings.pixelShaderName) > 0) {
+		pixelShader = &(_resourcePool->pixelShaders.at(settings.pixelShaderName));
 	}
 	else {
 		PixelShader newPixelShader;
 		String fullPath = "Shaders/" + settings.pixelShaderName;
 		newPixelShader.create(fullPath);
-		auto itr = _resourcePool->_pixelShaders.emplace(settings.pixelShaderName, std::move(newPixelShader));
+		auto itr = _resourcePool->pixelShaders.emplace(settings.pixelShaderName, std::move(newPixelShader));
 		pixelShader = &(*itr.first).second;
 	}
 
 	//ルートシグネチャキャッシュがあればそれを使う。なければ新規生成
 	RefPtr<RootSignature> rootSignature = nullptr;
-	if (_resourcePool->_rootSignatures.count(settings.name) > 0) {
-		rootSignature = &_resourcePool->_rootSignatures.at(settings.name);
+	if (_resourcePool->rootSignatures.count(settings.name) > 0) {
+		rootSignature = &_resourcePool->rootSignatures.at(settings.name);
 	}
 	else {
-		auto itr = _resourcePool->_rootSignatures.emplace(std::piecewise_construct,
+		auto itr = _resourcePool->rootSignatures.emplace(std::piecewise_construct,
 			std::make_tuple(settings.name),
 			std::make_tuple());
 
@@ -63,11 +62,11 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 
 	//パイプラインステートキャッシュがあればそれを使う。なければ新規生成
 	RefPtr<PipelineState> pipelineState = nullptr;
-	if (_resourcePool->_pipelineStates.count(settings.name) > 0) {
-		pipelineState = &_resourcePool->_pipelineStates.at(settings.name);
+	if (_resourcePool->pipelineStates.count(settings.name) > 0) {
+		pipelineState = &_resourcePool->pipelineStates.at(settings.name);
 	}
 	else {
-		auto itr = _resourcePool->_pipelineStates.emplace(std::piecewise_construct,
+		auto itr = _resourcePool->pipelineStates.emplace(std::piecewise_construct,
 			std::make_tuple(settings.name),
 			std::make_tuple());
 
@@ -78,7 +77,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 	//生成したマテリアルをキャッシュに登録
 	const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
 	const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
-	auto itr = _resourcePool->_sharedMaterials.emplace(std::piecewise_construct,
+	auto itr = _resourcePool->sharedMaterials.emplace(std::piecewise_construct,
 		std::make_tuple(settings.name),
 		std::make_tuple(vsReflection, psReflection, pipelineState->getRefPipelineState(), rootSignature->getRefRootSignature()));
 
@@ -152,7 +151,7 @@ void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandCont
 		String fullPath = "Resources/" + settings[i];
 
 		//テクスチャをキャッシュに生成
-		auto itr =_resourcePool->_textures.emplace(std::piecewise_construct,
+		auto itr =_resourcePool->textures.emplace(std::piecewise_construct,
 			std::make_tuple(settings[i]),
 			std::make_tuple());
 
@@ -308,17 +307,17 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 
 		//キャッシュにインスタンスを生成
 		const VectorArray<MaterialSlot> materialSlots = { slot };
-		auto itr = _resourcePool->_meshes.emplace(std::piecewise_construct,
+		auto itr = _resourcePool->vertexAndIndexBuffers.emplace(std::piecewise_construct,
 			std::make_tuple(fileName),
 			std::make_tuple(materialSlots));
 
-		MeshRenderSet& renderSet = (*itr.first).second;
+		VertexAndIndexBuffer& buffers = (*itr.first).second;
 
 		//頂点バッファ生成
-		renderSet._vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
+		buffers.vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
 
 		//インデックスバッファ
-		renderSet._indexBuffer.createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter++], indices);
+		buffers.indexBuffer.createDeferred(device, commandList, &uploadHeaps[uploadHeapCounter++], indices);
 	}
 
 	//アップロードバッファをGPUオンリーバッファにコピー
@@ -330,25 +329,29 @@ void GpuResourceManager::createMeshSets(RefPtr<ID3D12Device> device, CommandCont
 }
 
 void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) const{
-	assert(_resourcePool->_sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
-	dstMaterial = &_resourcePool->_sharedMaterials.at(materialName);
+	assert(_resourcePool->sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
+	dstMaterial = &_resourcePool->sharedMaterials.at(materialName);
 }
 
 void GpuResourceManager::loadTexture(const String & textureName, RefPtr<Texture2D>& dstTexture) const{
-	assert(_resourcePool->_textures.count(textureName) > 0 && "テクスチャが見つかりません");
-	dstTexture = &_resourcePool->_textures.at(textureName);
+	assert(_resourcePool->textures.count(textureName) > 0 && "テクスチャが見つかりません");
+	dstTexture = &_resourcePool->textures.at(textureName);
 }
 
-void GpuResourceManager::loadMeshSets(const String & meshName, RefPtr<MeshRenderSet>& dstMeshSet) const{
-	assert(_resourcePool->_meshes.count(meshName) > 0 && "メッシュが見つかりません");
-	dstMeshSet = &_resourcePool->_meshes.at(meshName);
+void GpuResourceManager::loadVertexAndIndexBuffer(const String& meshName, RefPtr<VertexAndIndexBuffer>& dstBuffers) const {
+	assert(_resourcePool->vertexAndIndexBuffers.count(meshName) > 0 && "メッシュが見つかりません");
+	dstBuffers = &_resourcePool->vertexAndIndexBuffers.at(meshName);
 }
 
 RefPtr<StaticSingleMeshRender> GpuResourceManager::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const{
 	//メッシュインスタンス生成
-	RefPtr<MeshRenderSet> renderSet;
-	loadMeshSets(name, renderSet);
-	StaticSingleMeshRender render(renderSet);
+	RefPtr<VertexAndIndexBuffer> buffers;
+	loadVertexAndIndexBuffer(name, buffers);
+
+	StaticSingleMeshRender render(
+		buffers->vertexBuffer.getRefVertexBufferView(),
+		buffers->indexBuffer.getRefIndexBufferView(),
+		buffers->materialSlots);
 
 	//マテリアルスロットにマテリアルをセット
 	for (size_t i = 0; i < materialNames.size(); ++i) {
@@ -357,7 +360,7 @@ RefPtr<StaticSingleMeshRender> GpuResourceManager::createStaticSingleMeshRender(
 		render.setMaterial(static_cast<uint32>(i), material);
 	}
 
-	auto& renderList = _resourcePool->_renderList;
+	auto& renderList = _resourcePool->renderLists;
 	renderList.emplace_back(std::move(render));
 
 	return &renderList.back();
@@ -370,6 +373,10 @@ void GpuResourceManager::shutdown() {
 	_resourcePool.reset();
 }
 
+UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const{
+	return _resourcePool->sharedMaterials;
+}
+
 const ListArray<StaticSingleMeshRender>& GpuResourceManager::getMeshes() const{
-	return _resourcePool->_renderList;
+	return _resourcePool->renderLists;
 }
