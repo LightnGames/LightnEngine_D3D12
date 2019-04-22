@@ -8,10 +8,10 @@ Frostbyte3.0 DisnyDiffuse改良版 https://seblagarde.files.wordpress.com/2015/0
 Real Shading in Unreal Engine 4  https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
 
 ## ThiredParty
-Direct3D12  https://docs.microsoft.com/en-us/windows/desktop/direct3d12/direct3d-12-graphics
-DirectXTex  https://github.com/Microsoft/DirectXTex
+Direct3D12  https://docs.microsoft.com/en-us/windows/desktop/direct3d12/direct3d-12-graphics  
+DirectXTex  https://github.com/Microsoft/DirectXTex  
 Imgui  https://github.com/ocornut/imgui  
-残りは全て自作のコードです。
+残りは全て自作のコードです。  
 
 ![銃](https://github.com/LightnGames/LightnEngine_D3D12/blob/develop/image/LTN_Gun.png)
 
