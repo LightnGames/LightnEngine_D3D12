@@ -5,9 +5,9 @@ Direct3D12を使用してフォトリアルなレンダリングフレームワ�
 Frostbyte3.0 DisnyDiffuse改良版 https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
 
 ## Image Based Rendering
-Real Shading in Unreal Engine 4   https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
+Real Shading in Unreal Engine4  https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
 
-## ThiredParty
+## Thired Party
 Direct3D12  https://docs.microsoft.com/en-us/windows/desktop/direct3d12/direct3d-12-graphics  
 DirectXTex  https://github.com/Microsoft/DirectXTex  
 Imgui  https://github.com/ocornut/imgui  
