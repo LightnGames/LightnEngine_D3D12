@@ -40,11 +40,31 @@ public:
 	void setupRenderCommand(RenderSettings& settings) const;
 	void updateWorldMatrix(const Matrix4& worldMatrix);
 
+	//このレンダーコマンドのマテリアルの最初のポインタを取得
+	//reinterpret_castもエラーで怒られるのC-Styleキャストを使用
+	constexpr RefPtr<MaterialSlot> getFirstMatrialPtr() const {
+		return (MaterialSlot*)(this + sizeof(StaticSingleMeshRCG));
+	}
+
+	//このインスタンスのマテリアル数を含めたメモリサイズを取得する
+	constexpr size_t getRequireMemorySize() const {
+		return getRequireMemorySize(_materialSlotSize);
+	}
+
+	//マテリアル格納分も含めたトータルサイズを取得する。
+	//このサイズをもとにメモリ確保しないと確実に死亡する
+	static constexpr size_t getRequireMemorySize(size_t materialCount) {
+		return sizeof(StaticSingleMeshRCG) + sizeof(MaterialSlot) * materialCount;
+	}
+
 private:
 	Matrix4 _worldMatrix;
 	const RefVertexBufferView _vertexBufferView;
 	const RefIndexBufferView _indexBufferView;
-	VectorArray<MaterialSlot> _materialSlots;
+	const size_t _materialSlotSize;
+	//VectorArray<MaterialSlot> _materialSlots;
+
+	//このインスタンスの後ろ(sizeof(StaticSingleMeshRCG))にマテリアルのデータを配置！！！
 };
 
 class StaticSingleMeshRender {

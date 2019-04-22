@@ -9,6 +9,9 @@
 #include "FrameResource.h"
 #include "CommandContext.h"
 #include "ImguiWindow.h"
+#include "RenderableEntity.h"
+
+#include <LinerAllocator.h>
 
 #define DEBUG
 
@@ -28,6 +31,7 @@ public:
 	void createMeshSets(const VectorArray<String>& fileNames);
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
+	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 
 public:
@@ -57,5 +61,8 @@ private:
 	ImguiWindow _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
+
+	uint32 _gpuCommandCount;
+	LinerAllocator _gpuCommandArray;
 };
 

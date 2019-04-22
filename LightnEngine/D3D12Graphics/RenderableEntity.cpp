@@ -8,8 +8,13 @@ StaticSingleMeshRCG::StaticSingleMeshRCG(
 	const VectorArray<MaterialSlot>& materialSlots) :
 	_vertexBufferView(vertexBufferView),
 	_indexBufferView(indexBufferView),
-	_materialSlots(materialSlots),
+	_materialSlotSize(materialSlots.size()),
 	_worldMatrix(Matrix4::identity) {
+
+	//このインスタンスの末尾にマテリアルのデータをコピー
+	//インスタンス生成時に適切なメモリを確保しておかないと即死亡！！！
+	RefPtr<MaterialSlot> endPtr = getFirstMatrialPtr();
+	memcpy(endPtr, materialSlots.data(), _materialSlotSize * sizeof(MaterialSlot));
 }
 
 void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
@@ -19,10 +24,19 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
 	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView.view);
 	commandList->IASetIndexBuffer(&_indexBufferView.view);
 
-	for (const auto& material : _materialSlots) {
-		material.material.setupRenderCommand(settings);
-		commandList->DrawIndexedInstanced(material.range.indexCount, 1, material.range.indexOffset, 0, 0);
+	RefPtr<MaterialSlot> material = getFirstMatrialPtr();
+
+	for (size_t i = 0; i < _materialSlotSize; ++i) {
+		material->material.setupRenderCommand(settings);
+		commandList->DrawIndexedInstanced(material->range.indexCount, 1, material->range.indexOffset, 0, 0);
+
+		++material;
 	}
+
+	//for (const auto& material : _materialSlots) {
+	//	material.material.setupRenderCommand(settings);
+	//	commandList->DrawIndexedInstanced(material.range.indexCount, 1, material.range.indexOffset, 0, 0);
+	//}
 }
 
 void StaticSingleMeshRCG::updateWorldMatrix(const Matrix4& worldMatrix) {

@@ -65,7 +65,7 @@ void GFXInterface::loadTexture(const String& textureName, RefPtr<Texture2D>& dst
 }
 
 StaticSingleMeshRender GFXInterface::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) {
-	return _graphicsCore->getGpuResourceManager()->createStaticSingleMeshRender(name, materialNames);
+	return _graphicsCore->createStaticSingleMeshRender(name, materialNames);
 }
 
 uint32 GFXInterface::getWidth() const{

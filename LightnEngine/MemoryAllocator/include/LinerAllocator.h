@@ -3,10 +3,16 @@
 #include <iostream>
 #include <cassert>
 
-using byte = unsigned char;
-using uint32 = unsigned int;
-using int32 = int;
-using ulong2 = unsigned long long;
+#include <Type.h>
+
+//#define DEBUG_ARRAY
+//#define DEBUG_PRINT_ENABLE
+
+#ifdef DEBUG_PRINT_ENABLE
+#define DEBUG_PRINT(str) std::cout << str << std::endl;
+#else
+#define DEBUG_PRINT(str)
+#endif
 
 class LinerAllocator {
 public:
@@ -14,7 +20,6 @@ public:
 	}
 
 	~LinerAllocator() {
-		shutdown();
 	}
 
 	void init(ulong2 allocateSize = 128) {
@@ -23,7 +28,7 @@ public:
 		mainMemory = new byte[mainMemorySize];
 		memset(mainMemory, 0, mainMemorySize);
 
-		std::cout << "allocate: " << mainMemorySize << "byte " << std::endl;
+		DEBUG_PRINT("allocate: " << mainMemorySize << "byte ");
 	}
 
 	void shutdown() {
@@ -31,14 +36,14 @@ public:
 		offset = 0;
 		mainMemorySize = 0;
 		mainMemory = nullptr;
-		std::cout << "shutdown allocator" << std::endl;
+		DEBUG_PRINT("shutdown allocator");
 	}
 
 	byte* divideMemory(uint32 size) {
 		assert(offset + size <= mainMemorySize && "‚±‚êˆÈãƒƒ‚ƒŠ‚ðŠm•Ûo—ˆ‚Ü‚¹‚ñ");
 		byte * mem = reinterpret_cast<byte*>(mainMemory + offset);
 		offset += size;
-		std::cout << "Divide Ptr: " << offset << " Size: " << size << std::endl;
+		DEBUG_PRINT("Divide Ptr: " << offset << " Size: " << size);
 
 		return mem;
 	}

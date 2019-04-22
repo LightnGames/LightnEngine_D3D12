@@ -62,6 +62,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//Imgui初期化
 	_imguiWindow.init(hwnd, _device.Get());
 
+	//GPUコマンド格納アロケータ初期化
+	_gpuCommandArray.init(4096);
+
 	//スワップチェーン生成
 	{
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -143,9 +146,21 @@ void GraphicsCore::onRender() {
 
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);
-	const auto& meshes = _gpuResourceManager.getMeshes();
-	for (const auto& mesh : meshes) {
-		mesh.setupRenderCommand(renderSettings);
+	//const auto& meshes = _gpuResourceManager.getMeshes();
+	//for (const auto& mesh : meshes) {
+	//	mesh.setupRenderCommand(renderSettings);
+	//}
+
+	union GpuCommandGroup{
+		RefPtr<StaticSingleMeshRCG> rcg;
+		byte* bytePtr;
+	};
+
+	GpuCommandGroup group;
+	group.rcg = reinterpret_cast<StaticSingleMeshRCG*>(_gpuCommandArray.mainMemory);
+	for (uint32 i = 0; i < _gpuCommandCount; ++i) {
+		group.rcg->setupRenderCommand(renderSettings);
+		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
 	//ImguiWindow描画
@@ -173,6 +188,8 @@ void GraphicsCore::onDestroy() {
 		_frameResources[i].shutdown();
 	}
 
+	_gpuCommandArray.shutdown();
+
 	_imguiWindow.shutdown();
 	_gpuResourceManager.shutdown();
 
@@ -193,6 +210,43 @@ void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames){
 
 void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings){
 	_gpuResourceManager.createSharedMaterial(_device.Get(), settings);
+}
+
+StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames){
+	//メッシュインスタンス生成
+	RefPtr<VertexAndIndexBuffer> buffers;
+	_gpuResourceManager.loadVertexAndIndexBuffer(name, buffers);
+
+	const size_t materialCount = buffers->materialDrawRanges.size();
+	VectorArray<MaterialSlot> slots;
+	VectorArray<RefPtr<SharedMaterial>> materials;
+	materials.reserve(materialCount);
+	slots.reserve(materialCount);
+
+	//マテリアルスロットにマテリアルをセット
+	for (size_t i = 0; i < materialNames.size(); ++i) {
+		RefPtr<SharedMaterial> material;
+		_gpuResourceManager.loadSharedMaterial(materialNames[i], material);
+
+		slots.emplace_back(buffers->materialDrawRanges[i], material->getRefSharedMaterial());
+		materials.emplace_back(material);
+	}
+
+	_gpuCommandCount++;
+
+	const size_t memorySize = StaticSingleMeshRCG::getRequireMemorySize(slots.size());
+	byte* r = _gpuCommandArray.divideMemory(memorySize);
+
+	RefPtr<StaticSingleMeshRCG> render = new (r) StaticSingleMeshRCG(
+		buffers->vertexBuffer.getRefVertexBufferView(),
+		buffers->indexBuffer.getRefIndexBufferView(),
+		slots);
+
+	StaticSingleMeshRender object;
+	object._materials = materials;
+	object._rcg = render;
+
+	return object;
 }
 
 RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager(){
