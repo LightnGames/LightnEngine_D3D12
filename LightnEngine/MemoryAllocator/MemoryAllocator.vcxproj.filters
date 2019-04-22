@@ -18,5 +18,8 @@
     <ClInclude Include="include\GenericAllocator.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="include\LinerAllocator.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
