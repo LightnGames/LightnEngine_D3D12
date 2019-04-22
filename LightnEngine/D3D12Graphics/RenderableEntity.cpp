@@ -24,19 +24,16 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
 	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView.view);
 	commandList->IASetIndexBuffer(&_indexBufferView.view);
 
+	//このインスタンスのすぐ後ろにマテリアルのコマンドが詰まっているのでまずは最初を取り出す
 	RefPtr<MaterialSlot> material = getFirstMatrialPtr();
 
 	for (size_t i = 0; i < _materialSlotSize; ++i) {
 		material->material.setupRenderCommand(settings);
 		commandList->DrawIndexedInstanced(material->range.indexCount, 1, material->range.indexOffset, 0, 0);
 
+		//ポインタをインクリメントして次のマテリアルを参照
 		++material;
 	}
-
-	//for (const auto& material : _materialSlots) {
-	//	material.material.setupRenderCommand(settings);
-	//	commandList->DrawIndexedInstanced(material.range.indexCount, 1, material.range.indexOffset, 0, 0);
-	//}
 }
 
 void StaticSingleMeshRCG::updateWorldMatrix(const Matrix4& worldMatrix) {

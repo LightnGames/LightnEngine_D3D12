@@ -28,6 +28,9 @@ struct IRenderableEntity {
 };
 
 //RCG...RenderCommandGroup
+//可変長のマテリアルをそれぞれ持ったインスタンスをメモリ上に連続して配置するために
+//レンダーコマンドグループ＋マテリアルコマンドサイズｘマテリアル数(sizeof(StaticSingleMeshRCG) + sizeof(MaterialSlot) * materialCount)
+//のメモリを独自に確保してリニアアロケーターにマップして利用する。
 class StaticSingleMeshRCG{
 public:
 	StaticSingleMeshRCG(
@@ -43,7 +46,7 @@ public:
 	//このレンダーコマンドのマテリアルの最初のポインタを取得
 	//reinterpret_castもエラーで怒られるのC-Styleキャストを使用
 	constexpr RefPtr<MaterialSlot> getFirstMatrialPtr() const {
-		return (MaterialSlot*)(this + sizeof(StaticSingleMeshRCG));
+		return (MaterialSlot*)((byte*)this + sizeof(StaticSingleMeshRCG));
 	}
 
 	//このインスタンスのマテリアル数を含めたメモリサイズを取得する
@@ -62,7 +65,6 @@ private:
 	const RefVertexBufferView _vertexBufferView;
 	const RefIndexBufferView _indexBufferView;
 	const size_t _materialSlotSize;
-	//VectorArray<MaterialSlot> _materialSlots;
 
 	//このインスタンスの後ろ(sizeof(StaticSingleMeshRCG))にマテリアルのデータを配置！！！
 };

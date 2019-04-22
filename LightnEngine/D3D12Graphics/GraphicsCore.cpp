@@ -63,7 +63,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_imguiWindow.init(hwnd, _device.Get());
 
 	//GPUコマンド格納アロケータ初期化
-	_gpuCommandArray.init(4096);
+	_gpuCommandArray.init(16384);
 
 	//スワップチェーン生成
 	{
@@ -146,10 +146,6 @@ void GraphicsCore::onRender() {
 
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);
-	//const auto& meshes = _gpuResourceManager.getMeshes();
-	//for (const auto& mesh : meshes) {
-	//	mesh.setupRenderCommand(renderSettings);
-	//}
 
 	union GpuCommandGroup{
 		RefPtr<StaticSingleMeshRCG> rcg;
@@ -157,6 +153,8 @@ void GraphicsCore::onRender() {
 	};
 
 	GpuCommandGroup group;
+	//リニアアロケーターに連続して描画コマンドが存在するので
+	//ポインタを任意でオフセットしながらレンダーコマンドグループのデータを参照してループする
 	group.rcg = reinterpret_cast<StaticSingleMeshRCG*>(_gpuCommandArray.mainMemory);
 	for (uint32 i = 0; i < _gpuCommandCount; ++i) {
 		group.rcg->setupRenderCommand(renderSettings);

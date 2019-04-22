@@ -39,7 +39,7 @@ public:
 		DEBUG_PRINT("shutdown allocator");
 	}
 
-	byte* divideMemory(uint32 size) {
+	byte* divideMemory(size_t size) {
 		assert(offset + size <= mainMemorySize && "‚±‚êˆÈãƒƒ‚ƒŠ‚ðŠm•Ûo—ˆ‚Ü‚¹‚ñ");
 		byte * mem = reinterpret_cast<byte*>(mainMemory + offset);
 		offset += size;
