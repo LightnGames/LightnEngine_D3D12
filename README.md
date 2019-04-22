@@ -4,7 +4,7 @@ Direct3D12を使用してフォトリアルなレンダリングフレームワ�
 ## Diffuse & Specular BRDF
 Frostbyte3.0 DisnyDiffuse改良版 https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
 
-## Image Based Rendering
+## Image Based Lighting
 Real Shading in Unreal Engine4  https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
 
 ## Editor
