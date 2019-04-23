@@ -1,0 +1,3 @@
+﻿  main.cpp
+C:\Users\Lightn\Documents\LightnEngine_D3D12\FBXConverter\FBXConverter\FBXConverter\main.cpp(1): warning C4326: 'main' の戻り値の型には、'int' を使用してください。'void' は使用できません
+  FBXConverter.vcxproj -> C:\Users\Lightn\Documents\LightnEngine_D3D12\FBXConverter\FBXConverter\Debug\FBXConverter.exe
