@@ -341,52 +341,10 @@ void GpuResourceManager::loadVertexAndIndexBuffer(const String& meshName, RefPtr
 	dstBuffers = &_resourcePool->vertexAndIndexBuffers.at(meshName);
 }
 
-StaticSingleMeshRender GpuResourceManager::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const{
-	//メッシュインスタンス生成
-	RefPtr<VertexAndIndexBuffer> buffers;
-	loadVertexAndIndexBuffer(name, buffers);
-
-	const size_t materialCount = buffers->materialDrawRanges.size();
-	VectorArray<MaterialSlot> slots;
-	VectorArray<RefPtr<SharedMaterial>> materials;
-	materials.reserve(materialCount);
-	slots.reserve(materialCount);
-
-	//マテリアルスロットにマテリアルをセット
-	for (size_t i = 0; i < materialNames.size(); ++i) {
-		RefPtr<SharedMaterial> material;
-		loadSharedMaterial(materialNames[i], material);
-
-		slots.emplace_back(buffers->materialDrawRanges[i], material->getRefSharedMaterial());
-		materials.emplace_back(material);
-	}
-
-	StaticSingleMeshRCG render(
-		buffers->vertexBuffer.getRefVertexBufferView(),
-		buffers->indexBuffer.getRefIndexBufferView(),
-		slots);
-
-	auto& renderList = _resourcePool->renderLists;
-	renderList.emplace_back(std::move(render));
-
-	StaticSingleMeshRender object;
-	object._materials = materials;
-	object._rcg = &renderList.back();
-
-	return object;
-}
-
-void GpuResourceManager::removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRCG> render){
-}
-
 void GpuResourceManager::shutdown() {
 	_resourcePool.reset();
 }
 
 UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const{
 	return _resourcePool->sharedMaterials;
-}
-
-const ListArray<StaticSingleMeshRCG>& GpuResourceManager::getMeshes() const{
-	return _resourcePool->renderLists;
 }

@@ -14,8 +14,6 @@ class SharedMaterial;
 class CommandContext;
 class StaticSingleMeshRCG;
 
-#include "RenderableEntity.h"
-
 class GpuResourceManager :public Singleton<GpuResourceManager> {
 public:
 	GpuResourceManager();
@@ -29,13 +27,9 @@ public:
 	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture) const;
 	void loadVertexAndIndexBuffer(const String& meshName, RefPtr<VertexAndIndexBuffer>& dstBuffers) const;
 
-	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) const;
-	void removeStaticSingleMeshRender(RefPtr<StaticSingleMeshRCG> render);
-
 	void shutdown();
 
 	UnorderedMap<String, SharedMaterial>& getMaterials() const;
-	const ListArray<StaticSingleMeshRCG>& getMeshes() const;
 
 private:
 	UniquePtr<GpuResourceDataPool> _resourcePool;

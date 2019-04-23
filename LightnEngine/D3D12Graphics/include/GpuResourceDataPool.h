@@ -2,7 +2,6 @@
 #include <PipelineState.h>
 #include <SharedMaterial.h>
 #include <GpuResource.h>
-#include <RenderableEntity.h>
 
 struct GpuResourceDataPool {
 	~GpuResourceDataPool() {
@@ -17,7 +16,6 @@ struct GpuResourceDataPool {
 		sharedMaterials.clear();
 		textures.clear();
 		vertexAndIndexBuffers.clear();
-		renderLists.clear();
 	}
 
 	UnorderedMap<String, VertexShader> vertexShaders;
@@ -27,6 +25,4 @@ struct GpuResourceDataPool {
 	UnorderedMap<String, SharedMaterial> sharedMaterials;
 	UnorderedMap<String, Texture2D> textures;
 	UnorderedMap<String, VertexAndIndexBuffer> vertexAndIndexBuffers;
-
-	ListArray<StaticSingleMeshRCG> renderLists;
 };

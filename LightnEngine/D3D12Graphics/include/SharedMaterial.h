@@ -87,6 +87,7 @@ struct RefSharedMaterial {
 		_pixelConstantViews(pixelConstantViews) {}
 
 	//描画コマンド構築
+	//定義を各位置を変えてインライン化する。
 	void setupRenderCommand(RenderSettings& settings) const;
 
 	const RefPipelineState _pipelineState;
