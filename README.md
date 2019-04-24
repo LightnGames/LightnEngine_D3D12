@@ -22,3 +22,5 @@ Imgui  https://github.com/ocornut/imgui
 ![シェーダーボール](https://github.com/LightnGames/LightnEngine_D3D12/blob/develop/image/LTN_Wood.png)
 
 ![PBRボール](https://github.com/LightnGames/LightnEngine_D3D12/blob/develop/image/LTN_Balls.png)
+
+![ゲームエンジン依存関係図](https://github.com/LightnGames/LightnEngine_D3D12/blob/develop/image/GameEngineDependencies.png)
