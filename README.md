@@ -13,6 +13,7 @@ Visual Studio 2019 https://visualstudio.microsoft.com/ja/free-developer-offers/
 ## Thired Party
 Direct3D12  https://docs.microsoft.com/en-us/windows/desktop/direct3d12/direct3d-12-graphics  
 DirectXTex  https://github.com/Microsoft/DirectXTex  
+FBXSDK2019  https://www.autodesk.com/developer-network/platform-technologies/fbx-sdk-2019-0
 Imgui  https://github.com/ocornut/imgui
 
 残りは全て自作のコードです。  
