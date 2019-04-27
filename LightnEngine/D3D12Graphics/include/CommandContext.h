@@ -10,7 +10,7 @@ class CommandAllocatorPool;
 class CommandQueue;
 
 struct CommandListSet {
-	CommandListSet(ID3D12GraphicsCommandList* list, ID3D12CommandAllocator* allocator, UINT64 fenceValue) :
+	CommandListSet(RefPtr<ID3D12GraphicsCommandList> list, RefPtr<ID3D12CommandAllocator> allocator, UINT64 fenceValue) :
 		commandList(list), allocator(allocator), fenceValue(fenceValue){ }
 
 	RefPtr<ID3D12GraphicsCommandList> commandList;

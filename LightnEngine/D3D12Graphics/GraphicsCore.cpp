@@ -241,16 +241,13 @@ StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& 
 	const size_t memorySize = StaticSingleMeshRCG::getRequireMemorySize(slots.size());
 	byte* r = _gpuCommandArray.divideMemory(memorySize);
 
+	//アロケートしたメモリの先頭からRCGインスタンスを生成
 	RefPtr<StaticSingleMeshRCG> render = new (r) StaticSingleMeshRCG(
 		buffers->vertexBuffer.getRefVertexBufferView(),
 		buffers->indexBuffer.getRefIndexBufferView(),
 		slots);
 
-	StaticSingleMeshRender object;
-	object._materials = materials;
-	object._rcg = render;
-
-	return object;
+	return StaticSingleMeshRender(materials, render);
 }
 
 RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager(){

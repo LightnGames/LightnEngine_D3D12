@@ -9,7 +9,7 @@ class GenericAllocator;
 
 class DescriptorHeap {
 public:
-	DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type);
+	explicit DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type);
 	~DescriptorHeap();
 
 	void create(RefPtr<ID3D12Device> device, uint32 maxDescriptorCount = MAX_HEAP_NUM);

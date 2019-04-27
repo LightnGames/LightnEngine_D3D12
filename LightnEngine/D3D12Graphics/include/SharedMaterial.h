@@ -173,6 +173,7 @@ public:
 
 	//コマンド構築データのみのマテリアルデータ構造体を取得
 	RefSharedMaterial getRefSharedMaterial() const {
+		//それぞれでデスクリプターテーブルのバインドインデックスを取得
 		uint32 descriptorTableIndex = 0;
 		uint32 srvPixelIndex = 0;
 		uint32 pixelConstantIndex = 0;

@@ -81,9 +81,6 @@
     <ClInclude Include="include\ImguiWindow.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="include\Mesh.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="include\PipelineState.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

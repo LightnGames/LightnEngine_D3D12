@@ -24,7 +24,6 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
 	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView.view);
 	commandList->IASetIndexBuffer(&_indexBufferView.view);
 
-
 	//このインスタンスのすぐ後ろにマテリアルのコマンドが詰まっているのでまずは最初を取り出す
 	RefPtr<MaterialSlot> material = getFirstMatrialPtr();
 
@@ -76,6 +75,13 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
 
 void StaticSingleMeshRCG::updateWorldMatrix(const Matrix4& worldMatrix) {
 	_worldMatrix = worldMatrix;
+}
+
+StaticSingleMeshRender::StaticSingleMeshRender() :_materials{}, _rcg(nullptr) {
+}
+
+StaticSingleMeshRender::StaticSingleMeshRender(const VectorArray<RefPtr<SharedMaterial>>& materials, RefPtr<StaticSingleMeshRCG> rcg) :
+	_materials(materials), _rcg(rcg) {
 }
 
 RefPtr<SharedMaterial> StaticSingleMeshRender::getMaterial(uint32 index) const{
