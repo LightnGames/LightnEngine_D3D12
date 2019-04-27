@@ -29,7 +29,7 @@ cbuffer DirectionalLightBuffer : register(b0)
 };
 
 //ŠgŽU”½ŽËBRDF
-float3 DiffuseBRDF(float3 diffuseColor)
+float3 DiffuseBRDF(in float3 diffuseColor)
 {
     return diffuseColor / PI;
 }
@@ -138,18 +138,18 @@ float4 PSMain(PSInput input) : SV_Target
     int maxMipLevels, width, height;
     prefilterMap.GetDimensions(0, width, height, maxMipLevels);
 
-    float3 F = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    float3 F = FresnelSchlickRoughness(max(dotNV, 0.0), F0, roughness);
     float3 kS = F;
     float3 kD = float3(1.0,1.0,1.0) - kS;
     kD *= 1.0 - metallic;
 
     //Diffuse
-    float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels-1).rgb;
+    float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels).rgb;
     float3 envDiffuse = irradiance * albedo;
 
     //Specular
     float3 prefilteredEnvColor = prefilterMap.SampleLevel(t_sampler, R, roughness * maxMipLevels).rgb;
-    float2 envBRDF = brdfLUT.Sample(t_sampler, float2(max(dot(N, V), 0.0), roughness)).rg;
+    float2 envBRDF = brdfLUT.Sample(t_sampler, float2(max(dotNV, 0.0), roughness)).rg;
     float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y);
 
     float3 ambient = (kD * envDiffuse + envSpecular) * ao;

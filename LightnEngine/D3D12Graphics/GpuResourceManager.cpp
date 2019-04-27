@@ -26,11 +26,13 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		vertexShader = &(_resourcePool->vertexShaders.at(settings.vertexShaderName));
 	}
 	else {
-		VertexShader newVertexShader;
-		String fullPath = "Shaders/" + settings.vertexShaderName;
-		newVertexShader.create(fullPath);
-		auto itr = _resourcePool->vertexShaders.emplace(settings.vertexShaderName, std::move(newVertexShader));
+		const String fullPath = "Shaders/" + settings.vertexShaderName;
+		auto itr = _resourcePool->vertexShaders.emplace(std::piecewise_construct,
+			std::make_tuple(settings.vertexShaderName),
+			std::make_tuple());
+
 		vertexShader = &(*itr.first).second;
+		vertexShader->create(fullPath);
 	}
 
 	//ピクセルシェーダーキャッシュがあればそれを使う。なければ新規生成
@@ -39,11 +41,13 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		pixelShader = &(_resourcePool->pixelShaders.at(settings.pixelShaderName));
 	}
 	else {
-		PixelShader newPixelShader;
-		String fullPath = "Shaders/" + settings.pixelShaderName;
-		newPixelShader.create(fullPath);
-		auto itr = _resourcePool->pixelShaders.emplace(settings.pixelShaderName, std::move(newPixelShader));
+		const String fullPath = "Shaders/" + settings.pixelShaderName;
+		auto itr = _resourcePool->pixelShaders.emplace(std::piecewise_construct,
+			std::make_tuple(settings.pixelShaderName),
+			std::make_tuple());
+
 		pixelShader = &(*itr.first).second;
+		pixelShader->create(fullPath);
 	}
 
 	//ルートシグネチャキャッシュがあればそれを使う。なければ新規生成
@@ -229,7 +233,7 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 		FbxAxisSystem::DirectX.ConvertScene(scene);
 
 		FbxMesh* mesh = scene->GetMember<FbxMesh>(0);
-		const uint32 materialCount = mesh->GetElementMaterialCount();
+		const uint32 materialCount = scene->GetMaterialCount();
 		const uint32 vertexCount = mesh->GetControlPointsCount();
 		const uint32 polygonCount = mesh->GetPolygonCount();
 		const uint32 polygonVertexCount = 3;
@@ -242,10 +246,18 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 		FbxLayerElementMaterial* meshMaterials = mesh->GetLayer(0)->GetMaterials();
 
 		//マテリアルごとの頂点インデックス数を調べる
-		VectorArray<uint32> materialIndexSize(materialCount);
+		VectorArray<uint32> materialIndexSizes(materialCount);
 		for (uint32 i = 0; i < polygonCount; ++i) {
 			const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
-			materialIndexSize[materialId] += polygonVertexCount;
+			materialIndexSizes[materialId] += polygonVertexCount;
+		}
+
+		//マテリアルごとのインデックスオフセットを計算
+		VectorArray<uint32> materialIndexOffsets(materialCount);
+		for (size_t i = 0; i < materialIndexOffsets.size(); ++i) {
+			for (size_t j = 0; j < i; ++j) {
+				materialIndexOffsets[i] += materialIndexSizes[j];
+			}
 		}
 
 		UnorderedMap<RawVertex, uint32> optimizedVertices;//重複しない頂点情報と新しい頂点インデックス
@@ -256,6 +268,7 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 
 		for (uint32 i = 0; i < polygonCount; ++i) {
 			const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
+			const uint32 materialIndexOffset = materialIndexOffsets[materialId];
 			uint32& indexCount = materialIndexCounter[materialId];
 
 			for (uint32 j = 0; j < polygonVertexCount; ++j) {
@@ -278,13 +291,14 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 
 				//Zを反転するとポリゴンが左回りになるので右回りになるようにインデックスを0,1,2 → 2,1,0にする
 				const uint32 indexInverseCorrectionedValue = indexCount + 2 - j;
+				const uint32 indexPerMaterial = materialIndexOffset + indexInverseCorrectionedValue;
 				if (optimizedVertices.count(r) == 0) {
 					uint32 vertexIndex = static_cast<uint32>(optimizedVertices.size());
-					indices[indexInverseCorrectionedValue] = vertexIndex;
+					indices[indexPerMaterial] = vertexIndex;
 					optimizedVertices.emplace(r, vertexIndex);
 				}
 				else {
-					indices[indexInverseCorrectionedValue] = optimizedVertices.at(r);
+					indices[indexPerMaterial] = optimizedVertices.at(r);
 				}
 
 			}
@@ -300,11 +314,15 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 
 		manager->Destroy();
 
-		//マテリアルの描画範囲
-		MaterialDrawRange slot(indexCount, 0);
+		//マテリアルの描画範囲を設定
+		VectorArray<MaterialDrawRange> materialSlots;
+		materialSlots.reserve(materialCount);
 
-		//キャッシュにインスタンスを生成
-		const VectorArray<MaterialDrawRange> materialSlots = { slot };
+		for (size_t i = 0; i < materialCount; ++i) {
+			materialSlots.emplace_back(materialIndexSizes[i], materialIndexOffsets[i]);
+		}
+
+		//メッシュ描画インスタンスを生成
 		auto itr = _resourcePool->vertexAndIndexBuffers.emplace(std::piecewise_construct,
 			std::make_tuple(fileName),
 			std::make_tuple(materialSlots));

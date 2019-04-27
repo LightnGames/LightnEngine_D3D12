@@ -89,7 +89,7 @@ struct ShaderReflectionResult {
 
 using namespace Microsoft::WRL;
 
-class Shader {
+class Shader :private NonCopyable {
 public:
 	//シェーダーバイナリからリフレクション結果を取得する
 	ShaderReflectionResult getShaderReflection(const D3D12_SHADER_BYTECODE& byteCode) {

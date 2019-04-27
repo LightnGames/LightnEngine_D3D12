@@ -18,7 +18,6 @@ StaticSingleMeshRCG::StaticSingleMeshRCG(
 }
 
 void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
-	settings.vertexRoot32bitConstants.emplace_back(static_cast<const void*>(&_worldMatrix), static_cast<uint32>(sizeof(_worldMatrix)));
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 
 	commandList->IASetVertexBuffers(0, 1, &_vertexBufferView.view);
@@ -28,6 +27,7 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
 	RefPtr<MaterialSlot> material = getFirstMatrialPtr();
 
 	for (size_t i = 0; i < _materialSlotSize; ++i) {
+		settings.vertexRoot32bitConstants.emplace_back(static_cast<const void*>(&_worldMatrix), static_cast<uint32>(sizeof(_worldMatrix)));
 		material->material.setupRenderCommand(settings);
 		commandList->DrawIndexedInstanced(material->range.indexCount, 1, material->range.indexOffset, 0, 0);
 
@@ -42,6 +42,10 @@ void StaticSingleMeshRCG::updateWorldMatrix(const Matrix4& worldMatrix) {
 
 RefPtr<SharedMaterial> StaticSingleMeshRender::getMaterial(uint32 index) const{
 	return _materials[index];
+}
+
+VectorArray<RefPtr<SharedMaterial>>& StaticSingleMeshRender::getMaterials(){
+	return _materials;
 }
 
 void StaticSingleMeshRender::updateWorldMatrix(const Matrix4& worldMatrix){

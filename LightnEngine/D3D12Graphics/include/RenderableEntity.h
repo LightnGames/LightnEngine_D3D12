@@ -72,6 +72,7 @@ private:
 class StaticSingleMeshRender {
 public:
 	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
+	VectorArray<RefPtr<SharedMaterial>>& getMaterials();
 	void updateWorldMatrix(const Matrix4& worldMatrix);
 
 	VectorArray<RefPtr<SharedMaterial>> _materials;
