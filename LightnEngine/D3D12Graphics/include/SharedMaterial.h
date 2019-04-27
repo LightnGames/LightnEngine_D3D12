@@ -18,7 +18,7 @@ struct RefConstantBufferViews {
 	RefBufferView views[FrameCount];
 
 	//このコンスタントバッファーたちが有効か？
-	inline bool isEnableBuffers() const {
+	inline constexpr bool isEnableBuffers() const {
 		return views[0].isEnable();//有効であればフレームカウントずつ生成するので０番だけ見ればよい
 	}
 };
@@ -38,11 +38,11 @@ struct ConstantBufferMaterial {
 	void flashBufferData(uint32 frameIndex);
 
 	//バッファビューの参照用コピーをフレームバッファリングする数分取得
-	RefConstantBufferViews getRefBufferViews() const{
+	RefConstantBufferViews getRefBufferViews(uint32 descriptorIndex) const{
 		return RefConstantBufferViews{
-			constantBufferViews[0].getRefBufferView(),
-			constantBufferViews[1].getRefBufferView(),
-			constantBufferViews[2].getRefBufferView()
+			constantBufferViews[0].getRefBufferView(descriptorIndex),
+			constantBufferViews[1].getRefBufferView(descriptorIndex),
+			constantBufferViews[2].getRefBufferView(descriptorIndex)
 		};
 	}
 
@@ -78,24 +78,32 @@ struct RefSharedMaterial {
 		const RefBufferView& srvPixel,
 		const RefBufferView& srvVertex,
 		const RefConstantBufferViews& vertexConstantViews,
-		const RefConstantBufferViews& pixelConstantViews) :
-		_pipelineState(pipelineState),
-		_rootSignature(rootSignature),
-		_srvPixel(srvPixel),
-		_srvVertex(srvVertex),
-		_vertexConstantViews(vertexConstantViews),
-		_pixelConstantViews(pixelConstantViews) {}
+		const RefConstantBufferViews& pixelConstantViews,
+		const uint32 pixelRoot32bitConstantIndex,
+		const uint32 pixelRoot32bitConstantCount,
+		const uint32 vertexRoot32bitConstantIndex,
+		const uint32 vertexRoot32bitConstantCount) :
+		pipelineState(pipelineState),
+		rootSignature(rootSignature),
+		srvPixel(srvPixel),
+		srvVertex(srvVertex),
+		vertexConstantViews(vertexConstantViews),
+		pixelConstantViews(pixelConstantViews),
+		pixelRoot32bitConstantIndex(pixelRoot32bitConstantIndex),
+		pixelRoot32bitConstantCount(pixelRoot32bitConstantCount),
+		vertexRoot32bitConstantIndex(vertexRoot32bitConstantIndex),
+		vertexRoot32bitConstantCount(vertexRoot32bitConstantCount){}
 
-	//描画コマンド構築
-	//定義を各位置を変えてインライン化する。
-	void setupRenderCommand(RenderSettings& settings) const;
-
-	const RefPipelineState _pipelineState;
-	const RefRootsignature _rootSignature;
-	const RefBufferView _srvPixel;
-	const RefBufferView _srvVertex;
-	const RefConstantBufferViews _vertexConstantViews;
-	const RefConstantBufferViews _pixelConstantViews;
+	const RefPipelineState pipelineState;
+	const RefRootsignature rootSignature;
+	const RefBufferView srvPixel;
+	const RefConstantBufferViews vertexConstantViews;
+	const uint32 pixelRoot32bitConstantIndex;
+	const uint32 pixelRoot32bitConstantCount;
+	const RefBufferView srvVertex;
+	const RefConstantBufferViews pixelConstantViews;
+	const uint32 vertexRoot32bitConstantIndex;
+	const uint32 vertexRoot32bitConstantCount;
 };
 
 class SharedMaterial {
@@ -165,11 +173,55 @@ public:
 
 	//コマンド構築データのみのマテリアルデータ構造体を取得
 	RefSharedMaterial getRefSharedMaterial() const {
-		return RefSharedMaterial(_pipelineState,_rootSignature,
-			_srvPixel.getRefBufferView(),
-			_srvVertex.getRefBufferView(),
-			_vertexConstantBuffer.getRefBufferViews(),
-			_pixelConstantBuffer.getRefBufferViews());
+		uint32 descriptorTableIndex = 0;
+		uint32 srvPixelIndex = 0;
+		uint32 pixelConstantIndex = 0;
+		uint32 pixelRoot32bitIndex = 0;
+		uint32 pixelRoot32bitCount = 0;
+		uint32 srvVertexIndex = 0;
+		uint32 vertexConstantIndex = 0;
+		uint32 vertexRoot32bitIndex = 0;
+		uint32 vertexRoot32bitCount = 0;
+
+		if (_srvPixel.isEnable()) {
+			srvPixelIndex = descriptorTableIndex++;
+		}
+
+		if (_pixelConstantBuffer.isEnableBuffer()) {
+			pixelConstantIndex = descriptorTableIndex++;
+		}
+
+		pixelRoot32bitCount = static_cast<uint32>(_psReflection.root32bitConstants.size());
+		if (pixelRoot32bitCount > 0) {
+			pixelRoot32bitIndex = descriptorTableIndex;
+			descriptorTableIndex += pixelRoot32bitCount;
+		}
+
+		if (_srvVertex.isEnable()) {
+			srvVertexIndex = descriptorTableIndex++;
+		}
+
+		if (_vertexConstantBuffer.isEnableBuffer()) {
+			vertexConstantIndex = descriptorTableIndex++;
+		}
+
+		vertexRoot32bitCount = static_cast<uint32>(_vsReflection.root32bitConstants.size());
+		if (vertexRoot32bitCount > 0) {
+			vertexRoot32bitIndex = descriptorTableIndex;
+			descriptorTableIndex += vertexRoot32bitCount;
+		}
+
+		return RefSharedMaterial(
+			_pipelineState,
+			_rootSignature,
+			_srvPixel.getRefBufferView(srvPixelIndex),
+			_srvVertex.getRefBufferView(srvVertexIndex),
+			_vertexConstantBuffer.getRefBufferViews(vertexConstantIndex),
+			_pixelConstantBuffer.getRefBufferViews(pixelConstantIndex),
+			pixelRoot32bitIndex,
+			pixelRoot32bitCount,
+			vertexRoot32bitIndex,
+			vertexRoot32bitCount);
 	}
 
 	const RefPipelineState _pipelineState;

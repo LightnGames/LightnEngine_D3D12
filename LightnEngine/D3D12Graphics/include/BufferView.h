@@ -4,13 +4,13 @@
 
 //バッファビュー参照用コピー、バッファビュー自体の寿命は管理しない
 struct RefBufferView {
-	RefBufferView(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) :
-		cpuHandle(cpuHandle), gpuHandle(gpuHandle) {}
+	RefBufferView(uint32 descriptorIndex, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) :
+		descriptorIndex(descriptorIndex), gpuHandle(gpuHandle) {}
 
-	inline bool isEnable() const { return cpuHandle.ptr != 0 && gpuHandle.ptr != 0; }
+	inline constexpr bool isEnable() const { return gpuHandle.ptr != 0; }
 
-	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
-	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+	const uint32 descriptorIndex;
+	const D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
 };
 
 //バッファービュー本体、この本体のみバッファビューの破棄ができる
@@ -20,8 +20,8 @@ struct BufferView :private NonCopyable {
 
 	inline bool isEnable() const { return cpuHandle.ptr != 0 && gpuHandle.ptr != 0 && location != 0 && size != 0; }
 
-	RefBufferView getRefBufferView() const {
-		return RefBufferView(cpuHandle, gpuHandle);
+	RefBufferView getRefBufferView(uint32 descriptorIndex) const {
+		return RefBufferView(descriptorIndex, gpuHandle);
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;

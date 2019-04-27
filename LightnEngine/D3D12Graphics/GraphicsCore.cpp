@@ -63,7 +63,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_imguiWindow.init(hwnd, _device.Get());
 
 	//GPUコマンド格納アロケータ初期化
-	_gpuCommandArray.init(16384);
+	_gpuCommandArray.init(163840);
 
 	//スワップチェーン生成
 	{
@@ -86,7 +86,13 @@ void GraphicsCore::onInit(HWND hwnd) {
 	}
 
 	//ビューポート初期化
-	_viewPort = { 0.0f, 0.0f, static_cast<float>(_width), static_cast<float>(_height), 0.0f, 1.0f };
+	_viewPort.TopLeftX = 0.0f;
+	_viewPort.TopLeftY = 0.0f;
+	_viewPort.Width = static_cast<float>(_width);
+	_viewPort.Height = static_cast<float>(_height);
+	_viewPort.MinDepth = 0.0f;
+	_viewPort.MaxDepth = 1.0f;
+
 	_scissorRect = { 0, 0, static_cast<LONG>(_width), static_cast<LONG>(_height) };
 
 	//デプスバッファ生成

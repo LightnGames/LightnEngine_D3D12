@@ -18,8 +18,8 @@ struct MaterialDrawRange {
 struct MaterialSlot {
 	MaterialSlot(const MaterialDrawRange& range, const RefSharedMaterial& material) :range(range), material(material) {}
 
-	const MaterialDrawRange range;
 	const RefSharedMaterial material;
+	const MaterialDrawRange range;
 };
 
 struct IRenderableEntity {
