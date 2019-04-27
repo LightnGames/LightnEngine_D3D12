@@ -15,8 +15,8 @@ public:
 
 		GFXInterface& gfx = GFXInterface::instance();
 
-		String meshName("Cerberus/Cerberus.fbx");
-		String skyName("skySphere.fbx");
+		String meshName("Cerberus/Cerberus.mesh");
+		String skyName("skySphere.mesh");
 		String diffuseEnv("cubemapEnvHDR.dds");
 		String specularEnv("cubemapSpecularHDR.dds");
 		String specularBrdf("cubemapBrdf.dds");
@@ -356,8 +356,8 @@ public:
 
 		GFXInterface& gfx = GFXInterface::instance();
 
-		String meshName("MultiMaterial.fbx");
-		String skyName("skySphere.fbx");
+		String meshName("MultiMaterial.mesh");
+		String skyName("skySphere.mesh");
 		String diffuseEnv("cubemapEnvHDR.dds");
 		String specularEnv("cubemapSpecularHDR.dds");
 		String specularBrdf("cubemapBrdf.dds");
@@ -476,7 +476,7 @@ public:
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 	Win32Application app;
 	app.init(hInstance, nCmdShow);
-	app._sceneManager->changeScene<TestScene_MultiMaterial>();
+	app._sceneManager->changeScene<TestScene_Gun>();
 
 	return app.run();
 }

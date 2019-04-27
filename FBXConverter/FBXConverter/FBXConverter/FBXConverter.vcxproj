@@ -87,9 +87,12 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Math\include;C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Utility\include;C:\Program Files\Autodesk\FBX\FBX SDK\2019.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Math\lib;C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Utility\lib;C:\Program Files\Autodesk\FBX\FBX SDK\2019.0\lib\vs2015\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Math_$(Configuration).lib;Utility_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -115,11 +118,14 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Math\include;C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Utility\include;C:\Program Files\Autodesk\FBX\FBX SDK\2019.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Math\lib;C:\Users\Dunois\Documents\VisualStudio Projects\LightnEngine_D3D12\LightnEngine\Utility\lib;C:\Program Files\Autodesk\FBX\FBX SDK\2019.0\lib\vs2015\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Math_$(Configuration).lib;Utility_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

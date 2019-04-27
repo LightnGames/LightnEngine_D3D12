@@ -8,6 +8,7 @@
 
 //マテリアルの描画範囲定義
 struct MaterialDrawRange {
+	MaterialDrawRange() {}
 	MaterialDrawRange(uint32 indexCount, uint32 indexOffset) :indexCount(indexCount), indexOffset(indexOffset) {}
 
 	uint32 indexCount;

@@ -12,7 +12,7 @@
 
 GpuResourceManager* Singleton<GpuResourceManager>::_singleton = 0;
 
-GpuResourceManager::GpuResourceManager(){
+GpuResourceManager::GpuResourceManager() {
 	_resourcePool = makeUnique<GpuResourceDataPool>();
 }
 
@@ -155,7 +155,7 @@ void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandCont
 		String fullPath = "Resources/" + settings[i];
 
 		//テクスチャをキャッシュに生成
-		auto itr =_resourcePool->textures.emplace(std::piecewise_construct,
+		auto itr = _resourcePool->textures.emplace(std::piecewise_construct,
 			std::make_tuple(settings[i]),
 			std::make_tuple());
 
@@ -177,7 +177,7 @@ struct RawVertex {
 	Vector3 tangent;
 	Vector2 texcoord;
 
-	bool operator==(const RawVertex &left) const {
+	bool operator==(const RawVertex& left) const {
 		return position == left.position && texcoord == texcoord;
 	}
 };
@@ -189,7 +189,7 @@ namespace std {
 	class hash<RawVertex> {
 	public:
 
-		size_t operator () (const RawVertex &p) const {
+		size_t operator () (const RawVertex& p) const {
 			size_t seed = 0;
 
 			seed ^= HashCombine(hash<float>()(p.position.x), seed);
@@ -205,129 +205,160 @@ namespace std {
 	};
 }
 
+#include <fstream>
 #include <fbxsdk.h>
 using namespace fbxsdk;
-void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device, CommandContext & commandContext, const VectorArray<String>& fileNames) {
+void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& fileNames) {
 	VectorArray<ComPtr<ID3D12Resource>> uploadHeaps(fileNames.size() * 2);//読み込むファイル数×(頂点バッファ＋インデックスバッファ)
 	auto commandListSet = commandContext.requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
-	
+
 	uint32 uploadHeapCounter = 0;
 	for (const auto& fileName : fileNames) {
-		fbxsdk::FbxManager* manager = fbxsdk::FbxManager::Create();
-		FbxIOSettings* ios = FbxIOSettings::Create(manager, IOSROOT);
-		manager->SetIOSettings(ios);
-		FbxScene* scene = FbxScene::Create(manager, "");
+		//fbxsdk::FbxManager* manager = fbxsdk::FbxManager::Create();
+		//FbxIOSettings* ios = FbxIOSettings::Create(manager, IOSROOT);
+		//manager->SetIOSettings(ios);
+		//FbxScene* scene = FbxScene::Create(manager, "");
 
-		FbxImporter* importer = FbxImporter::Create(manager, "");
+		//FbxImporter* importer = FbxImporter::Create(manager, "");
+		//String fullPath = "Resources/" + fileName;
+		//bool isSuccsess = importer->Initialize(fullPath.c_str(), -1, manager->GetIOSettings());
+		//assert(isSuccsess && "FBX読み込み失敗");
+
+		//importer->Import(scene);
+		//importer->Destroy();
+
+		//FbxGeometryConverter geometryConverter(manager);
+		//geometryConverter.Triangulate(scene, true);
+
+		//FbxAxisSystem::DirectX.ConvertScene(scene);
+
+		//FbxMesh* mesh = scene->GetMember<FbxMesh>(0);
+		//const uint32 materialCount = scene->GetMaterialCount();
+		//const uint32 vertexCount = mesh->GetControlPointsCount();
+		//const uint32 polygonCount = mesh->GetPolygonCount();
+		//const uint32 polygonVertexCount = 3;
+		//const uint32 indexCount = polygonCount * polygonVertexCount;
+
+		//FbxStringList uvSetNames;
+		//bool bIsUnmapped = false;
+		//mesh->GetUVSetNames(uvSetNames);
+
+		//FbxLayerElementMaterial* meshMaterials = mesh->GetLayer(0)->GetMaterials();
+
+		////マテリアルごとの頂点インデックス数を調べる
+		//VectorArray<uint32> materialIndexSizes(materialCount);
+		//for (uint32 i = 0; i < polygonCount; ++i) {
+		//	const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
+		//	materialIndexSizes[materialId] += polygonVertexCount;
+		//}
+
+		////マテリアルごとのインデックスオフセットを計算
+		//VectorArray<uint32> materialIndexOffsets(materialCount);
+		//for (size_t i = 0; i < materialIndexOffsets.size(); ++i) {
+		//	for (size_t j = 0; j < i; ++j) {
+		//		materialIndexOffsets[i] += materialIndexSizes[j];
+		//	}
+		//}
+
+		//UnorderedMap<RawVertex, uint32> optimizedVertices;//重複しない頂点情報と新しい頂点インデックス
+		//VectorArray<UINT32> indices(indexCount);//新しい頂点インデックスでできたインデックスバッファ
+		//VectorArray<uint32> materialIndexCounter(materialCount);//マテリアルごとのインデックス数を管理
+
+		//optimizedVertices.reserve(indexCount);
+
+		//for (uint32 i = 0; i < polygonCount; ++i) {
+		//	const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
+		//	const uint32 materialIndexOffset = materialIndexOffsets[materialId];
+		//	uint32& indexCount = materialIndexCounter[materialId];
+
+		//	for (uint32 j = 0; j < polygonVertexCount; ++j) {
+		//		const uint32 vertexIndex = mesh->GetPolygonVertex(i, j);
+		//		FbxVector4 v = mesh->GetControlPointAt(vertexIndex);
+		//		FbxVector4 normal;
+		//		FbxVector2 texcoord;
+
+		//		FbxString uvSetName = uvSetNames.GetStringAt(0);//UVSetは０番インデックスのみ対応
+		//		mesh->GetPolygonVertexUV(i, j, uvSetName, texcoord, bIsUnmapped);
+		//		mesh->GetPolygonVertexNormal(i, j, normal);
+
+		//		RawVertex r;
+		//		r.position = { (float)v[0], (float)v[1], -(float)v[2] };//FBXは右手座標系なので左手座標系に直すためにZを反転する
+		//		r.normal = { (float)normal[0], (float)normal[1], -(float)normal[2] };
+		//		r.texcoord = { (float)texcoord[0], 1 - (float)texcoord[1] };
+
+		//		const Vector3 vectorUp = { 0.0f, 1, EPSILON };
+		//		r.tangent = Vector3::cross(r.normal, vectorUp);
+
+		//		//Zを反転するとポリゴンが左回りになるので右回りになるようにインデックスを0,1,2 → 2,1,0にする
+		//		const uint32 indexInverseCorrectionedValue = indexCount + 2 - j;
+		//		const uint32 indexPerMaterial = materialIndexOffset + indexInverseCorrectionedValue;
+		//		if (optimizedVertices.count(r) == 0) {
+		//			uint32 vertexIndex = static_cast<uint32>(optimizedVertices.size());
+		//			indices[indexPerMaterial] = vertexIndex;
+		//			optimizedVertices.emplace(r, vertexIndex);
+		//		}
+		//		else {
+		//			indices[indexPerMaterial] = optimizedVertices.at(r);
+		//		}
+
+		//	}
+
+		//	indexCount += polygonVertexCount;
+		//}
+
+		////UnorederedMapの配列からVectorArrayに変換
+		//VectorArray<RawVertex> vertices(optimizedVertices.size());
+		//for (const auto& vertex : optimizedVertices) {
+		//	vertices[vertex.second] = vertex.first;
+		//}
+
+		//manager->Destroy();
+
+		////マテリアルの描画範囲を設定
+		//VectorArray<MaterialDrawRange> materialSlots;
+		//materialSlots.reserve(materialCount);
+
+		//for (size_t i = 0; i < materialCount; ++i) {
+		//	materialSlots.emplace_back(materialIndexSizes[i], materialIndexOffsets[i]);
+		//}
+
 		String fullPath = "Resources/" + fileName;
-		bool isSuccsess = importer->Initialize(fullPath.c_str(), -1, manager->GetIOSettings());
-		assert(isSuccsess && "FBX読み込み失敗");
+		std::ifstream fin(fullPath.c_str(), std::ios::in | std::ios::binary);
+		fin.exceptions(std::ios::badbit);
 
-		importer->Import(scene);
-		importer->Destroy();
+		assert(!fin.fail() && "メッシュファイルが読み込めません");
 
-		FbxGeometryConverter geometryConverter(manager);
-		geometryConverter.Triangulate(scene, true);
+		uint32 allFileSize = 0;
+		uint32 verticesCount = 0;
+		uint32 indicesCount = 0;
+		uint32 materialCount = 0;
 
-		FbxAxisSystem::DirectX.ConvertScene(scene);
+		fin.read(reinterpret_cast<char*>(&allFileSize), 4);
+		fin.read(reinterpret_cast<char*>(&verticesCount), 4);
+		fin.read(reinterpret_cast<char*>(&indicesCount), 4);
+		fin.read(reinterpret_cast<char*>(&materialCount), 4);
 
-		FbxMesh* mesh = scene->GetMember<FbxMesh>(0);
-		const uint32 materialCount = scene->GetMaterialCount();
-		const uint32 vertexCount = mesh->GetControlPointsCount();
-		const uint32 polygonCount = mesh->GetPolygonCount();
-		const uint32 polygonVertexCount = 3;
-		const uint32 indexCount = polygonCount * polygonVertexCount;
+		uint32 verticesSize = verticesCount * sizeof(RawVertex);
+		uint32 indicesSize = indicesCount * sizeof(uint32);
+		uint32 materialSize = materialCount * sizeof(MaterialDrawRange);
 
-		FbxStringList uvSetNames;
-		bool bIsUnmapped = false;
-		mesh->GetUVSetNames(uvSetNames);
+		VectorArray<RawVertex> vertices(verticesCount);
+		VectorArray<uint32> indices(indicesCount);
+		VectorArray<MaterialDrawRange> materialRanges(materialCount);
 
-		FbxLayerElementMaterial* meshMaterials = mesh->GetLayer(0)->GetMaterials();
+		fin.read(reinterpret_cast<char*>(vertices.data()), verticesSize);
+		fin.read(reinterpret_cast<char*>(indices.data()), indicesSize);
+		fin.read(reinterpret_cast<char*>(materialRanges.data()), materialSize);
 
-		//マテリアルごとの頂点インデックス数を調べる
-		VectorArray<uint32> materialIndexSizes(materialCount);
-		for (uint32 i = 0; i < polygonCount; ++i) {
-			const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
-			materialIndexSizes[materialId] += polygonVertexCount;
-		}
-
-		//マテリアルごとのインデックスオフセットを計算
-		VectorArray<uint32> materialIndexOffsets(materialCount);
-		for (size_t i = 0; i < materialIndexOffsets.size(); ++i) {
-			for (size_t j = 0; j < i; ++j) {
-				materialIndexOffsets[i] += materialIndexSizes[j];
-			}
-		}
-
-		UnorderedMap<RawVertex, uint32> optimizedVertices;//重複しない頂点情報と新しい頂点インデックス
-		VectorArray<UINT32> indices(indexCount);//新しい頂点インデックスでできたインデックスバッファ
-		VectorArray<uint32> materialIndexCounter(materialCount);//マテリアルごとのインデックス数を管理
-
-		optimizedVertices.reserve(indexCount);
-
-		for (uint32 i = 0; i < polygonCount; ++i) {
-			const uint32 materialId = meshMaterials->GetIndexArray().GetAt(i);
-			const uint32 materialIndexOffset = materialIndexOffsets[materialId];
-			uint32& indexCount = materialIndexCounter[materialId];
-
-			for (uint32 j = 0; j < polygonVertexCount; ++j) {
-				const uint32 vertexIndex = mesh->GetPolygonVertex(i, j);
-				FbxVector4 v = mesh->GetControlPointAt(vertexIndex);
-				FbxVector4 normal;
-				FbxVector2 texcoord;
-
-				FbxString uvSetName = uvSetNames.GetStringAt(0);//UVSetは０番インデックスのみ対応
-				mesh->GetPolygonVertexUV(i, j, uvSetName, texcoord, bIsUnmapped);
-				mesh->GetPolygonVertexNormal(i, j, normal);
-
-				RawVertex r;
-				r.position = { (float)v[0], (float)v[1], -(float)v[2] };//FBXは右手座標系なので左手座標系に直すためにZを反転する
-				r.normal = { (float)normal[0], (float)normal[1], -(float)normal[2] };
-				r.texcoord = { (float)texcoord[0], 1 - (float)texcoord[1] };
-
-				const Vector3 vectorUp = { 0.0f, 1, EPSILON };
-				r.tangent = Vector3::cross(r.normal, vectorUp);
-
-				//Zを反転するとポリゴンが左回りになるので右回りになるようにインデックスを0,1,2 → 2,1,0にする
-				const uint32 indexInverseCorrectionedValue = indexCount + 2 - j;
-				const uint32 indexPerMaterial = materialIndexOffset + indexInverseCorrectionedValue;
-				if (optimizedVertices.count(r) == 0) {
-					uint32 vertexIndex = static_cast<uint32>(optimizedVertices.size());
-					indices[indexPerMaterial] = vertexIndex;
-					optimizedVertices.emplace(r, vertexIndex);
-				}
-				else {
-					indices[indexPerMaterial] = optimizedVertices.at(r);
-				}
-
-			}
-
-			indexCount += polygonVertexCount;
-		}
-
-		//UnorederedMapの配列からVectorArrayに変換
-		VectorArray<RawVertex> vertices(optimizedVertices.size());
-		for (const auto& vertex : optimizedVertices) {
-			vertices[vertex.second] = vertex.first;
-		}
-
-		manager->Destroy();
-
-		//マテリアルの描画範囲を設定
-		VectorArray<MaterialDrawRange> materialSlots;
-		materialSlots.reserve(materialCount);
-
-		for (size_t i = 0; i < materialCount; ++i) {
-			materialSlots.emplace_back(materialIndexSizes[i], materialIndexOffsets[i]);
-		}
+		fin.close();
 
 		//メッシュ描画インスタンスを生成
 		auto itr = _resourcePool->vertexAndIndexBuffers.emplace(std::piecewise_construct,
 			std::make_tuple(fileName),
-			std::make_tuple(materialSlots));
+			std::make_tuple(materialRanges));
 
-		VertexAndIndexBuffer& buffers = (*itr.first).second;
+		VertexAndIndexBuffer & buffers = (*itr.first).second;
 
 		//頂点バッファ生成
 		buffers.vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
@@ -344,17 +375,17 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 	commandContext.waitForIdle();
 }
 
-void GpuResourceManager::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial) const{
+void GpuResourceManager::loadSharedMaterial(const String & materialName, RefPtr<SharedMaterial> & dstMaterial) const {
 	assert(_resourcePool->sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
 	dstMaterial = &_resourcePool->sharedMaterials.at(materialName);
 }
 
-void GpuResourceManager::loadTexture(const String & textureName, RefPtr<Texture2D>& dstTexture) const{
+void GpuResourceManager::loadTexture(const String & textureName, RefPtr<Texture2D> & dstTexture) const {
 	assert(_resourcePool->textures.count(textureName) > 0 && "テクスチャが見つかりません");
 	dstTexture = &_resourcePool->textures.at(textureName);
 }
 
-void GpuResourceManager::loadVertexAndIndexBuffer(const String& meshName, RefPtr<VertexAndIndexBuffer>& dstBuffers) const {
+void GpuResourceManager::loadVertexAndIndexBuffer(const String & meshName, RefPtr<VertexAndIndexBuffer> & dstBuffers) const {
 	assert(_resourcePool->vertexAndIndexBuffers.count(meshName) > 0 && "メッシュが見つかりません");
 	dstBuffers = &_resourcePool->vertexAndIndexBuffers.at(meshName);
 }
@@ -363,6 +394,6 @@ void GpuResourceManager::shutdown() {
 	_resourcePool.reset();
 }
 
-UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const{
+UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const {
 	return _resourcePool->sharedMaterials;
 }
