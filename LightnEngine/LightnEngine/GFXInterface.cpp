@@ -52,13 +52,13 @@ void GFXInterface::createSharedMaterial(const SharedMaterialCreateSettings& sett
 #endif
 }
 
-void GFXInterface::loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial){
+void GFXInterface::loadSharedMaterial(const String& materialName, RefAddressOf<SharedMaterial> dstMaterial){
 #ifdef D3D12
 	_graphicsCore->getGpuResourceManager()->loadSharedMaterial(materialName, dstMaterial);
 #endif
 }
 
-void GFXInterface::loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture){
+void GFXInterface::loadTexture(const String& textureName, RefAddressOf<Texture2D> dstTexture){
 #ifdef D3D12
 	_graphicsCore->getGpuResourceManager()->loadTexture(textureName, dstTexture);
 #endif

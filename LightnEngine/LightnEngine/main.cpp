@@ -8,6 +8,13 @@
 #include <GpuResource.h>
 #include <Scene.h>
 
+VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
+{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+};
+
 class TestScene_Gun :public Scene {
 public:
 	void onStart() override {
@@ -36,6 +43,7 @@ public:
 		materialSettings.pixelShaderName = "shader_ps.hlsl";
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness, ao };
+		materialSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(materialSettings);
 
 		SharedMaterialCreateSettings skyMatSettings;
@@ -44,6 +52,7 @@ public:
 		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
+		skyMatSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
@@ -142,6 +151,7 @@ public:
 		materialSettings.pixelShaderName = "shader_ps.hlsl";
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness, ao };
+		materialSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(materialSettings);
 
 		SharedMaterialCreateSettings skyMatSettings;
@@ -150,6 +160,7 @@ public:
 		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
+		skyMatSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
@@ -245,6 +256,7 @@ public:
 		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
+		skyMatSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
@@ -262,6 +274,7 @@ public:
 				materialSettings.pixelShaderName = "pbr_gradation_ps.hlsl";
 				materialSettings.vsTextures = {};
 				materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf };
+				materialSettings.inputLayouts = inputLayouts;
 				gfx.createSharedMaterial(materialSettings);
 
 				_meshes[x * xNum + y] = gfx.createStaticSingleMeshRender(meshName, { matName });
@@ -384,6 +397,7 @@ public:
 		materialSettings.pixelShaderName = "shader_ps.hlsl";
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness, ao };
+		materialSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(materialSettings);
 
 		SharedMaterialCreateSettings materialSettings2;
@@ -392,6 +406,7 @@ public:
 		materialSettings2.pixelShaderName = "shader_ps.hlsl";
 		materialSettings2.vsTextures = {};
 		materialSettings2.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo2, normal2, metallic2, roughness2, ao2 };
+		materialSettings2.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(materialSettings2);
 
 		SharedMaterialCreateSettings skyMatSettings;
@@ -400,6 +415,7 @@ public:
 		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
+		skyMatSettings.inputLayouts = inputLayouts;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み

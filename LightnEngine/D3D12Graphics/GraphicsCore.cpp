@@ -8,14 +8,20 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
+RefPtr<SharedMaterial> gizmoMat;
+D3D12_VERTEX_BUFFER_VIEW gizmoVertex;
+ID3D12Resource* gizmoVertexResource;
+RootSignature gizmoRootSignature;
+PipelineState gizmoPipelineState;
+
 GraphicsCore::GraphicsCore() :
 	_width(1280),
 	_height(720),
 	_frameIndex(0),
 	_viewPort({}),
 	_scissorRect({}),
-	_dsv(), 
-	_currentFrameResource(nullptr){
+	_dsv(),
+	_currentFrameResource(nullptr) {
 }
 
 GraphicsCore::~GraphicsCore() {
@@ -82,7 +88,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 		//フルスクリーンサポートをオフ
 		throwIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
-		throwIfFailed(swapChain.As(&_swapChain)); 
+		throwIfFailed(swapChain.As(&_swapChain));
 	}
 
 	//ビューポート初期化
@@ -113,6 +119,75 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
+
+	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
+		{ "START_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+		{ "END_POSITION"  , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+		{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+	};
+
+
+	SharedMaterialCreateSettings materialSettings;
+	materialSettings.name = "GizmoT";
+	materialSettings.vertexShaderName = "GizmoLine.hlsl";
+	materialSettings.pixelShaderName = "GizmoLine.hlsl";
+	materialSettings.vsTextures = {};
+	materialSettings.psTextures = {};
+	materialSettings.inputLayouts = inputLayouts;
+	_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
+	_gpuResourceManager.loadSharedMaterial("GizmoT", &gizmoMat);
+
+	struct GizmoLineVertex {
+		Vector3 startPos;
+		Vector3 endPos;
+		Color color;
+	};
+
+	constexpr uint32 MAX_GIZMO = 256;
+
+	D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
+	D3D12_RESOURCE_DESC vertexBufferDesc = {};
+	vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	vertexBufferDesc.Width = MAX_GIZMO * sizeof(GizmoLineVertex);
+	vertexBufferDesc.Height = 1;
+	vertexBufferDesc.DepthOrArraySize = 1;
+	vertexBufferDesc.MipLevels = 1;
+	vertexBufferDesc.SampleDesc.Count = 1;
+	vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	throwIfFailed(_device->CreateCommittedResource(
+		&vertexUploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&vertexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&gizmoVertexResource)
+	));
+
+	GizmoLineVertex* mapPtr = nullptr;
+	gizmoVertexResource->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
+
+	new (mapPtr) GizmoLineVertex{ Vector3(0,0,0),Vector3(1,0,0),Color::red };
+	mapPtr++;
+
+	new (mapPtr) GizmoLineVertex{ Vector3(0,0.2f,0),Vector3(1,0.2f,0),Color::blue };
+	mapPtr++;
+
+	new (mapPtr) GizmoLineVertex{ Vector3(0,0.4f,0),Vector3(1,0.4f,0),Color::green };
+	mapPtr++;
+
+	gizmoVertex.BufferLocation = gizmoVertexResource->GetGPUVirtualAddress();
+	gizmoVertex.StrideInBytes = sizeof(GizmoLineVertex);
+	gizmoVertex.SizeInBytes = static_cast<UINT>(vertexBufferDesc.Width);
+
+	RefPtr<VertexShader> vs;
+	RefPtr<PixelShader> ps;
+	_gpuResourceManager.loadVertexShader("Shaders/" + materialSettings.vertexShaderName, &vs);
+	_gpuResourceManager.loadPixelShader("Shaders/" + materialSettings.pixelShaderName, &ps);
+
+	gizmoRootSignature.create(_device.Get(), *vs, *ps);
+	gizmoPipelineState.create(_device.Get(), &gizmoRootSignature, *vs, *ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
+
 }
 
 void GraphicsCore::onUpdate() {
@@ -153,7 +228,7 @@ void GraphicsCore::onRender() {
 	//メッシュを描画
 	RenderSettings renderSettings(commandList, _frameIndex);
 
-	union GpuCommandGroup{
+	union GpuCommandGroup {
 		RefPtr<StaticSingleMeshRCG> rcg;
 		byte* bytePtr;
 	};
@@ -166,6 +241,12 @@ void GraphicsCore::onRender() {
 		group.rcg->setupRenderCommand(renderSettings);
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
+
+	commandList->SetGraphicsRootSignature(gizmoRootSignature._rootSignature.Get());
+	commandList->SetPipelineState(gizmoPipelineState._pipelineState.Get());
+	commandList->IASetVertexBuffers(0, 1, &gizmoVertex);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+	commandList->DrawInstanced(2, 3, 0, 0);
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);
@@ -204,22 +285,22 @@ void GraphicsCore::onDestroy() {
 	_device = nullptr;
 }
 
-void GraphicsCore::createTextures(const VectorArray<String>& textureNames){
+void GraphicsCore::createTextures(const VectorArray<String>& textureNames) {
 	_gpuResourceManager.createTextures(_device.Get(), _commandContext, textureNames);
 }
 
-void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames){
+void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames) {
 	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _commandContext, fileNames);
 }
 
-void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings){
+void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings) {
 	_gpuResourceManager.createSharedMaterial(_device.Get(), settings);
 }
 
-StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames){
+StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) {
 	//メッシュインスタンス生成
 	RefPtr<VertexAndIndexBuffer> buffers;
-	_gpuResourceManager.loadVertexAndIndexBuffer(name, buffers);
+	_gpuResourceManager.loadVertexAndIndexBuffer(name, &buffers);
 
 	const size_t materialCount = buffers->materialDrawRanges.size();
 	VectorArray<MaterialSlot> slots;
@@ -230,7 +311,7 @@ StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& 
 	//マテリアルスロットにマテリアルをセット
 	for (size_t i = 0; i < materialNames.size(); ++i) {
 		RefPtr<SharedMaterial> material;
-		_gpuResourceManager.loadSharedMaterial(materialNames[i], material);
+		_gpuResourceManager.loadSharedMaterial(materialNames[i], &material);
 
 		slots.emplace_back(buffers->materialDrawRanges[i], material->getRefSharedMaterial());
 		materials.emplace_back(material);
@@ -250,7 +331,7 @@ StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& 
 	return StaticSingleMeshRender(materials, render);
 }
 
-RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager(){
+RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager() {
 	return &_gpuResourceManager;
 }
 

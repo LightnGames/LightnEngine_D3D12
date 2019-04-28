@@ -285,15 +285,9 @@ public:
 
 class VertexShader :public Shader {
 public:
-	void create(const String& fileName) {
+	void create(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& layouts) {
 		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &shader, nullptr));
-
-		inputLayouts = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		};
+		inputLayouts = layouts;
 
 		shaderReflectionResult = getShaderReflection(getByteCode());
 	}
@@ -423,7 +417,8 @@ public:
 
 class PipelineState :private NonCopyable {
 public:
-	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature, const VertexShader& vertexShader, const PixelShader& pixelShader) {
+	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature,
+		const VertexShader& vertexShader, const PixelShader& pixelShader, D3D12_PRIMITIVE_TOPOLOGY_TYPE topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE) {
 		D3D12_RASTERIZER_DESC rasterizerDesc = {};
 		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 		rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
@@ -483,7 +478,7 @@ public:
 		psoDesc.BlendState = blendDesc;
 		psoDesc.DepthStencilState = dsDesc;
 		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.PrimitiveTopologyType = topology;
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = RenderTargetFormat;
 		psoDesc.DSVFormat = DepthStencilFormat;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Utility.h>
+#include <d3d12.h>
 #include "GraphicsConstantSettings.h"
 #include "BufferView.h"
 
@@ -13,6 +14,16 @@ class PixelShader;
 #include "PipelineState.h"
 
 using Root32bitConstantInfo = std::pair<const void*, uint32>;//データポインタ、サイズ
+
+//以下グラフィックスインターフェース定義。グラフィックスAPIインターフェースヘッダーに移動する
+struct SharedMaterialCreateSettings {
+	String name;
+	String vertexShaderName;
+	String pixelShaderName;
+	VectorArray<String> vsTextures;
+	VectorArray<String> psTextures;
+	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts;
+};
 
 struct RefConstantBufferViews {
 	RefBufferView views[FrameCount];

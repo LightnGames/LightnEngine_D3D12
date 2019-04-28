@@ -24,8 +24,8 @@ public:
 	void createMeshSets(const VectorArray<String>& fileNames);
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
-	void loadSharedMaterial(const String& materialName, RefPtr<SharedMaterial>& dstMaterial);
-	void loadTexture(const String& textureName, RefPtr<Texture2D>& dstTexture);
+	void loadSharedMaterial(const String& materialName, RefAddressOf<SharedMaterial> dstMaterial);
+	void loadTexture(const String& textureName, RefAddressOf<Texture2D> dstTexture);
 
 	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 

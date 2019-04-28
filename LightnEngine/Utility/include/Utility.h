@@ -93,7 +93,10 @@ template <class T>
 using UniquePtr = std::unique_ptr<T>;
 
 template <class T>
-using RefPtr = T *;
+using RefPtr = T*;
+
+template <class T>
+using RefAddressOf = T**;
 
 template <class T, class ...Args>
 UniquePtr<T> makeUnique(Args ...args) {
@@ -133,12 +136,3 @@ namespace std {
 
 template <class T, class U>
 using UnorderedMap = std::unordered_map < T, U, std::hash<T>, std::equal_to<T>, MyAllocator<std::pair<const T, U>>>; 
-
-//以下グラフィックスインターフェース定義。グラフィックスAPIインターフェースヘッダーに移動する
-struct SharedMaterialCreateSettings {
-	String name;
-	String vertexShaderName;
-	String pixelShaderName;
-	VectorArray<String> vsTextures;
-	VectorArray<String> psTextures;
-};
