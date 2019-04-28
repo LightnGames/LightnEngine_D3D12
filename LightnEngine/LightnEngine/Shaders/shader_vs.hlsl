@@ -16,10 +16,11 @@ struct VSInput
     float2 uv : TEXCOORD;
 };
 
-cbuffer Constant1 : register(b0)
+cbuffer CameraInfo : register(b0)
 {
     float4x4 mtxView;
     float4x4 mtxProj;
+	float3 cameraPos;
 }
 
 cbuffer ROOT_32BIT_CONSTANTS_MtxWorld : register(b1)
@@ -39,7 +40,7 @@ PSInput VSMain(VSInput input)
     result.binormal = cross(result.normal, result.tangent);
 
     result.uv = input.uv;
-    result.viewDir = normalize(float3(0, 0, 0) - worldPos.xyz);
+    result.viewDir = normalize(cameraPos - worldPos.xyz);
 
     return result;
 }

@@ -242,6 +242,9 @@ void GraphicsCore::onRender() {
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
+	//gizmoMat->setParameter<Matrix4>("mtxView", mtxView.transpose());
+	//gizmoMat->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
+
 	commandList->SetGraphicsRootSignature(gizmoRootSignature._rootSignature.Get());
 	commandList->SetPipelineState(gizmoPipelineState._pipelineState.Get());
 	commandList->IASetVertexBuffers(0, 1, &gizmoVertex);
@@ -283,6 +286,10 @@ void GraphicsCore::onDestroy() {
 
 	_swapChain = nullptr;
 	_device = nullptr;
+
+	gizmoVertexResource->Release();
+	gizmoRootSignature._rootSignature = nullptr;
+	gizmoPipelineState._pipelineState = nullptr;
 }
 
 void GraphicsCore::createTextures(const VectorArray<String>& textureNames) {
