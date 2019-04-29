@@ -97,7 +97,6 @@ public:
 		GFXInterface& gfx = GFXInterface::instance();
 
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
-		//mtxProj = Matrix4::identity;
 
 		_mesh.updateWorldMatrix(mtxWorld.transpose());
 		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));

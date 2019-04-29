@@ -167,13 +167,15 @@ void GraphicsCore::onInit(HWND hwnd) {
 	GizmoLineVertex* mapPtr = nullptr;
 	gizmoVertexResource->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
 
-	new (mapPtr) GizmoLineVertex{ Vector3(0,0,0),Vector3(1,0,0),Color::red };
+	Vector3 offset = Vector3::forward*5;
+
+	new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(1,0,0) + offset,Color::red };
 	mapPtr++;
 
-	new (mapPtr) GizmoLineVertex{ Vector3(0,0.2f,0),Vector3(1,0.2f,0),Color::blue };
+	new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(0,0,1) + offset,Color::blue };
 	mapPtr++;
 
-	new (mapPtr) GizmoLineVertex{ Vector3(0,0.4f,0),Vector3(1,0.4f,0),Color::green };
+	new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(0,1,0) + offset,Color::green };
 	mapPtr++;
 
 	gizmoVertex.BufferLocation = gizmoVertexResource->GetGPUVirtualAddress();
@@ -273,12 +275,10 @@ void GraphicsCore::onRender() {
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
-	//gizmoMat->setParameter<Matrix4>("mtxView", mtxView.transpose());
-	//gizmoMat->setParameter<Matrix4>("mtxProj", mtxProj.transpose());
-
 	commandList->SetGraphicsRootSignature(gizmoRootSignature._rootSignature.Get());
 	commandList->SetPipelineState(gizmoPipelineState._pipelineState.Get());
 	commandList->IASetVertexBuffers(0, 1, &gizmoVertex);
+	commandList->SetGraphicsRootDescriptorTable(0, gizmoMat->_vertexConstantBuffer.constantBufferViews[_frameIndex].gpuHandle);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 	commandList->DrawInstanced(2, 3, 0, 0);
 
