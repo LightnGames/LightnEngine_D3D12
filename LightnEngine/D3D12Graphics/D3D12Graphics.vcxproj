@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\BufferView.h" />
+    <ClInclude Include="include\Camera.h" />
     <ClInclude Include="include\CommandAllocatorPool.h" />
     <ClInclude Include="include\CommandContext.h" />
     <ClInclude Include="include\CommandListPool.h" />

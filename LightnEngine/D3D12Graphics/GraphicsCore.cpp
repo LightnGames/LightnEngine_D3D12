@@ -218,11 +218,42 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+	static float xC = 0.0f;
+	static float yC = 0.0f;
+	static float zC = 0.0f;
+	static float pitchC = 0;
+	static float yawC = 0;
+	static float rollC = 0;
+
+	ImGui::Begin("Camera");
+	ImGui::SliderFloat("World X", &xC, -5, 5);
+	ImGui::SliderFloat("World Y", &yC, -5, 5);
+	ImGui::SliderFloat("World Z", &zC, -5, 5);
+	ImGui::SliderAngle("Picth", &pitchC);
+	ImGui::SliderAngle("Yaw", &yawC);
+	ImGui::SliderAngle("Roll", &rollC);
+	ImGui::End();
+
+	RefPtr<Camera> mainCamera = _gpuResourceManager.getMainCamera();
+	mainCamera->setPosition(xC, yC, zC);
+	mainCamera->setRotationEuler(pitchC, yawC, rollC, true);
+	mainCamera->setFieldOfView(60);
+	mainCamera->setNearZ(0.01f);
+	mainCamera->setFarZ(1000.0f);
+	mainCamera->setAspectRate(_width, _height);
+	mainCamera->computeProjectionMatrix();
+	mainCamera->computeViewMatrix();
+
+	
 	//マテリアルの定数バッファをGPUへアップロード
 	auto& materials = _gpuResourceManager.getMaterials();
 	for (auto& material : materials) {
-		material.second._vertexConstantBuffer.flashBufferData(_frameIndex);
-		material.second._pixelConstantBuffer.flashBufferData(_frameIndex);
+		SharedMaterial& sharedMaterial = material.second;
+		sharedMaterial.setParameter<Matrix4>("mtxView", mainCamera->getViewMatrixTransposed());
+		sharedMaterial.setParameter<Matrix4>("mtxProj", mainCamera->getProjectionMatrixTransposed());
+		sharedMaterial.setParameter<Vector3>("cameraPos", mainCamera->getPosition());
+		sharedMaterial._vertexConstantBuffer.flashBufferData(_frameIndex);
+		sharedMaterial._pixelConstantBuffer.flashBufferData(_frameIndex);
 	}
 
 	//メッシュを描画

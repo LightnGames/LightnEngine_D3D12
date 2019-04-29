@@ -154,12 +154,12 @@ public:
 		}
 
 		//ルート32bit定数
-		for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
-			const auto variable = _vsReflection.root32bitConstants[i].getVariable(name);
-			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_vertexRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
-			}
-		}
+		//for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
+		//	const auto variable = _vsReflection.root32bitConstants[i].getVariable(name);
+		//	if (variable != nullptr) {
+		//		return reinterpret_cast<T*>(reinterpret_cast<byte*>(_vertexRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
+		//	}
+		//}
 
 		//ピクセルシェーダー定義からパラメータを検索
 
@@ -172,12 +172,12 @@ public:
 		}
 
 		//ルート32bit定数
-		for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
-			const auto variable = _psReflection.root32bitConstants[i].getVariable(name);
-			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_pixelRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
-			}
-		}
+		//for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
+		//	const auto variable = _psReflection.root32bitConstants[i].getVariable(name);
+		//	if (variable != nullptr) {
+		//		return reinterpret_cast<T*>(reinterpret_cast<byte*>(_pixelRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
+		//	}
+		//}
 
 		return nullptr;
 	}

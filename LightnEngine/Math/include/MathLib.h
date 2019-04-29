@@ -13,7 +13,9 @@ const float M_PIDIV2 = 1.570796327f;
 const float M_PIDIV4 = 0.785398163f;
 
 //“x”‚©‚çƒ‰ƒWƒAƒ“‚É•ÏŠ·
-float radianFromDegree(const float degree);
+constexpr inline float radianFromDegree(const float degree) {
+	return degree * (M_PI / 180.0f);
+}
 
 float clamp(float value, float min, float max);
 float lerp(float value, float min, float max);

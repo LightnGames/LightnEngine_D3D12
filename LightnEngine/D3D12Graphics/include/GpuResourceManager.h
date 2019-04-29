@@ -3,6 +3,8 @@
 #include <Utility.h>
 #include <d3d12.h>
 
+#include "Camera.h"
+
 struct ID3D12Device;
 struct BufferView;
 struct IRenderableEntity;
@@ -37,7 +39,9 @@ public:
 	void shutdown();
 
 	UnorderedMap<String, SharedMaterial>& getMaterials() const;
+	RefPtr<Camera> getMainCamera();
 
 private:
 	UniquePtr<GpuResourceDataPool> _resourcePool;
+	Camera _mainCamera;
 };

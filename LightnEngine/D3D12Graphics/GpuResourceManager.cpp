@@ -422,3 +422,7 @@ void GpuResourceManager::shutdown() {
 UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const {
 	return _resourcePool->sharedMaterials;
 }
+
+RefPtr<Camera> GpuResourceManager::getMainCamera(){
+	return &_mainCamera;
+}
