@@ -88,8 +88,15 @@ SharedMaterial::SharedMaterial(
 	const ShaderReflectionResult& vsReflection,
 	const ShaderReflectionResult& psReflection,
 	const RefPipelineState& pipelineState,
-	const RefRootsignature& rootSignature)
-	:_vsReflection(vsReflection), _psReflection(psReflection), _pipelineState(pipelineState), _rootSignature(rootSignature), _srvVertex(), _srvPixel() {
+	const RefRootsignature& rootSignature,
+	D3D_PRIMITIVE_TOPOLOGY topology)
+	:_vsReflection(vsReflection),
+	_psReflection(psReflection),
+	_pipelineState(pipelineState),
+	_rootSignature(rootSignature),
+	_srvVertex(),
+	_srvPixel(),
+	_topology(topology) {
 }
 
 SharedMaterial::~SharedMaterial() {
@@ -163,7 +170,7 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 		descriptorTableIndex++;
 	}
 
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->IASetPrimitiveTopology(_topology);
 
 	pixelRoot32bitConstants.clear();
 	vertexRoot32bitConstants.clear();

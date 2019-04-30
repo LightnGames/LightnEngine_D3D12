@@ -23,6 +23,7 @@ struct SharedMaterialCreateSettings {
 	VectorArray<String> vsTextures;
 	VectorArray<String> psTextures;
 	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts;
+	D3D_PRIMITIVE_TOPOLOGY topology;
 };
 
 struct RefConstantBufferViews {
@@ -93,7 +94,8 @@ struct RefSharedMaterial {
 		const uint32 pixelRoot32bitConstantIndex,
 		const uint32 pixelRoot32bitConstantCount,
 		const uint32 vertexRoot32bitConstantIndex,
-		const uint32 vertexRoot32bitConstantCount) :
+		const uint32 vertexRoot32bitConstantCount,
+		D3D_PRIMITIVE_TOPOLOGY topology) :
 		pipelineState(pipelineState),
 		rootSignature(rootSignature),
 		srvPixel(srvPixel),
@@ -103,7 +105,8 @@ struct RefSharedMaterial {
 		pixelRoot32bitConstantIndex(pixelRoot32bitConstantIndex),
 		pixelRoot32bitConstantCount(pixelRoot32bitConstantCount),
 		vertexRoot32bitConstantIndex(vertexRoot32bitConstantIndex),
-		vertexRoot32bitConstantCount(vertexRoot32bitConstantCount){}
+		vertexRoot32bitConstantCount(vertexRoot32bitConstantCount),
+		topology(topology){}
 
 	const RefPipelineState pipelineState;
 	const RefRootsignature rootSignature;
@@ -115,6 +118,7 @@ struct RefSharedMaterial {
 	const RefConstantBufferViews pixelConstantViews;
 	const uint32 vertexRoot32bitConstantIndex;
 	const uint32 vertexRoot32bitConstantCount;
+	const D3D_PRIMITIVE_TOPOLOGY topology;
 };
 
 class SharedMaterial {
@@ -123,7 +127,8 @@ public:
 		const ShaderReflectionResult& vsReflection,
 		const ShaderReflectionResult& psReflection,
 		const RefPipelineState& pipelineState,
-		const RefRootsignature& rootSignature);
+		const RefRootsignature& rootSignature,
+		D3D_PRIMITIVE_TOPOLOGY topology);
 
 	~SharedMaterial();
 
@@ -233,8 +238,10 @@ public:
 			pixelRoot32bitIndex,
 			pixelRoot32bitCount,
 			vertexRoot32bitIndex,
-			vertexRoot32bitCount);
+			vertexRoot32bitCount,
+			_topology);
 	}
+	const D3D_PRIMITIVE_TOPOLOGY _topology;
 
 	const RefPipelineState _pipelineState;
 	const RefRootsignature _rootSignature;

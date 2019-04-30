@@ -265,6 +265,52 @@ public:
 	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
 };
 
+class VertexBufferDynamic :public GpuResource {
+public:
+	void createDirectDynamic(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, uint32 length, uint32 strideInBytes) {
+		auto commandListSet = commandContext->requestCommandListSet();
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
+
+		const UINT64 vertexBufferSize = static_cast<UINT64>(length * strideInBytes);
+		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
+		D3D12_RESOURCE_DESC vertexBufferDesc = {};
+		vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		vertexBufferDesc.Width = vertexBufferSize;
+		vertexBufferDesc.Height = 1;
+		vertexBufferDesc.DepthOrArraySize = 1;
+		vertexBufferDesc.MipLevels = 1;
+		vertexBufferDesc.SampleDesc.Count = 1;
+		vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+		throwIfFailed(device->CreateCommittedResource(
+			&vertexUploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&vertexBufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&_resource)
+		));
+
+		_vertexBufferView.BufferLocation = _resource->GetGPUVirtualAddress();
+		_vertexBufferView.StrideInBytes = strideInBytes;
+		_vertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
+
+		_resource->Map(0, nullptr, reinterpret_cast<void**>(&_dataPtr));
+
+		//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
+		commandContext->executeCommandList(commandList);
+		commandContext->discardCommandListSet(commandListSet);
+
+		//コピーが終わるまでアップロードヒープを破棄しない
+		commandContext->waitForIdle();
+	}
+
+
+
+	void* _dataPtr;
+	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
+};
+
 class IndexBuffer :public GpuResource {
 public:
 	void createDirect(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<UINT32>& indices) {

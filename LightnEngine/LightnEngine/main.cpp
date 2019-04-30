@@ -44,6 +44,7 @@ public:
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness, ao };
 		materialSettings.inputLayouts = inputLayouts;
+		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(materialSettings);
 
 		SharedMaterialCreateSettings skyMatSettings;
@@ -53,6 +54,7 @@ public:
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
 		skyMatSettings.inputLayouts = inputLayouts;
+		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
@@ -144,6 +146,7 @@ public:
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness, ao };
 		materialSettings.inputLayouts = inputLayouts;
+		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(materialSettings);
 
 		SharedMaterialCreateSettings skyMatSettings;
@@ -153,6 +156,7 @@ public:
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
 		skyMatSettings.inputLayouts = inputLayouts;
+		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
@@ -242,6 +246,7 @@ public:
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
 		skyMatSettings.inputLayouts = inputLayouts;
+		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
@@ -260,6 +265,7 @@ public:
 				materialSettings.vsTextures = {};
 				materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf };
 				materialSettings.inputLayouts = inputLayouts;
+				materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 				gfx.createSharedMaterial(materialSettings);
 
 				_meshes[x * xNum + y] = gfx.createStaticSingleMeshRender(meshName, { matName });
@@ -376,6 +382,7 @@ public:
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo, normal, metallic, roughness, ao };
 		materialSettings.inputLayouts = inputLayouts;
+		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(materialSettings);
 
 		SharedMaterialCreateSettings materialSettings2;
@@ -385,6 +392,7 @@ public:
 		materialSettings2.vsTextures = {};
 		materialSettings2.psTextures = { diffuseEnv, specularEnv, specularBrdf, albedo2, normal2, metallic2, roughness2, ao2 };
 		materialSettings2.inputLayouts = inputLayouts;
+		materialSettings2.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(materialSettings2);
 
 		SharedMaterialCreateSettings skyMatSettings;
@@ -394,6 +402,7 @@ public:
 		skyMatSettings.vsTextures = {};
 		skyMatSettings.psTextures = { diffuseEnv };
 		skyMatSettings.inputLayouts = inputLayouts;
+		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み

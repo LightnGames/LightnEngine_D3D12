@@ -65,7 +65,7 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const{
 		commandList->SetGraphicsRoot32BitConstants(mat.vertexRoot32bitConstantIndex, static_cast<uint32>(sizeof(_worldMatrix) / 4), &_worldMatrix, 0);
 
 		//ドローコール
-		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->IASetPrimitiveTopology(mat.topology);
 		commandList->DrawIndexedInstanced(material->range.indexCount, 1, material->range.indexOffset, 0, 0);
 
 		//ポインタをインクリメントして次のマテリアルを参照

@@ -22,6 +22,16 @@ inline void throwIfFailed(HRESULT hr) {
 	}
 }
 
+//トポロジーの種類からトポロジーのタイプに変換(TriangleList, TriangleStrip → TypeTriangle)
+inline D3D12_PRIMITIVE_TOPOLOGY_TYPE castTopologyToType(D3D_PRIMITIVE_TOPOLOGY topology) {
+	switch (topology) {
+		case D3D_PRIMITIVE_TOPOLOGY_LINELIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE; break;
+		case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST: return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; break;
+	}
+
+	return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
+}
+
 #ifdef DEBUG
 inline void SetName(ID3D12Object* pObject, LPCWSTR name) {
 	pObject->SetName(name);

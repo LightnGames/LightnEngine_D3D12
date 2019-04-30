@@ -66,7 +66,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			std::make_tuple());
 
 		pipelineState = &(*itr.first).second;
-		pipelineState->create(device, rootSignature, *vertexShader, *pixelShader);
+		pipelineState->create(device, rootSignature, *vertexShader, *pixelShader, castTopologyToType(settings.topology));
 	}
 
 	//生成したマテリアルをキャッシュに登録
@@ -74,10 +74,13 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 	const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
 	auto itr = _resourcePool->sharedMaterials.emplace(std::piecewise_construct,
 		std::make_tuple(settings.name),
-		std::make_tuple(vsReflection, psReflection, pipelineState->getRefPipelineState(), rootSignature->getRefRootSignature()));
+		std::make_tuple(vsReflection,
+			psReflection,
+			pipelineState->getRefPipelineState(),
+			rootSignature->getRefRootSignature(),
+			settings.topology));
 
 	SharedMaterial& material = (*itr.first).second;
-
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 
 	//頂点シェーダーテクスチャSRV生成

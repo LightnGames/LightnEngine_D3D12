@@ -8,18 +8,14 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
+constexpr uint32 MAX_GIZMO = 256;
+
 RefPtr<SharedMaterial> gizmoMat;
-D3D12_VERTEX_BUFFER_VIEW gizmoVertex;
-ID3D12Resource* gizmoVertexResource;
-RootSignature gizmoRootSignature;
-PipelineState gizmoPipelineState;
+VertexBufferDynamic gizmoVertex;
 
 RefPtr<SharedMaterial> gizmoMatB;
 VertexBuffer gizmoBVertexBuffer;
-D3D12_VERTEX_BUFFER_VIEW gizmoVertexB;
-ID3D12Resource* gizmoVertexResourceB;
-RootSignature gizmoRootSignatureB;
-PipelineState gizmoPipelineStateB;
+VertexBufferDynamic gizmoVertexB;
 
 GraphicsCore::GraphicsCore() :
 	_width(1280),
@@ -145,6 +141,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = {};
 		materialSettings.inputLayouts = inputLayouts;
+		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
 		_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
 		_gpuResourceManager.loadSharedMaterial("GizmoB", &gizmoMatB);
 
@@ -153,55 +150,22 @@ void GraphicsCore::onInit(HWND hwnd) {
 			Color color;
 		};
 
-		constexpr uint32 MAX_GIZMO = 256;
+		gizmoVertexB.createDirectDynamic(_device.Get(), &_commandContext, MAX_GIZMO, sizeof(GizmoGeometryVertex));
 
-		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-		D3D12_RESOURCE_DESC vertexBufferDesc = {};
-		vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferDesc.Width = MAX_GIZMO * sizeof(GizmoGeometryVertex);
-		vertexBufferDesc.Height = 1;
-		vertexBufferDesc.DepthOrArraySize = 1;
-		vertexBufferDesc.MipLevels = 1;
-		vertexBufferDesc.SampleDesc.Count = 1;
-		vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-		throwIfFailed(_device->CreateCommittedResource(
-			&vertexUploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&gizmoVertexResourceB)
-		));
-
-		GizmoGeometryVertex* mapPtr = nullptr;
-		gizmoVertexResourceB->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
-
+		GizmoGeometryVertex* mapPtr = reinterpret_cast<GizmoGeometryVertex*>(gizmoVertexB._dataPtr);
 		Vector3 offset = Vector3::forward * 5;
 
-		new (mapPtr) GizmoGeometryVertex{ Matrix4::translateXYZ(Vector3(0,0,0) + offset).transpose(),Color::white };
+		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(0,0,0) + offset).transpose(), Color::white };
 		mapPtr++;
 
-		new (mapPtr) GizmoGeometryVertex{ Matrix4::translateXYZ(Vector3(1,0,0) + offset).transpose(),Color::red };
+		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(1,0,0) + offset).transpose(), Color::red };
 		mapPtr++;
 
-		new (mapPtr) GizmoGeometryVertex{ Matrix4::translateXYZ(Vector3(0,0,1) + offset).transpose(),Color::blue };
+		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(0,0,1) + offset).transpose(), Color::blue };
 		mapPtr++;
 
-		new (mapPtr) GizmoGeometryVertex{ Matrix4::translateXYZ(Vector3(0,1,0) + offset).transpose(),Color::green };
+		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(0,1,0) + offset).transpose(), Color::green };
 		mapPtr++;
-
-		gizmoVertexB.BufferLocation = gizmoVertexResourceB->GetGPUVirtualAddress();
-		gizmoVertexB.StrideInBytes = sizeof(GizmoGeometryVertex);
-		gizmoVertexB.SizeInBytes = static_cast<UINT>(vertexBufferDesc.Width);
-
-		RefPtr<VertexShader> vs;
-		RefPtr<PixelShader> ps;
-		_gpuResourceManager.loadVertexShader("Shaders/" + materialSettings.vertexShaderName, &vs);
-		_gpuResourceManager.loadPixelShader("Shaders/" + materialSettings.pixelShaderName, &ps);
-
-		gizmoRootSignatureB.create(_device.Get(), *vs, *ps);
-		gizmoPipelineStateB.create(_device.Get(), &gizmoRootSignatureB, *vs, *ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
 
 		VectorArray<Vector3> vertices = {
 			{-0.5f,-0.5f,-0.5f},
@@ -243,7 +207,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 			{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		};
 
-
 		SharedMaterialCreateSettings materialSettings;
 		materialSettings.name = "GizmoT";
 		materialSettings.vertexShaderName = "GizmoLine.hlsl";
@@ -251,6 +214,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		materialSettings.vsTextures = {};
 		materialSettings.psTextures = {};
 		materialSettings.inputLayouts = inputLayouts;
+		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
 		_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
 		_gpuResourceManager.loadSharedMaterial("GizmoT", &gizmoMat);
 
@@ -260,30 +224,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 			Color color;
 		};
 
-		constexpr uint32 MAX_GIZMO = 256;
+		gizmoVertex.createDirectDynamic(_device.Get(), &_commandContext, MAX_GIZMO, sizeof(GizmoLineVertex));
 
-		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-		D3D12_RESOURCE_DESC vertexBufferDesc = {};
-		vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferDesc.Width = MAX_GIZMO * sizeof(GizmoLineVertex);
-		vertexBufferDesc.Height = 1;
-		vertexBufferDesc.DepthOrArraySize = 1;
-		vertexBufferDesc.MipLevels = 1;
-		vertexBufferDesc.SampleDesc.Count = 1;
-		vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-		throwIfFailed(_device->CreateCommittedResource(
-			&vertexUploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&gizmoVertexResource)
-		));
-
-		GizmoLineVertex* mapPtr = nullptr;
-		gizmoVertexResource->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
-
+		GizmoLineVertex* mapPtr = reinterpret_cast<GizmoLineVertex*>(gizmoVertex._dataPtr);
 		Vector3 offset = Vector3::forward * 5;
 
 		new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(1,0,0) + offset,Color::red };
@@ -294,20 +237,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 		new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(0,1,0) + offset,Color::green };
 		mapPtr++;
-
-		gizmoVertex.BufferLocation = gizmoVertexResource->GetGPUVirtualAddress();
-		gizmoVertex.StrideInBytes = sizeof(GizmoLineVertex);
-		gizmoVertex.SizeInBytes = static_cast<UINT>(vertexBufferDesc.Width);
-
-		RefPtr<VertexShader> vs;
-		RefPtr<PixelShader> ps;
-		_gpuResourceManager.loadVertexShader("Shaders/" + materialSettings.vertexShaderName, &vs);
-		_gpuResourceManager.loadPixelShader("Shaders/" + materialSettings.pixelShaderName, &ps);
-
-		gizmoRootSignature.create(_device.Get(), *vs, *ps);
-		gizmoPipelineState.create(_device.Get(), &gizmoRootSignature, *vs, *ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE); 
 	}
-
 }
 
 void GraphicsCore::onUpdate() {
@@ -393,19 +323,13 @@ void GraphicsCore::onRender() {
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
-	commandList->SetGraphicsRootSignature(gizmoRootSignature._rootSignature.Get());
-	commandList->SetPipelineState(gizmoPipelineState._pipelineState.Get());
-	commandList->IASetVertexBuffers(0, 1, &gizmoVertex);
-	commandList->SetGraphicsRootDescriptorTable(0, gizmoMat->_vertexConstantBuffer.constantBufferViews[_frameIndex].gpuHandle);
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+	gizmoMat->setupRenderCommand(renderSettings);
+	commandList->IASetVertexBuffers(0, 1, &gizmoVertex._vertexBufferView);
 	commandList->DrawInstanced(2, 3, 0, 0);
 
-	commandList->SetGraphicsRootSignature(gizmoRootSignatureB._rootSignature.Get());
-	commandList->SetPipelineState(gizmoPipelineStateB._pipelineState.Get());
-	D3D12_VERTEX_BUFFER_VIEW views[] = { gizmoBVertexBuffer._vertexBufferView, gizmoVertexB };
+	gizmoMatB->setupRenderCommand(renderSettings);
+	D3D12_VERTEX_BUFFER_VIEW views[] = { gizmoBVertexBuffer._vertexBufferView, gizmoVertexB._vertexBufferView };
 	commandList->IASetVertexBuffers(0, 2, views);
-	commandList->SetGraphicsRootDescriptorTable(0, gizmoMatB->_vertexConstantBuffer.constantBufferViews[_frameIndex].gpuHandle);
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 	commandList->DrawInstanced(24, 4, 0, 0);
 
 	//ImguiWindow•`‰æ
@@ -444,14 +368,9 @@ void GraphicsCore::onDestroy() {
 	_swapChain = nullptr;
 	_device = nullptr;
 
-	gizmoVertexResourceB->Release();
 	gizmoBVertexBuffer.destroy();
-	gizmoRootSignatureB._rootSignature = nullptr;
-	gizmoPipelineStateB._pipelineState = nullptr;
-
-	gizmoVertexResource->Release();
-	gizmoRootSignature._rootSignature = nullptr;
-	gizmoPipelineState._pipelineState = nullptr;
+	gizmoVertex.destroy();
+	gizmoVertexB.destroy();
 }
 
 void GraphicsCore::createTextures(const VectorArray<String>& textureNames) {
