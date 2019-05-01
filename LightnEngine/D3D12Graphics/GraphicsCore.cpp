@@ -8,15 +8,6 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-constexpr uint32 MAX_GIZMO = 256;
-
-RefPtr<SharedMaterial> gizmoMat;
-VertexBufferDynamic gizmoVertex;
-
-RefPtr<SharedMaterial> gizmoMatB;
-VertexBuffer gizmoBVertexBuffer;
-VertexBufferDynamic gizmoVertexB;
-
 GraphicsCore::GraphicsCore() :
 	_width(1280),
 	_height(720),
@@ -71,6 +62,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//Imgui初期化
 	_imguiWindow.init(hwnd, _device.Get());
 
+	//デバッグ描画機能初期化
+	_debugGeometryRender.create(_device.Get(), &_commandContext);
+
 	//GPUコマンド格納アロケータ初期化
 	_gpuCommandArray.init(163840);
 
@@ -122,122 +116,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
-
-	{
-		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-			{ "POSITION"      , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,   0 },
-			{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-		};
-
-
-		SharedMaterialCreateSettings materialSettings;
-		materialSettings.name = "GizmoB";
-		materialSettings.vertexShaderName = "GizmoGeometry.hlsl";
-		materialSettings.pixelShaderName = "GizmoGeometry.hlsl";
-		materialSettings.vsTextures = {};
-		materialSettings.psTextures = {};
-		materialSettings.inputLayouts = inputLayouts;
-		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-		_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
-		_gpuResourceManager.loadSharedMaterial("GizmoB", &gizmoMatB);
-
-		struct GizmoGeometryVertex {
-			Matrix4 mtxWorld;
-			Color color;
-		};
-
-		gizmoVertexB.createDirectDynamic(_device.Get(), &_commandContext, MAX_GIZMO, sizeof(GizmoGeometryVertex));
-
-		GizmoGeometryVertex* mapPtr = reinterpret_cast<GizmoGeometryVertex*>(gizmoVertexB._dataPtr);
-		Vector3 offset = Vector3::forward * 5;
-
-		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(0,0,0) + offset).transpose(), Color::white };
-		mapPtr++;
-
-		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(1,0,0) + offset).transpose(), Color::red };
-		mapPtr++;
-
-		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(0,0,1) + offset).transpose(), Color::blue };
-		mapPtr++;
-
-		new (mapPtr) GizmoGeometryVertex { Matrix4::translateXYZ(Vector3(0,1,0) + offset).transpose(), Color::green };
-		mapPtr++;
-
-		VectorArray<Vector3> vertices = {
-			{-0.5f,-0.5f,-0.5f},
-			{-0.5f, 0.5f,-0.5f},
-			{-0.5f, 0.5f,-0.5f},
-			{ 0.5f, 0.5f,-0.5f},
-			{ 0.5f, 0.5f,-0.5f},
-			{ 0.5f,-0.5f,-0.5f},
-			{ 0.5f,-0.5f,-0.5f},
-			{-0.5f,-0.5f,-0.5f},
-
-			{-0.5f,-0.5f, 0.5f},
-			{-0.5f, 0.5f, 0.5f},
-			{-0.5f, 0.5f, 0.5f},
-			{ 0.5f, 0.5f, 0.5f},
-			{ 0.5f, 0.5f, 0.5f},
-			{ 0.5f,-0.5f, 0.5f},
-			{ 0.5f,-0.5f, 0.5f},
-			{-0.5f,-0.5f, 0.5f},
-
-			{-0.5f,-0.5f, 0.5f},
-			{-0.5f,-0.5f,-0.5f},
-			{-0.5f, 0.5f, 0.5f},
-			{-0.5f, 0.5f,-0.5f},
-			{ 0.5f, 0.5f, 0.5f},
-			{ 0.5f, 0.5f,-0.5f},
-			{ 0.5f,-0.5f, 0.5f},
-			{ 0.5f,-0.5f,-0.5f},
-		};
-
-		gizmoBVertexBuffer.createDirect<Vector3>(_device.Get(), &_commandContext, vertices);
-	}
-
-	//デバッグ線生成
-	{
-		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-			{ "START_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "END_POSITION"  , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-		};
-
-		SharedMaterialCreateSettings materialSettings;
-		materialSettings.name = "GizmoT";
-		materialSettings.vertexShaderName = "GizmoLine.hlsl";
-		materialSettings.pixelShaderName = "GizmoLine.hlsl";
-		materialSettings.vsTextures = {};
-		materialSettings.psTextures = {};
-		materialSettings.inputLayouts = inputLayouts;
-		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-		_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
-		_gpuResourceManager.loadSharedMaterial("GizmoT", &gizmoMat);
-
-		struct GizmoLineVertex {
-			Vector3 startPos;
-			Vector3 endPos;
-			Color color;
-		};
-
-		gizmoVertex.createDirectDynamic(_device.Get(), &_commandContext, MAX_GIZMO, sizeof(GizmoLineVertex));
-
-		GizmoLineVertex* mapPtr = reinterpret_cast<GizmoLineVertex*>(gizmoVertex._dataPtr);
-		Vector3 offset = Vector3::forward * 5;
-
-		new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(1,0,0) + offset,Color::red };
-		mapPtr++;
-
-		new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(0,0,1) + offset,Color::blue };
-		mapPtr++;
-
-		new (mapPtr) GizmoLineVertex{ Vector3(0,0,0) + offset,Vector3(0,1,0) + offset,Color::green };
-		mapPtr++;
-	}
 }
 
 void GraphicsCore::onUpdate() {
@@ -323,14 +201,8 @@ void GraphicsCore::onRender() {
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
-	gizmoMat->setupRenderCommand(renderSettings);
-	commandList->IASetVertexBuffers(0, 1, &gizmoVertex._vertexBufferView);
-	commandList->DrawInstanced(2, 3, 0, 0);
-
-	gizmoMatB->setupRenderCommand(renderSettings);
-	D3D12_VERTEX_BUFFER_VIEW views[] = { gizmoBVertexBuffer._vertexBufferView, gizmoVertexB._vertexBufferView };
-	commandList->IASetVertexBuffers(0, 2, views);
-	commandList->DrawInstanced(24, 4, 0, 0);
+	//デバッグ描画コマンド発効
+	_debugGeometryRender.setupRenderCommand(renderSettings);
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);
@@ -358,6 +230,7 @@ void GraphicsCore::onDestroy() {
 	}
 
 	_gpuCommandArray.shutdown();
+	_debugGeometryRender.destroy();
 
 	_imguiWindow.shutdown();
 	_gpuResourceManager.shutdown();
@@ -367,10 +240,6 @@ void GraphicsCore::onDestroy() {
 
 	_swapChain = nullptr;
 	_device = nullptr;
-
-	gizmoBVertexBuffer.destroy();
-	gizmoVertex.destroy();
-	gizmoVertexB.destroy();
 }
 
 void GraphicsCore::createTextures(const VectorArray<String>& textureNames) {

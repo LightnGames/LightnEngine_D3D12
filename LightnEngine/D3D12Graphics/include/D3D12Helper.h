@@ -5,6 +5,7 @@
 inline std::string HrToString(HRESULT hr) {
 	char str[64] = {};
 	printf_s(str, "HRESULT of 0x%08X", static_cast<UINT>(hr));
+	OutputDebugString(str);
 	return std::string(str);
 }
 

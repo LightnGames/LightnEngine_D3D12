@@ -10,6 +10,7 @@
 #include "CommandContext.h"
 #include "ImguiWindow.h"
 #include "RenderableEntity.h"
+#include "DebugGeometry.h"
 
 #include <LinerAllocator.h>
 
@@ -58,6 +59,7 @@ private:
 	FrameResource _frameResources[FrameCount];
 	DescriptorHeapManager _descriptorHeapManager;
 	GpuResourceManager _gpuResourceManager;
+	DebugGeometryRender _debugGeometryRender;
 	ImguiWindow _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
