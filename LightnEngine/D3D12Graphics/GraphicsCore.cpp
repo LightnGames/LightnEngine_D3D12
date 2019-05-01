@@ -146,6 +146,18 @@ void GraphicsCore::onUpdate() {
 	mainCamera->setAspectRate(_width, _height);
 	mainCamera->computeProjectionMatrix();
 	mainCamera->computeViewMatrix();
+
+	Vector3 offset = Vector3::forward * 5;
+	_debugGeometryRender.debugDrawCube(Vector3(0, 0, 0) + offset, Quaternion::identity, Vector3::one, Color::white);
+	_debugGeometryRender.debugDrawCube(Vector3(1, 0, 0) + offset, Quaternion::identity, Vector3::one, Color::red);
+	_debugGeometryRender.debugDrawCube(Vector3(0, 0, 1) + offset, Quaternion::identity, Vector3::one, Color::blue);
+	_debugGeometryRender.debugDrawCube(Vector3(0, 1, 0) + offset, Quaternion::identity, Vector3::one, Color::green);
+
+	_debugGeometryRender.debugDrawLine(Vector3(0, 0, 0) + offset, Vector3(1, 0, 0) + offset, Color::red);
+	_debugGeometryRender.debugDrawLine(Vector3(0, 0, 0) + offset, Vector3(0, 0, 1) + offset, Color::blue);
+	_debugGeometryRender.debugDrawLine(Vector3(0, 0, 0) + offset, Vector3(0, 1, 0) + offset, Color::green);
+
+	_debugGeometryRender.debugDrawSphere(Vector3(-1, 0, 0) + offset, Quaternion::identity, 1, Color::red);
 }
 
 void GraphicsCore::onRender() {
@@ -202,6 +214,7 @@ void GraphicsCore::onRender() {
 	}
 
 	//デバッグ描画コマンド発効
+	_debugGeometryRender.updatePerInstanceData(_frameIndex);
 	_debugGeometryRender.setupRenderCommand(renderSettings);
 
 	//ImguiWindow描画
