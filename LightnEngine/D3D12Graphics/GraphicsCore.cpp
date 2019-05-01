@@ -128,10 +128,13 @@ void GraphicsCore::onUpdate() {
 	static float yawC = 0;
 	static float rollC = 0;
 
+	static float height = 2;
+
 	ImGui::Begin("Camera");
 	ImGui::SliderFloat("World X", &xC, -5, 5);
 	ImGui::SliderFloat("World Y", &yC, -5, 5);
 	ImGui::SliderFloat("World Z", &zC, -5, 5);
+	ImGui::SliderFloat("Height", &height, 0, 10);
 	ImGui::SliderAngle("Picth", &pitchC);
 	ImGui::SliderAngle("Yaw", &yawC);
 	ImGui::SliderAngle("Roll", &rollC);
@@ -158,6 +161,8 @@ void GraphicsCore::onUpdate() {
 	_debugGeometryRender.debugDrawLine(Vector3(0, 0, 0) + offset, Vector3(0, 1, 0) + offset, Color::green);
 
 	_debugGeometryRender.debugDrawSphere(Vector3(-1, 0, 0) + offset, Quaternion::identity, 1, Color::red);
+
+	_debugGeometryRender.debugDrawCapsule(Vector3(-2, 0, 0) + offset, Quaternion::identity, 1, height, Color::blue);
 }
 
 void GraphicsCore::onRender() {

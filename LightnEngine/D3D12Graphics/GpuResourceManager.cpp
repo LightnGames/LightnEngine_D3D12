@@ -69,6 +69,8 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		pipelineState->create(device, rootSignature, *vertexShader, *pixelShader, castTopologyToType(settings.topology));
 	}
 
+	assert(_resourcePool->sharedMaterials.count(settings.name) == 0 && "その名前のマテリアルはすでに存在します！");
+
 	//生成したマテリアルをキャッシュに登録
 	const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
 	const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
