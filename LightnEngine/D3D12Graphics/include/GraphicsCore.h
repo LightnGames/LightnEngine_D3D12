@@ -34,6 +34,7 @@ public:
 
 	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 	RefPtr<GpuResourceManager> getGpuResourceManager();
+	RefPtr<DebugGeometryRender> getDebugGeometryRender();
 
 public:
 	UINT _width;

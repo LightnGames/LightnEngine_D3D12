@@ -7,6 +7,7 @@
 #include <SharedMaterial.h>
 #include <GpuResource.h>
 #include <Scene.h>
+#include <GraphicsCore.h>
 
 VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
 { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -124,8 +125,8 @@ public:
 
 		GFXInterface& gfx = GFXInterface::instance();
 
-		String shaderBallName("ShaderBall/shaderBall.fbx");
-		String skyName("skySphere.fbx");
+		String shaderBallName("ShaderBall/shaderBall.mesh");
+		String skyName("skySphere.mesh");
 		String diffuseEnv("cubemapEnvHDR.dds");
 		String specularEnv("cubemapSpecularHDR.dds");
 		String specularBrdf("cubemapBrdf.dds");
@@ -229,9 +230,8 @@ public:
 
 		GFXInterface& gfx = GFXInterface::instance();
 
-		String meshName("sphere.fbx");
-		String shaderBallName("ShaderBall/shaderBall.fbx");
-		String skyName("skySphere.fbx");
+		String meshName("sphere.mesh");
+		String skyName("skySphere.mesh");
 		String diffuseEnv("cubemapEnvHDR.dds");
 		String specularEnv("cubemapSpecularHDR.dds");
 		String specularBrdf("cubemapBrdf.dds");
@@ -469,10 +469,93 @@ public:
 	StaticSingleMeshRender _mesh;
 };
 
+
+class TestScene_DebugGeometrys :public Scene {
+public:
+	void onStart() override {
+		Scene::onStart();
+
+		GFXInterface& gfx = GFXInterface::instance();
+
+		String skyName("skySphere.mesh");
+		String diffuseEnv("cubemapEnvHDR.dds");
+		String specularEnv("cubemapSpecularHDR.dds");
+		String specularBrdf("cubemapBrdf.dds");
+
+		//テクスチャ読み込み
+		gfx.createTextures({ diffuseEnv, specularEnv, specularBrdf });
+
+		SharedMaterialCreateSettings skyMatSettings;
+		skyMatSettings.name = "TestS";
+		skyMatSettings.vertexShaderName = "skyShaders.hlsl";
+		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
+		skyMatSettings.vsTextures = {};
+		skyMatSettings.psTextures = { diffuseEnv };
+		skyMatSettings.inputLayouts = inputLayouts;
+		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		gfx.createSharedMaterial(skyMatSettings);
+
+		//メッシュデータ読み込み
+		gfx.createMeshSets({ skyName });
+		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+	}
+
+	void onUpdate() override {
+		Scene::onUpdate();
+
+		static float sphereRadius = 1;
+
+		static float capsuleRadius = 1;
+		static float capsuleHeight = 1;
+
+		static float sphereColor[4] = { 0,1,0,1 };
+		static Vector3 lineStartPosition = Vector3::zero;
+		static Vector3 lineEndPosition = Vector3::up;
+		static Vector3 cubeRotation = Vector3::zero;
+		static Vector3 cubeExtent = Vector3::one;
+
+		{
+			ImGui::Begin("DebugGeometry");
+			ImGui::DragFloat3("LineStart", (float*)& lineStartPosition, 0.1f);
+			ImGui::DragFloat3("LineEnd", (float*)& lineEndPosition, 0.1f);
+			ImGui::DragFloat3("CubeExtent", (float*)& cubeExtent, 0.1f);
+			ImGui::SliderAngle("CubeRotateX", &cubeRotation.x);
+			ImGui::SliderAngle("CubeRotateY", &cubeRotation.y);
+			ImGui::SliderAngle("CubeRotateZ", &cubeRotation.z);
+			ImGui::SliderFloat("CapsuleRadius", &capsuleRadius, 0, 10);
+			ImGui::SliderFloat("CapsuleHeight", &capsuleHeight, 0, 10);
+			ImGui::SliderFloat("SphereRadius", &sphereRadius, 0, 10);
+			ImGui::ColorEdit4("SphereColor", sphereColor);
+			ImGui::End();
+		}
+
+		RefPtr<DebugGeometryRender> debugGeometryRender = GFXInterface::instance()._graphicsCore->getDebugGeometryRender();
+
+		Vector3 offset = Vector3::forward * 5;
+		debugGeometryRender->debugDrawCube(Vector3(0, 0, 0) + offset, Quaternion::euler(cubeRotation, true), cubeExtent, Color::white);
+
+		debugGeometryRender->debugDrawLine(Vector3(0, 0, 0) + offset, Vector3(1, 0, 0) + offset, Color::red);
+		debugGeometryRender->debugDrawLine(Vector3(0, 0, 0) + offset, Vector3(0, 0, 1) + offset, Color::blue);
+		debugGeometryRender->debugDrawLine(lineStartPosition + offset, lineEndPosition + offset, Color::green);
+
+		debugGeometryRender->debugDrawSphere(Vector3(-1, 0, 0) + offset, Quaternion::identity, sphereRadius, *((Color*)sphereColor));
+
+		debugGeometryRender->debugDrawCapsule(Vector3(-2.5f, 0, 0) + offset, Quaternion::identity, capsuleRadius, capsuleHeight, Color::blue);
+
+		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
+		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+	}
+	void onDestroy() override {
+		Scene::onDestroy();
+	}
+
+	StaticSingleMeshRender _sky;
+};
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 	Win32Application app;
 	app.init(hInstance, nCmdShow);
-	app._sceneManager->changeScene<TestScene_MultiMaterial>();
+	app._sceneManager->changeScene<TestScene_Gun>();
 
 	return app.run();
 }

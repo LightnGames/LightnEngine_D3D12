@@ -32,8 +32,9 @@ public:
 	uint32 getWidth() const;
 	uint32 getHeight() const;
 
-private:
 #ifdef D3D12
 	UniquePtr<GraphicsCore> _graphicsCore;
 #endif
+
+private:
 };

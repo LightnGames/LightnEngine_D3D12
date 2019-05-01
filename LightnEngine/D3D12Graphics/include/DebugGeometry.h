@@ -55,7 +55,7 @@ protected:
 class DebugLineRender :public DebugRender{
 public:
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext);
-	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount);
+	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const;
 	void destroy() override;
 };
 
@@ -63,7 +63,7 @@ public:
 class DebugCubeRender :public DebugRender{
 public:
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext);
-	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount);
+	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const;
 	void destroy() override;
 
 private:
@@ -74,7 +74,7 @@ private:
 class DebugSphereRender :public DebugRender {
 public:
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext);
-	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount);
+	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const;
 	void destroy() override;
 
 private:
@@ -85,7 +85,7 @@ private:
 class DebugCapsuleRender :public DebugRender {
 public:
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext);
-	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount);
+	void setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const;
 	void destroy() override;
 
 private:
@@ -94,65 +94,28 @@ private:
 
 class DebugGeometryRender :private NonCopyable {
 public:
-	DebugGeometryRender() {
-		_lineDatas.reserve(MAX_GIZMO);
-		_cubeDatas.reserve(MAX_GIZMO);
-		_sphereDatas.reserve(MAX_GIZMO);
-		_capsuleDatas.reserve(MAX_GIZMO);
-	}
+	DebugGeometryRender();
 
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext) {
-		_lineRender.create(device, commandContext);
-		_cubeRender.create(device, commandContext);
-		_sphereRender.create(device, commandContext);
-		_capsuleRender.create(device, commandContext);
-	}
+	//デバッグジオメトリインスタンスを初期化＆生成
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext);
 
-	void updatePerInstanceData(uint32 frameIndex) {
-		_lineRender.writeBufferDara(frameIndex, _lineDatas.data(), _lineDatas.size() * sizeof(DebugLineVertex));
-		_cubeRender.writeBufferDara(frameIndex, _cubeDatas.data(), _cubeDatas.size() * sizeof(DebugGeometryVertex));
-		_sphereRender.writeBufferDara(frameIndex, _sphereDatas.data(), _sphereDatas.size() * sizeof(DebugGeometryVertex));
-		_capsuleRender.writeBufferDara(frameIndex, _capsuleDatas.data(), _capsuleDatas.size() * sizeof(DebugCapsuleRender));
-	}
+	//インスタンスごとのデータをマップする
+	void updatePerInstanceData(uint32 frameIndex);
 
-	void setupRenderCommand(RenderSettings& settings) {
-		_lineRender.setupRenderCommand(settings, static_cast<uint32>(_lineDatas.size()));
-		_cubeRender.setupRenderCommand(settings, static_cast<uint32>(_cubeDatas.size()));
-		_sphereRender.setupRenderCommand(settings, static_cast<uint32>(_sphereDatas.size()));
-		_capsuleRender.setupRenderCommand(settings, static_cast<uint32>(_capsuleDatas.size()));
-		clearDebugDatas();
-	}
+	//デバッグジオメトリの描画コマンドを発行
+	void setupRenderCommand(RenderSettings& settings) const;
 
-	void debugDrawLine(const Vector3& startPos, const Vector3& endPos, const Color& color = Color::red) {
-		_lineDatas.emplace_back(startPos, endPos, color);
-	}
+	//デバッグジオメトリの描画リストを追加
+	void debugDrawLine(const Vector3& startPos, const Vector3& endPos, const Color& color = Color::red);
+	void debugDrawCube(const Vector3& position, const Quaternion& rotation, const Vector3& extent, const Color& color = Color::red);
+	void debugDrawSphere(const Vector3& position, const Quaternion& rotation, float radius, const Color& color = Color::red);
+	void debugDrawCapsule(const Vector3& position, const Quaternion& rotation, float radius, float height, const Color& color = Color::red);
 
-	void debugDrawCube(const Vector3& position, const Quaternion& rotation, const Vector3& extent, const Color& color = Color::red) {
-		_cubeDatas.emplace_back(Matrix4::createWorldMatrix(position, rotation, extent).transpose(), color);
-	}
+	//デバッグジオメトリのデータ配列をクリーンアップ
+	void clearDebugDatas();
 
-	void debugDrawSphere(const Vector3& position, const Quaternion& rotation, float radius, const Color& color = Color::red) {
-		_sphereDatas.emplace_back(Matrix4::createWorldMatrix(position, rotation, Vector3::one * radius).transpose(), color);
-	}
-
-	void debugDrawCapsule(const Vector3& position, const Quaternion& rotation, float radius, float height, const Color& color = Color::red) {
-		_capsuleDatas.emplace_back(Matrix4::createWorldMatrix(position, rotation, Vector3::one * radius).transpose(), height / radius, color);
-	}
-
-	void clearDebugDatas() {
-		_lineDatas.clear();
-		_cubeDatas.clear();
-		_sphereDatas.clear();
-		_capsuleDatas.clear();
-	}
-
-	void destroy() {
-		clearDebugDatas();
-		_lineRender.destroy();
-		_cubeRender.destroy();
-		_sphereRender.destroy();
-		_capsuleRender.destroy();
-	}
+	//破棄
+	void destroy();
 
 private:
 	DebugLineRender _lineRender;

@@ -29,7 +29,7 @@ void DebugLineRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	}
 }
 
-void DebugLineRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount){
+void DebugLineRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 	_material->setupRenderCommand(settings);
@@ -101,7 +101,7 @@ void DebugCubeRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	_geometryVertexBuffer.createDirect<Vector3>(device, commandContext, vertices);
 }
 
-void DebugCubeRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount){
+void DebugCubeRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 	_material->setupRenderCommand(settings);
@@ -202,7 +202,7 @@ void DebugSphereRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContex
 	_geometryVertexBuffer.createDirect<Vector3>(device, commandContext, vertices);
 }
 
-void DebugSphereRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount){
+void DebugSphereRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 	_material->setupRenderCommand(settings);
@@ -317,7 +317,7 @@ void DebugCapsuleRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	_geometryVertexBuffer.createDirect<Vector4>(device, commandContext, vertices);
 }
 
-void DebugCapsuleRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount){
+void DebugCapsuleRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 	_material->setupRenderCommand(settings);
@@ -330,4 +330,64 @@ void DebugCapsuleRender::setupRenderCommand(RenderSettings& settings, uint32 ins
 void DebugCapsuleRender::destroy(){
 	DebugRender::destroy();
 	_geometryVertexBuffer.destroy();
+}
+
+DebugGeometryRender::DebugGeometryRender(){
+	_lineDatas.reserve(MAX_GIZMO);
+	_cubeDatas.reserve(MAX_GIZMO);
+	_sphereDatas.reserve(MAX_GIZMO);
+	_capsuleDatas.reserve(MAX_GIZMO);
+}
+
+void DebugGeometryRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext){
+	_lineRender.create(device, commandContext);
+	_cubeRender.create(device, commandContext);
+	_sphereRender.create(device, commandContext);
+	_capsuleRender.create(device, commandContext);
+}
+
+void DebugGeometryRender::updatePerInstanceData(uint32 frameIndex){
+	_lineRender.writeBufferDara(frameIndex, _lineDatas.data(), _lineDatas.size() * sizeof(DebugLineVertex));
+	_cubeRender.writeBufferDara(frameIndex, _cubeDatas.data(), _cubeDatas.size() * sizeof(DebugGeometryVertex));
+	_sphereRender.writeBufferDara(frameIndex, _sphereDatas.data(), _sphereDatas.size() * sizeof(DebugGeometryVertex));
+	_capsuleRender.writeBufferDara(frameIndex, _capsuleDatas.data(), _capsuleDatas.size() * sizeof(DebugCapsuleRender));
+
+}
+
+void DebugGeometryRender::setupRenderCommand(RenderSettings& settings) const{
+	_lineRender.setupRenderCommand(settings, static_cast<uint32>(_lineDatas.size()));
+	_cubeRender.setupRenderCommand(settings, static_cast<uint32>(_cubeDatas.size()));
+	_sphereRender.setupRenderCommand(settings, static_cast<uint32>(_sphereDatas.size()));
+	_capsuleRender.setupRenderCommand(settings, static_cast<uint32>(_capsuleDatas.size()));
+}
+
+void DebugGeometryRender::debugDrawLine(const Vector3& startPos, const Vector3& endPos, const Color& color){
+	_lineDatas.emplace_back(startPos, endPos, color);
+}
+
+void DebugGeometryRender::debugDrawCube(const Vector3& position, const Quaternion& rotation, const Vector3& extent, const Color& color){
+	_cubeDatas.emplace_back(Matrix4::createWorldMatrix(position, rotation, extent).transpose(), color);
+}
+
+void DebugGeometryRender::debugDrawSphere(const Vector3& position, const Quaternion& rotation, float radius, const Color& color){
+	_sphereDatas.emplace_back(Matrix4::createWorldMatrix(position, rotation, Vector3::one * radius).transpose(), color);
+}
+
+void DebugGeometryRender::debugDrawCapsule(const Vector3& position, const Quaternion& rotation, float radius, float height, const Color& color){
+	_capsuleDatas.emplace_back(Matrix4::createWorldMatrix(position, rotation, Vector3::one * radius).transpose(), height / radius, color);
+}
+
+void DebugGeometryRender::clearDebugDatas(){
+	_lineDatas.clear();
+	_cubeDatas.clear();
+	_sphereDatas.clear();
+	_capsuleDatas.clear();
+}
+
+void DebugGeometryRender::destroy(){
+	clearDebugDatas();
+	_lineRender.destroy();
+	_cubeRender.destroy();
+	_sphereRender.destroy();
+	_capsuleRender.destroy();
 }
