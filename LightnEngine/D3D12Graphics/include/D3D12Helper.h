@@ -51,3 +51,9 @@ inline void SetNameIndexed(ID3D12Object* pObject, LPCWSTR name, UINT index) {}
 
 #define NAME_D3D12_OBJECT(x) SetName((x).Get(), L#x)
 #define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x, n)
+
+//UAVカウンタを同じバッファ内に含める。バッファを4Kにアラインする
+inline constexpr UINT AlignForUavCounter(UINT bufferSize){
+	const UINT alignment = D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT;
+	return (bufferSize + (alignment - 1)) & ~(alignment - 1);
+}

@@ -48,6 +48,7 @@ public:
 	void createConstantBufferView(ID3D12Resource** constantBuffers, RefPtr<BufferView> dstView, uint32 viewCount);
 	void createShaderResourceView(ID3D12Resource** shaderResources, RefPtr<BufferView> dstView, uint32 viewCount);
 	void createDepthStencilView(ID3D12Resource** depthStencils, RefPtr<BufferView> dstView, uint32 viewCount);
+	void createUnorederdAcsessView(ID3D12Resource** unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer);
 
 	void discardRenderTargetView(const BufferView& bufferView);
 	void discardConstantBufferView(const BufferView& bufferView);

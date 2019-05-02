@@ -194,6 +194,30 @@ void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStenci
 	device->Release();
 }
 
+void DescriptorHeapManager::createUnorederdAcsessView(ID3D12Resource** unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer){
+	assert(viewCount > 0 && "Request UnorederdAcsess View 0");
+	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
+
+	ID3D12Device* device = nullptr;
+	unorederdAcsess[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
+
+	D3D12_CPU_DESCRIPTOR_HANDLE uavHandle = dstView->cpuHandle;
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	for (uint32 i = 0; i < viewCount; ++i) {
+		auto desc = unorederdAcsess[i]->GetDesc();
+		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		uavDesc.Buffer = buffer;
+		uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+		device->CreateUnorderedAccessView(unorederdAcsess[i], unorederdAcsess[i], &uavDesc, uavHandle);
+		uavHandle.ptr += _cbvSrvHeap.incrimentSize();
+	}
+
+	device->Release();
+}
+
 void DescriptorHeapManager::discardRenderTargetView(const BufferView& bufferView) {
 	_rtvHeap.discardBufferView(bufferView);
 }
