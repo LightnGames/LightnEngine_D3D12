@@ -8,51 +8,19 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-RootSignature rootSignature;
-PipelineState pipelineState;
-ConstantBuffer constantBuffer;
+RefPtr<SharedMaterial> mat;
+RefPtr<VertexAndIndexBuffer> viBuffer;
+VertexBufferDynamic vertexBufferDynamic;
 ComPtr<ID3D12CommandSignature> m_commandSignature;
-ComPtr<ID3D12Resource> m_processedCommandBuffers[FrameCount];
 ComPtr<ID3D12Resource> m_commandBuffer;
-ComPtr<ID3D12Resource> m_processedCommandBufferCounterReset;
-
-enum GraphicsRootParameters
-{
-	Cbv,
-	GraphicsRootParametersCount
-};
-
-enum HeapOffsets
-{
-	CbvSrvOffset = 0,                                                    // SRV that points to the constant buffers used by the rendering thread.
-	CommandsOffset = CbvSrvOffset + 1,                                    // SRV that points to all of the indirect commands.
-	ProcessedCommandsOffset = CommandsOffset + 1,                        // UAV that records the commands we actually want to execute.
-	CbvSrvUavDescriptorCountPerFrame = ProcessedCommandsOffset + 1        // 2 SRVs + 1 UAV for the compute shader.
-};
 
 struct IndirectCommand
 {
-	D3D12_GPU_VIRTUAL_ADDRESS cbv;
-	D3D12_DRAW_ARGUMENTS drawArguments;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
+	D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
 };
 
-// Constant buffer definition.
-struct SceneConstantBuffer
-{
-	Vector4 velocity;
-	Vector4 offset;
-	Vector4 color;
-	Matrix4 projection;
-
-	// Constant buffers are 256-byte aligned. Add padding in the struct to allow multiple buffers
-	// to be array-indexed.
-	float padding[36];
-};
-
-constexpr UINT TriangleCount = 1024;
-constexpr UINT TriangleResourceCount = TriangleCount * FrameCount;
-constexpr UINT CommandSizePerFrame = TriangleCount * sizeof(IndirectCommand);
-constexpr UINT CommandBufferCounterOffset = AlignForUavCounter(CommandSizePerFrame);
+constexpr UINT TriangleCount = 100;
 
 GraphicsCore::GraphicsCore() :
 	_width(1280),
@@ -166,92 +134,59 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//コマンドシグネチャ生成
 	{
 		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR",   0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "POSITION",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,   0 },
+			{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		};
 
-		RefPtr<VertexShader> vs = new VertexShader();
-		RefPtr<PixelShader> ps = new PixelShader();
-		vs->create("Shaders/Indirect.hlsl", inputLayouts);
-		ps->create("Shaders/Indirect.hlsl");
+		struct PerInstanceIndirect {
+			Matrix4 mtxWorld;
+			Color color;
+		};
 
-		//rootSignature.create(_device.Get(), *vs, *ps);
-		VectorArray<D3D12_ROOT_PARAMETER1> rootParameters;
+		_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _commandContext, { "cube.mesh" });
+		_gpuResourceManager.loadVertexAndIndexBuffer("cube.mesh", &viBuffer);
+		vertexBufferDynamic.createDirectDynamic(_device.Get(), &_commandContext, TriangleCount, sizeof(PerInstanceIndirect));
 
-		D3D12_ROOT_PARAMETER1 parameterDesc = {};
-		parameterDesc.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		parameterDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		parameterDesc.Descriptor.RegisterSpace = 0;
-		parameterDesc.Descriptor.ShaderRegister = 0;
+		VectorArray<PerInstanceIndirect> perInstanceInputs(TriangleCount);
+		for (size_t i = 0; i < perInstanceInputs.size(); ++i) {
+			perInstanceInputs[i].mtxWorld = Matrix4::translateXYZ(i * 1.2f - TriangleCount / 2, 0, 2).transpose();
+			perInstanceInputs[i].color = Color(i * 0.01f, 0, 0, 1);
+		}
+		memcpy(vertexBufferDynamic._dataPtr, perInstanceInputs.data(), sizeof(PerInstanceIndirect)* perInstanceInputs.size());
 
-		rootParameters.push_back(parameterDesc);
-
-		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-		samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
-		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 0;
-		samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		samplerDesc.MinLOD = 0.0f;
-		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-		samplerDesc.ShaderRegister = 0;
-		samplerDesc.RegisterSpace = 0;
-		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSignatureDesc.Desc_1_1.NumParameters = static_cast<UINT>(rootParameters.size());
-		rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
-		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
-		rootSignatureDesc.Desc_1_1.pStaticSamplers = &samplerDesc;
-		rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-		ComPtr<ID3DBlob> signature;
-		ComPtr<ID3DBlob> error;
-		throwIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-		throwIfFailed(_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature._rootSignature)));
-		NAME_D3D12_OBJECT(rootSignature._rootSignature);
-
-		pipelineState.create(_device.Get(), &rootSignature, *vs, *ps);
+		SharedMaterialCreateSettings materialSettings;
+		materialSettings.name = "TestI";
+		materialSettings.vertexShaderName = "Indirect.hlsl";
+		materialSettings.pixelShaderName = "Indirect.hlsl";
+		materialSettings.vsTextures = {};
+		materialSettings.psTextures = {};
+		materialSettings.inputLayouts = inputLayouts;
+		materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
+		_gpuResourceManager.loadSharedMaterial("TestI", &mat);
 
 		// Each command consists of a CBV update and a DrawInstanced call.
 		D3D12_INDIRECT_ARGUMENT_DESC argumentDescs[2] = {};
-		argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
-		argumentDescs[0].ConstantBufferView.RootParameterIndex = Cbv;
-		argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+		argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
+		argumentDescs[0].VertexBuffer.Slot = 1;
+		argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
 		D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
 		commandSignatureDesc.pArgumentDescs = argumentDescs;
 		commandSignatureDesc.NumArgumentDescs = _countof(argumentDescs);
 		commandSignatureDesc.ByteStride = sizeof(IndirectCommand);
 
-		throwIfFailed(_device->CreateCommandSignature(&commandSignatureDesc, rootSignature._rootSignature.Get(), IID_PPV_ARGS(&m_commandSignature)));
+		throwIfFailed(_device->CreateCommandSignature(&commandSignatureDesc, nullptr, IID_PPV_ARGS(&m_commandSignature)));
 		NAME_D3D12_OBJECT(m_commandSignature);
 	}
 
-	uint32 cbSize = TriangleResourceCount * sizeof(SceneConstantBuffer);
-	SceneConstantBuffer* scenePtr = new SceneConstantBuffer[TriangleResourceCount];
-	memset(scenePtr, 0, cbSize);
-
-	for (uint32 i = 0; i < TriangleCount; ++i) {
-		scenePtr[i].offset = Vector4(i * 0.01f, 0, 0, 0);
-		scenePtr[i].color = Vector4(i * 0.01f, 0, 0, 1);
-	}
-
-	constantBuffer.create(_device.Get(), cbSize);
-	constantBuffer.writeData(scenePtr, cbSize);
-
-	auto commandListSet = _commandContext.requestCommandListSet();
-	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
-
 	D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-	D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_DEFAULT };
 
-	UINT m_cbvSrvUavDescriptorSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	const UINT commandBufferSize = CommandSizePerFrame * FrameCount;
+	const UINT commandBufferSize = sizeof(IndirectCommand) * FrameCount;
 
 
 	D3D12_RESOURCE_DESC bufferDesc = {};
@@ -273,38 +208,30 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	NAME_D3D12_OBJECT(m_commandBuffer);
 
-	std::vector<IndirectCommand> commands;
-	commands.resize(TriangleResourceCount);
-	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = constantBuffer._resource->GetGPUVirtualAddress();
+	std::vector<IndirectCommand> commands(FrameCount);
 	UINT commandIndex = 0;
 
 	for (UINT frame = 0; frame < FrameCount; frame++)
 	{
-		for (UINT n = 0; n < TriangleCount; n++)
-		{
-			commands[commandIndex].cbv = gpuAddress;
-			commands[commandIndex].drawArguments.VertexCountPerInstance = 3;
-			commands[commandIndex].drawArguments.InstanceCount = 1;
-			commands[commandIndex].drawArguments.StartVertexLocation = 0;
-			commands[commandIndex].drawArguments.StartInstanceLocation = 0;
+		commands[commandIndex].vertexBufferView = vertexBufferDynamic._vertexBufferView;
+		commands[commandIndex].drawArguments.BaseVertexLocation = 0;
+		commands[commandIndex].drawArguments.IndexCountPerInstance = viBuffer->indexBuffer._indexCount;
+		commands[commandIndex].drawArguments.InstanceCount = TriangleCount;
+		commands[commandIndex].drawArguments.StartIndexLocation = 0;
+		commands[commandIndex].drawArguments.StartInstanceLocation = 0;
 
-			commandIndex++;
-			gpuAddress += sizeof(SceneConstantBuffer);
-		}
+		commandIndex++;
 	}
 
 	IndirectCommand* mapPtr = nullptr;
 	m_commandBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
-	memcpy(mapPtr, commands.data(), TriangleResourceCount * sizeof(IndirectCommand));
-
-	_commandContext.executeCommandList(commandListSet);
-	_commandContext.discardCommandListSet(commandListSet);
+	memcpy(mapPtr, commands.data(), commandBufferSize);
 }
 
 void GraphicsCore::onUpdate() {
 	_imguiWindow.startFrame();
 
-	static Vector3 positionC = Vector3::zero;
+	static Vector3 positionC = -Vector3::forward*10;
 	static float pitchC = 0;
 	static float yawC = 0;
 	static float rollC = 0;
@@ -385,18 +312,18 @@ void GraphicsCore::onRender() {
 	_debugGeometryRender.setupRenderCommand(renderSettings);
 	_debugGeometryRender.clearDebugDatas();
 
-	commandList->SetGraphicsRootSignature(rootSignature._rootSignature.Get());
-	commandList->SetPipelineState(pipelineState._pipelineState.Get());
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//commandList->DrawInstanced(3, 1, 0, 0);
+	mat->setupRenderCommand(renderSettings);
+
+	commandList->IASetVertexBuffers(0, 1, &viBuffer->vertexBuffer._vertexBufferView);
+	commandList->IASetIndexBuffer(&viBuffer->indexBuffer._indexBufferView);
 
 	commandList->ExecuteIndirect(
 		m_commandSignature.Get(),
-		TriangleCount,
+		1,
 		m_commandBuffer.Get(),
 		0,
 		m_commandBuffer.Get(),
-		CommandBufferCounterOffset);
+		0);
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);

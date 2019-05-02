@@ -6,49 +6,29 @@ struct PSInput
 
 struct VSInput {
 	float3 position : POSITION;
-	float4 color : COLOR;
+	float4x4 mtxWorld : MATRIX0;
+	float4 color : COLOR0;
 };
 
-//cbuffer CameraInfo : register(b0)
-//{
-//	float4x4 mtxView;
-//	float4x4 mtxProj;
-//	float3 cameraPos;
-//}
-
-cbuffer SceneConstantBuffer : register(b0)
+cbuffer CameraInfo : register(b0)
 {
-	float4 velocity;
-	float4 offset;
-	float4 color;
-	float4x4 projection;
-};
+	float4x4 mtxView;
+	float4x4 mtxProj;
+	float3 cameraPos;
+}
 
 PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 {
 	PSInput result;
+	//input.position += offset.xyz;
 
-	if (vertexId == 0) {
-		input.position = float3(-0.5, -0.5, 0);
-	}
-
-	if (vertexId == 1) {
-		input.position = float3(-0.0, 0.5, 0);
-	}
-
-	if (vertexId == 2) {
-		input.position = float3(0.5, -0.5, 0);
-	}
-
-	input.position += offset.xyz;
-
-	float4 worldPos = float4(input.position, 1);
-	//float4 viewPos = mul(worldPos, mtxView);
-	//result.position = mul(viewPos, mtxProj);
+	float4 worldPos = mul(float4(input.position, 1), input.mtxWorld);
+	float4 viewPos = mul(worldPos, mtxView);
+	result.position = mul(viewPos, mtxProj);
 	//result.color = input.color;
 
-	result.position = worldPos;
-	result.color = color;
+	//result.position = worldPos;
+	result.color = input.color;
 
 	return result;
 }
