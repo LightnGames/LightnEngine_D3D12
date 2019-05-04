@@ -76,8 +76,20 @@ public:
 		return _mtxProjTransposed;
 	}
 
+	Matrix4 getProjectionMatrix() const {
+		return _mtxProj;
+	}
+
 	Vector3 getPosition() const {
 		return _position;
+	}
+
+	float getFarZ() const {
+		return _farZ;
+	}
+
+	float getNearZ() const {
+		return _nearZ;
 	}
 
 private:

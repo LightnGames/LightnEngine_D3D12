@@ -443,23 +443,83 @@ void GraphicsCore::onUpdate() {
 	static float pitchC = 0;
 	static float yawC = 0;
 	static float rollC = 0;
+	static float fov = 60;
+	static float farZ = 1000;
+	static float nearZ = 0.01f;
 
 	ImGui::Begin("Camera");
 	ImGui::DragFloat3("Position", (float*)& positionC, 0.05f);
 	ImGui::SliderAngle("Picth", &pitchC);
 	ImGui::SliderAngle("Yaw", &yawC);
 	ImGui::SliderAngle("Roll", &rollC);
+	ImGui::SliderFloat("Fov", &fov, 0, 120);
+	ImGui::SliderFloat("NearZ", &nearZ, 0.001f, 10);
+	ImGui::SliderFloat("FarZ", &farZ, 10, 1000);
 	ImGui::End();
 
 	RefPtr<Camera> mainCamera = _gpuResourceManager.getMainCamera();
 	mainCamera->setPosition(positionC);
 	mainCamera->setRotationEuler(pitchC, yawC, rollC, true);
-	mainCamera->setFieldOfView(60);
-	mainCamera->setNearZ(0.01f);
-	mainCamera->setFarZ(1000.0f);
+	mainCamera->setFieldOfView(fov);
+	mainCamera->setNearZ(nearZ);
+	mainCamera->setFarZ(farZ);
 	mainCamera->setAspectRate(_width, _height);
 	mainCamera->computeProjectionMatrix();
 	mainCamera->computeViewMatrix();
+
+	static Vector3 positionV = -Vector3::forward * 2;
+	static float pitchV = 0;
+	static float yawV = 0;
+	static float rollV = 0;
+	static float fovV = 60;
+	static float farZV = 10;
+	static float nearZV = 0.5f;
+
+	ImGui::Begin("Virtual Camera");
+	ImGui::DragFloat3("Position", (float*)& positionV, 0.05f);
+	ImGui::SliderAngle("Picth", &pitchV);
+	ImGui::SliderAngle("Yaw", &yawV);
+	ImGui::SliderAngle("Roll", &rollV);
+	ImGui::SliderFloat("Fov", &fovV, 0, 120);
+	ImGui::SliderFloat("NearZ", &nearZV, 0.001f, 10);
+	ImGui::SliderFloat("FarZ", &farZV, 10, 1000);
+	ImGui::End();
+
+	Quaternion virtualRotate = Quaternion::euler({ pitchV,yawV,rollV }, true);
+	Matrix4 virtualView = Matrix4::createWorldMatrix(positionV, virtualRotate, Vector3::one);
+	Matrix4 virtualProj = Matrix4::perspectiveFovLH(radianFromDegree(fovV), _width / static_cast<float>(_height), nearZV, farZV);
+	float x = 1 / virtualProj[0][0];
+	float y = 1 / virtualProj[1][1];
+	Color lineColor = Color::blue;
+	Vector3 topLeft = Quaternion::rotVector(virtualRotate, Vector3(x, y, 1));
+	Vector3 topRight = Quaternion::rotVector(virtualRotate, Vector3(-x, y, 1));
+	Vector3 bottomLeft = Quaternion::rotVector(virtualRotate, Vector3(x, -y, 1));
+	Vector3 bottomRight = Quaternion::rotVector(virtualRotate, Vector3(-x, -y, 1));
+
+	Vector3 farTopLeft = topLeft * farZV + positionV;
+	Vector3 farTopRight = topRight * farZV + positionV;
+	Vector3 farBottomLeft = bottomLeft * farZV + positionV;
+	Vector3 farBottomRight = bottomRight * farZV + positionV;
+
+	Vector3 nearTopLeft = topLeft * nearZV + positionV;
+	Vector3 nearTopRight = topRight * nearZV + positionV;
+	Vector3 nearBottomLeft = bottomLeft * nearZV + positionV;
+	Vector3 nearBottomRight = bottomRight * nearZV + positionV;
+
+	_debugGeometryRender.debugDrawLine(positionV, farTopLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(positionV, farTopRight, lineColor);
+	_debugGeometryRender.debugDrawLine(positionV, farBottomLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(positionV, farBottomRight, lineColor);
+
+	_debugGeometryRender.debugDrawLine(farTopRight, farTopLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(farTopLeft, farBottomLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(farBottomRight, farBottomLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(farBottomRight, farTopRight, lineColor);
+
+	_debugGeometryRender.debugDrawLine(nearTopRight, nearTopLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(nearTopLeft, nearBottomLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(nearBottomRight, nearBottomLeft, lineColor);
+	_debugGeometryRender.debugDrawLine(nearBottomRight, nearTopRight, lineColor);
 }
 
 void GraphicsCore::onRender() {
