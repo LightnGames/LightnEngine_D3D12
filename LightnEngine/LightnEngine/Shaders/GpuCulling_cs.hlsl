@@ -30,7 +30,7 @@ void CSMain(uint3 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	// Each thread of the CS operates on one of the indirect commands.
 	uint index = (groupId.x * threadBlockSize) + groupIndex;
 
-	if (inputCommands[index].startPosAABB.x > 0) {
+	if (inputCommands[index].startPosAABB.x > xOffset) {
 		OutputInfo info;
 		info.mtxWorld = inputCommands[index].mtxWorld;
 		info.color = inputCommands[index].color;

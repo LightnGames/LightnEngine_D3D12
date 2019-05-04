@@ -11,18 +11,18 @@
 RefPtr<SharedMaterial> mat;
 RefPtr<VertexAndIndexBuffer> viBuffer;
 ComPtr<ID3D12CommandSignature> m_commandSignature;
-ComPtr<ID3D12Resource> m_commandBuffer;
+ComPtr<ID3D12Resource> m_commandBuffer[FrameCount];
 
 ComPtr<ID3D12Resource> in_processedCommandBuffer;
-ComPtr<ID3D12Resource> out_processedCommandBuffer;
+ComPtr<ID3D12Resource> out_processedCommandBuffer[FrameCount];
 ComPtr<ID3D12Resource> out_processedCommandBufferCounterReset;
 BufferView srvView;
-BufferView uavView;
+BufferView uavView[FrameCount];
 
 ComPtr<ID3D12RootSignature> m_computeRootSignature;
 ComPtr<ID3D12PipelineState> m_computeState;
 
-D3D12_VERTEX_BUFFER_VIEW uavVertexBufferView;
+bool gpuDrivenStenby = false;
 
 struct IndirectCommand
 {
@@ -260,26 +260,30 @@ void GraphicsCore::onInit(HWND hwnd) {
 	throwIfFailed(_device->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&m_computeState)));
 	NAME_D3D12_OBJECT(m_computeState);
 
-	D3D12_RESOURCE_DESC outCommandBufferDesc = {};
-	outCommandBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	outCommandBufferDesc.Width = CommandBufferCounterOffset + sizeof(UINT);
-	outCommandBufferDesc.Height = 1;
-	outCommandBufferDesc.DepthOrArraySize = 1;
-	outCommandBufferDesc.MipLevels = 1;
-	outCommandBufferDesc.SampleDesc.Count = 1;
-	outCommandBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	outCommandBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-	throwIfFailed(_device->CreateCommittedResource(
-		&defaultHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&outCommandBufferDesc,
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
-		IID_PPV_ARGS(&out_processedCommandBuffer)));
+	for (uint32 i = 0; i < FrameCount; ++i) {
+		D3D12_RESOURCE_DESC outCommandBufferDesc = {};
+		outCommandBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		outCommandBufferDesc.Width = CommandBufferCounterOffset + sizeof(UINT);
+		outCommandBufferDesc.Height = 1;
+		outCommandBufferDesc.DepthOrArraySize = 1;
+		outCommandBufferDesc.MipLevels = 1;
+		outCommandBufferDesc.SampleDesc.Count = 1;
+		outCommandBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		outCommandBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-	NAME_D3D12_OBJECT(out_processedCommandBuffer);
+		throwIfFailed(_device->CreateCommittedResource(
+			&defaultHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&outCommandBufferDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&out_processedCommandBuffer[i])));
+	}
 
+	NAME_D3D12_OBJECT_INDEXED(out_processedCommandBuffer, FrameCount);
+
+	ComPtr<ID3D12Resource> inCommandUploadBuffer;
 	D3D12_RESOURCE_DESC inCommandBufferDesc = {};
 	inCommandBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	inCommandBufferDesc.Width = TriangleCount * sizeof(ObjectInfo);
@@ -295,9 +299,20 @@ void GraphicsCore::onInit(HWND hwnd) {
 		&inCommandBufferDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
+		IID_PPV_ARGS(&inCommandUploadBuffer)));
+
+	throwIfFailed(_device->CreateCommittedResource(
+		&defaultHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&inCommandBufferDesc,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		nullptr,
 		IID_PPV_ARGS(&in_processedCommandBuffer)));
 
 	NAME_D3D12_OBJECT(in_processedCommandBuffer);
+
+	auto commandListSet = _commandContext.requestCommandListSet();
+	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 	VectorArray<ObjectInfo> objectInfos(TriangleCount);
 	for (size_t i = 0; i < objectInfos.size(); ++i) {
@@ -308,47 +323,17 @@ void GraphicsCore::onInit(HWND hwnd) {
 	}
 
 	ObjectInfo* mapPtrC = nullptr;
-	in_processedCommandBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mapPtrC));
+	inCommandUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mapPtrC));
 	memcpy(mapPtrC, objectInfos.data(), sizeof(ObjectInfo)* TriangleCount);
 
-	//{
-	//	ComPtr<ID3D12Resource> uploadHeap;
-	//	//アップロード用バッファを生成
-	//	D3D12_RESOURCE_DESC vertexBufferDesc = {};
-	//	vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	//	vertexBufferDesc.Width = sizeof(ObjectInfo) * TriangleCount;
-	//	vertexBufferDesc.Height = 1;
-	//	vertexBufferDesc.DepthOrArraySize = 1;
-	//	vertexBufferDesc.MipLevels = 1;
-	//	vertexBufferDesc.SampleDesc.Count = 1;
-	//	vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	commandList->CopyBufferRegion(in_processedCommandBuffer.Get(), 0, inCommandUploadBuffer.Get(), 0, TriangleCount * sizeof(ObjectInfo));
 
-	//	throwIfFailed(_device->CreateCommittedResource(
-	//		&uploadHeapProperties,
-	//		D3D12_HEAP_FLAG_NONE,
-	//		&vertexBufferDesc,
-	//		D3D12_RESOURCE_STATE_GENERIC_READ,
-	//		nullptr,
-	//		IID_PPV_ARGS(&uploadHeap)
-	//	));
+	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
+	_commandContext.executeCommandList(commandList);
+	_commandContext.discardCommandListSet(commandListSet);
 
-	//	auto commandListSet = _commandContext.requestCommandListSet();
-	//	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
-
-	//	ObjectInfo* mapPtrEx = nullptr;
-	//	uploadHeap->Map(0, nullptr, reinterpret_cast<void**>(&mapPtrEx));
-	//	memcpy(mapPtrEx, objectInfos.data(), vertexBufferDesc.Width);
-
-	//	commandList->CopyBufferRegion(out_processedCommandBuffer.Get(), 0, uploadHeap.Get(), 0, vertexBufferDesc.Width);
-
-	//	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
-	//	_commandContext.executeCommandList(commandList);
-	//	_commandContext.discardCommandListSet(commandListSet);
-
-	//	//コピーが終わるまでアップロードヒープを破棄しない
-	//	_commandContext.waitForIdle();
-	//}
-
+	//コピーが終わるまでアップロードヒープを破棄しない
+	_commandContext.waitForIdle();
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -360,13 +345,16 @@ void GraphicsCore::onInit(HWND hwnd) {
 	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 	_descriptorHeapManager.getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->allocateBufferView(&srvView, 1);
-	_descriptorHeapManager.getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->allocateBufferView(&uavView, 1);
 
-	_device->CreateUnorderedAccessView(
-		out_processedCommandBuffer.Get(),
-		out_processedCommandBuffer.Get(),
-		&uavDesc,
-		uavView.cpuHandle);
+	for (uint32 i = 0; i < FrameCount; ++i) {
+		_descriptorHeapManager.getDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->allocateBufferView(&uavView[i], 1);
+
+		_device->CreateUnorderedAccessView(
+			out_processedCommandBuffer[i].Get(),
+			out_processedCommandBuffer[i].Get(),
+			&uavDesc,
+			uavView[i].cpuHandle);
+	}
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -379,49 +367,45 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_device->CreateShaderResourceView(in_processedCommandBuffer.Get(), &srvDesc, srvView.cpuHandle);
 
+	std::vector<IndirectCommand> commands(FrameCount);
 	const UINT commandBufferSize = sizeof(IndirectCommand) * FrameCount;
 
-	D3D12_RESOURCE_DESC bufferDesc = {};
-	bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	bufferDesc.Width = commandBufferSize;
-	bufferDesc.Height = 1;
-	bufferDesc.DepthOrArraySize = 1;
-	bufferDesc.MipLevels = 1;
-	bufferDesc.SampleDesc.Count = 1;
-	bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	for (uint32 i = 0; i < FrameCount; ++i) {
+		D3D12_RESOURCE_DESC bufferDesc = {};
+		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		bufferDesc.Width = commandBufferSize;
+		bufferDesc.Height = 1;
+		bufferDesc.DepthOrArraySize = 1;
+		bufferDesc.MipLevels = 1;
+		bufferDesc.SampleDesc.Count = 1;
+		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-	throwIfFailed(_device->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&bufferDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_commandBuffer)));
+		throwIfFailed(_device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_commandBuffer[i])));
 
-	NAME_D3D12_OBJECT(m_commandBuffer);
+		D3D12_VERTEX_BUFFER_VIEW uavVertexBufferView;
+		uavVertexBufferView.BufferLocation = out_processedCommandBuffer[i]->GetGPUVirtualAddress();
+		uavVertexBufferView.StrideInBytes = sizeof(PerInstanceIndirect);
+		uavVertexBufferView.SizeInBytes = CommandBufferCounterOffset + sizeof(UINT);
 
-	std::vector<IndirectCommand> commands(FrameCount);
-	UINT commandIndex = 0;
+		commands[i].vertexBufferView = uavVertexBufferView;
+		commands[i].drawArguments.BaseVertexLocation = 0;
+		commands[i].drawArguments.IndexCountPerInstance = viBuffer->indexBuffer._indexCount;
+		commands[i].drawArguments.InstanceCount = TriangleCount;
+		commands[i].drawArguments.StartIndexLocation = 0;
+		commands[i].drawArguments.StartInstanceLocation = 0;
 
-	uavVertexBufferView.BufferLocation = out_processedCommandBuffer->GetGPUVirtualAddress();
-	uavVertexBufferView.StrideInBytes = sizeof(PerInstanceIndirect);
-	uavVertexBufferView.SizeInBytes = outCommandBufferDesc.Width;
-
-	for (UINT frame = 0; frame < FrameCount; frame++)
-	{
-		commands[commandIndex].vertexBufferView = uavVertexBufferView;
-		commands[commandIndex].drawArguments.BaseVertexLocation = 0;
-		commands[commandIndex].drawArguments.IndexCountPerInstance = viBuffer->indexBuffer._indexCount;
-		commands[commandIndex].drawArguments.InstanceCount = TriangleCount;
-		commands[commandIndex].drawArguments.StartIndexLocation = 0;
-		commands[commandIndex].drawArguments.StartInstanceLocation = 0;
-
-		commandIndex++;
+		IndirectCommand* mapPtr = nullptr;
+		m_commandBuffer[i]->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
+		memcpy(mapPtr, commands.data(), commandBufferSize);
 	}
 
-	IndirectCommand* mapPtr = nullptr;
-	m_commandBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
-	memcpy(mapPtr, commands.data(), commandBufferSize);
+	NAME_D3D12_OBJECT_INDEXED(m_commandBuffer, FrameCount);
 
 	//return;
 
@@ -449,46 +433,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	ZeroMemory(pMappedCounterReset, sizeof(UINT));
 	out_processedCommandBufferCounterReset->Unmap(0, nullptr);
 
-	{
-		auto computeCommandListSet = _commandContext.requestCommandListSet();
-		RefPtr<ID3D12GraphicsCommandList> computeCommandList = computeCommandListSet.commandList;
-
-		//デスクリプタヒープをセット
-		RefPtr<ID3D12DescriptorHeap> ppHeap[] = { _descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
-		computeCommandList->SetDescriptorHeaps(1, ppHeap);
-
-		computeCommandList->SetPipelineState(m_computeState.Get());
-		computeCommandList->SetComputeRootSignature(m_computeRootSignature.Get());
-
-		struct SceneConstant {
-			float xOffset;        // Half the width of the triangles.
-			float zOffset;        // The z offset for the triangle vertices.
-			float cullOffset;    // The culling plane offset in homogenous space.
-			float commandCount;    // The number of commands to be processed.
-		};
-
-		SceneConstant constant;
-
-		computeCommandList->SetComputeRootDescriptorTable(0, srvView.gpuHandle);
-		computeCommandList->SetComputeRootDescriptorTable(1, uavView.gpuHandle);
-		computeCommandList->SetComputeRoot32BitConstants(2, 4, reinterpret_cast<void*>(&constant), 0);
-
-		// Reset the UAV counter for this frame.
-		computeCommandList->CopyBufferRegion(out_processedCommandBuffer.Get(), CommandBufferCounterOffset, out_processedCommandBufferCounterReset.Get(), 0, sizeof(UINT));
-
-		D3D12_RESOURCE_BARRIER barrier = LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		computeCommandList->ResourceBarrier(1, &barrier);
-
-		computeCommandList->Dispatch(1, 1, 1);
-
-		D3D12_RESOURCE_BARRIER barrier2 = LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		computeCommandList->ResourceBarrier(1, &barrier2);
-
-		_commandContext.executeCommandList(computeCommandListSet);
-		_commandContext.discardCommandListSet(computeCommandListSet);
-
-		_commandContext.waitForIdle();
-	}
+	gpuDrivenStenby = true;
 }
 
 void GraphicsCore::onUpdate() {
@@ -518,6 +463,50 @@ void GraphicsCore::onUpdate() {
 }
 
 void GraphicsCore::onRender() {
+	if(gpuDrivenStenby){
+		auto computeCommandListSet = _commandContext.requestCommandListSet();
+		RefPtr<ID3D12GraphicsCommandList> computeCommandList = computeCommandListSet.commandList;
+
+		//デスクリプタヒープをセット
+		RefPtr<ID3D12DescriptorHeap> ppHeap[] = { _descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
+		computeCommandList->SetDescriptorHeaps(1, ppHeap);
+
+		computeCommandList->SetPipelineState(m_computeState.Get());
+		computeCommandList->SetComputeRootSignature(m_computeRootSignature.Get());
+
+		struct SceneConstant {
+			float xOffset;        // Half the width of the triangles.
+			float zOffset;        // The z offset for the triangle vertices.
+			float cullOffset;    // The culling plane offset in homogenous space.
+			float commandCount;    // The number of commands to be processed.
+		};
+
+		SceneConstant constant;
+
+		static float cullingX = 0.0f;
+		ImGui::Begin("GPUCulling");
+		ImGui::SliderFloat("CullingX", &cullingX, -5, 5);
+		ImGui::End();
+		constant.xOffset = cullingX;
+
+		computeCommandList->SetComputeRootDescriptorTable(0, srvView.gpuHandle);
+		computeCommandList->SetComputeRootDescriptorTable(1, uavView[_frameIndex].gpuHandle);
+		computeCommandList->SetComputeRoot32BitConstants(2, 4, reinterpret_cast<void*>(&constant), 0);
+
+		// Reset the UAV counter for this frame.
+		computeCommandList->CopyBufferRegion(out_processedCommandBuffer[_frameIndex].Get(), CommandBufferCounterOffset, out_processedCommandBufferCounterReset.Get(), 0, sizeof(UINT));
+
+		computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+		computeCommandList->Dispatch(1, 1, 1);
+
+		_commandContext.executeCommandList(computeCommandListSet);
+		_commandContext.discardCommandListSet(computeCommandListSet);
+
+		_commandContext.waitForIdle();
+	}
+
+
 	auto commandListSet = _commandContext.requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
@@ -580,13 +569,17 @@ void GraphicsCore::onRender() {
 	commandList->IASetVertexBuffers(0, 1, &viBuffer->vertexBuffer._vertexBufferView);
 	commandList->IASetIndexBuffer(&viBuffer->indexBuffer._indexBufferView);
 
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
 	commandList->ExecuteIndirect(
 		m_commandSignature.Get(),
 		1,
-		m_commandBuffer.Get(),
+		m_commandBuffer[_frameIndex].Get(),
 		0,
 		nullptr,
 		0);
+
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST));
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);
