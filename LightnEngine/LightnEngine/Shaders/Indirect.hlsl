@@ -20,12 +20,10 @@ cbuffer CameraInfo : register(b0)
 PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 {
 	PSInput result;
-	//input.position += offset.xyz;
 
 	float4 worldPos = mul(float4(input.position, 1), input.mtxWorld);
 	float4 viewPos = mul(worldPos, mtxView);
 	result.position = mul(viewPos, mtxProj);
-	//result.color = input.color;
 
 	//result.position = worldPos;
 	result.color = input.color;
