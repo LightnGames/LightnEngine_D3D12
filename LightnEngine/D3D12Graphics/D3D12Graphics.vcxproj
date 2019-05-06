@@ -56,12 +56,12 @@
     <ClCompile Include="CommandContext.cpp" />
     <ClCompile Include="CommandListPool.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
+    <ClCompile Include="DebugGeometry.cpp" />
     <ClCompile Include="DescriptorHeap.cpp" />
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="ImguiWindow.cpp" />
-    <ClCompile Include="include\DebugGeometry.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RenderableEntity.cpp" />
     <ClCompile Include="SharedMaterial.cpp" />
