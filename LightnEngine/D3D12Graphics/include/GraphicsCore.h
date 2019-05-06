@@ -18,6 +18,11 @@
 
 using namespace Microsoft::WRL;
 
+struct SceneConstant {
+	Vector4 cameraPosition;
+	Vector4 frustumPlanes[4];
+};
+
 class GraphicsCore :private NonCopyable {
 public:
 	GraphicsCore();
@@ -67,5 +72,7 @@ private:
 
 	uint32 _gpuCommandCount;
 	LinerAllocator _gpuCommandArray;
+
+	SceneConstant gpuCullingConstant;
 };
 

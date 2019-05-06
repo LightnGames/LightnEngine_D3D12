@@ -1,5 +1,6 @@
 
-#define threadBlockSize 128
+#define ThreadBlockSize 128
+#define FrustumPlaneCount 4
 
 struct ObjectInfo {
 	float4x4 mtxWorld;
@@ -15,25 +16,42 @@ struct OutputInfo {
 
 cbuffer RootConstants : register(b0)
 {
-	float xOffset;        // Half the width of the triangles.
-	float zOffset;        // The z offset for the triangle vertices.
-	float cullOffset;    // The culling plane offset in homogenous space.
-	float commandCount;    // The number of commands to be processed.
+	float4 cameraPosition;
+	float4 frustumPlanes[FrustumPlaneCount];//Right Left Top Bottom Near Far[-Near]
 };
 
 StructuredBuffer<ObjectInfo> inputCommands            : register(t0);    // SRV: Indirect commands
 AppendStructuredBuffer<OutputInfo> outputCommands    : register(u0);    // UAV: Processed indirect commands
 
-[numthreads(threadBlockSize, 1, 1)]
+[numthreads(ThreadBlockSize, 1, 1)]
 void CSMain(uint3 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 {
 	// Each thread of the CS operates on one of the indirect commands.
-	uint index = (groupId.x * threadBlockSize) + groupIndex;
+	uint index = (groupId.x * ThreadBlockSize) + groupIndex;
 
-	if (inputCommands[index].startPosAABB.x > xOffset) {
+	float3 viewPosition = inputCommands[index].startPosAABB - cameraPosition.xyz;
+	uint inCount = 0;
+	for (uint i = 0; i < FrustumPlaneCount; ++i) {
+		float length = dot(frustumPlanes[i].xyz, viewPosition);
+		if (length > 0) {
+			inCount++;
+		}
+	}
+
+	if (inCount == FrustumPlaneCount) {
 		OutputInfo info;
 		info.mtxWorld = inputCommands[index].mtxWorld;
 		info.color = inputCommands[index].color;
 		outputCommands.Append(info);
+		return;
 	}
+
+	OutputInfo info;
+	info.mtxWorld = float4x4(
+		0,0,0,0,
+		0,0,0,0,
+		0,0,0,0,
+		0,0,0,0);
+	info.color = inputCommands[index].color;
+	outputCommands.Append(info);
 }

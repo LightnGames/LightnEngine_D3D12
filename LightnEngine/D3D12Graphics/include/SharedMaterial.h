@@ -41,13 +41,16 @@ struct ConstantBufferMaterial {
 
 	void shutdown();
 
-	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);
+	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);//要素ごとにサイズを指定
 
 	//この定数バッファは有効か？(初期化されていれば配列が０以上なのでそれで判断)
 	bool isEnableBuffer() const;
 
 	//現在設定されている定数バッファのデータを指定フレームの定数バッファに更新
 	void flashBufferData(uint32 frameIndex);
+
+	//バッファのデータポインタを更新
+	void writeBufferData(const void* dataPtr, uint32 length, uint32 bufferIndex);
 
 	//バッファビューの参照用コピーをフレームバッファリングする数分取得
 	RefConstantBufferViews getRefBufferViews(uint32 descriptorIndex) const{

@@ -22,6 +22,8 @@ BufferView uavView[FrameCount];
 ComPtr<ID3D12RootSignature> m_computeRootSignature;
 ComPtr<ID3D12PipelineState> m_computeState;
 
+ConstantBufferMaterial gpuCullingCameraInfo;
+
 bool gpuDrivenStenby = false;
 
 struct IndirectCommand
@@ -63,9 +65,13 @@ void GraphicsCore::onInit(HWND hwnd) {
 	UINT dxgiFactoryFlags = 0;
 #ifdef DEBUG
 	ComPtr<ID3D12Debug> debugController;
+	ComPtr<ID3D12Debug1> debugControllerGpu;
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
 		debugController->EnableDebugLayer();
 		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
+		debugController->QueryInterface(IID_PPV_ARGS(&debugControllerGpu));
+		debugControllerGpu->SetEnableGPUBasedValidation(true);
 	}
 #endif // DEBUG
 
@@ -195,6 +201,8 @@ void GraphicsCore::onInit(HWND hwnd) {
 		NAME_D3D12_OBJECT(m_commandSignature);
 	}
 
+	gpuCullingCameraInfo.create(_device.Get(), { sizeof(SceneConstant) });
+
 	D3D12_HEAP_PROPERTIES defaultHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
 	D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 
@@ -214,6 +222,14 @@ void GraphicsCore::onInit(HWND hwnd) {
 	uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
 	uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	D3D12_DESCRIPTOR_RANGE1 cbvRange = {};
+	cbvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRange.NumDescriptors = 1;
+	cbvRange.BaseShaderRegister = 0;
+	cbvRange.RegisterSpace = 0;
+	cbvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+	cbvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	D3D12_ROOT_PARAMETER1 parameterDesc[3] = {};
 	parameterDesc[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	parameterDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -225,11 +241,10 @@ void GraphicsCore::onInit(HWND hwnd) {
 	parameterDesc[1].DescriptorTable.NumDescriptorRanges = 1;
 	parameterDesc[1].DescriptorTable.pDescriptorRanges = &uavRange;
 
-	parameterDesc[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	parameterDesc[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	parameterDesc[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	parameterDesc[2].Constants.Num32BitValues = 4;
-	parameterDesc[2].Constants.RegisterSpace = 0;
-	parameterDesc[2].Constants.ShaderRegister = 0;
+	parameterDesc[2].DescriptorTable.NumDescriptorRanges = 1;
+	parameterDesc[2].DescriptorTable.pDescriptorRanges = &cbvRange;
 
 	D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -327,13 +342,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	memcpy(mapPtrC, objectInfos.data(), sizeof(ObjectInfo)* TriangleCount);
 
 	commandList->CopyBufferRegion(in_processedCommandBuffer.Get(), 0, inCommandUploadBuffer.Get(), 0, TriangleCount * sizeof(ObjectInfo));
-
-	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
-	_commandContext.executeCommandList(commandList);
-	_commandContext.discardCommandListSet(commandListSet);
-
-	//コピーが終わるまでアップロードヒープを破棄しない
-	_commandContext.waitForIdle();
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(in_processedCommandBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -367,7 +376,8 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_device->CreateShaderResourceView(in_processedCommandBuffer.Get(), &srvDesc, srvView.cpuHandle);
 
-	std::vector<IndirectCommand> commands(FrameCount);
+	ComPtr<ID3D12Resource> indirectCommandUpload[3];
+	VectorArray<IndirectCommand> commands(FrameCount);
 	const UINT commandBufferSize = sizeof(IndirectCommand) * FrameCount;
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
@@ -386,6 +396,14 @@ void GraphicsCore::onInit(HWND hwnd) {
 			&bufferDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
+			IID_PPV_ARGS(&indirectCommandUpload[i])));
+
+		throwIfFailed(_device->CreateCommittedResource(
+			&defaultHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
 			IID_PPV_ARGS(&m_commandBuffer[i])));
 
 		D3D12_VERTEX_BUFFER_VIEW uavVertexBufferView;
@@ -401,16 +419,26 @@ void GraphicsCore::onInit(HWND hwnd) {
 		commands[i].drawArguments.StartInstanceLocation = 0;
 
 		IndirectCommand* mapPtr = nullptr;
-		m_commandBuffer[i]->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
+		indirectCommandUpload[i]->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr));
 		memcpy(mapPtr, commands.data(), commandBufferSize);
+
+		commandList->CopyBufferRegion(m_commandBuffer[i].Get(), 0, indirectCommandUpload[i].Get(), 0, commandBufferSize);
+
+		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(m_commandBuffer[i].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 	}
 
 	NAME_D3D12_OBJECT_INDEXED(m_commandBuffer, FrameCount);
 
+	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
+	_commandContext.executeCommandList(commandList);
+	_commandContext.discardCommandListSet(commandListSet);
+
+	//コピーが終わるまでアップロードヒープを破棄しない
+	_commandContext.waitForIdle();
+
 	//return;
 
-	// Allocate a buffer that can be used to reset the UAV counters and initialize
-// it to 0.
+	//UAVカウンタをリセットするための(UINT)0のバッファを生成
 	D3D12_RESOURCE_DESC countBufferDesc = {};
 	countBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	countBufferDesc.Width = sizeof(UINT);
@@ -467,7 +495,7 @@ void GraphicsCore::onUpdate() {
 	mainCamera->computeProjectionMatrix();
 	mainCamera->computeViewMatrix();
 
-	static Vector3 positionV = -Vector3::forward * 2;
+	static Vector3 positionV = -Vector3::forward * 5;
 	static float pitchV = 0;
 	static float yawV = 0;
 	static float rollV = 0;
@@ -491,10 +519,12 @@ void GraphicsCore::onUpdate() {
 	float x = 1 / virtualProj[0][0];
 	float y = 1 / virtualProj[1][1];
 	Color lineColor = Color::blue;
-	Vector3 topLeft = Quaternion::rotVector(virtualRotate, Vector3(x, y, 1));
-	Vector3 topRight = Quaternion::rotVector(virtualRotate, Vector3(-x, y, 1));
-	Vector3 bottomLeft = Quaternion::rotVector(virtualRotate, Vector3(x, -y, 1));
-	Vector3 bottomRight = Quaternion::rotVector(virtualRotate, Vector3(-x, -y, 1));
+
+	Vector3 forwardNear = Quaternion::rotVector(virtualRotate, Vector3::forward);
+	Vector3 topLeft = Quaternion::rotVector(virtualRotate, Vector3(-x, y, 1));
+	Vector3 topRight = Quaternion::rotVector(virtualRotate, Vector3(x, y, 1));
+	Vector3 bottomLeft = Quaternion::rotVector(virtualRotate, Vector3(-x, -y, 1));
+	Vector3 bottomRight = Quaternion::rotVector(virtualRotate, Vector3(x, -y, 1));
 
 	Vector3 farTopLeft = topLeft * farZV + positionV;
 	Vector3 farTopRight = topRight * farZV + positionV;
@@ -520,6 +550,31 @@ void GraphicsCore::onUpdate() {
 	_debugGeometryRender.debugDrawLine(nearTopLeft, nearBottomLeft, lineColor);
 	_debugGeometryRender.debugDrawLine(nearBottomRight, nearBottomLeft, lineColor);
 	_debugGeometryRender.debugDrawLine(nearBottomRight, nearTopRight, lineColor);
+
+	Vector3 leftNormal = Vector3::cross(Vector3(-x, 0, 1), -Vector3::up).normalize();
+	Vector3 rightNormal = Vector3::cross(Vector3(x, 0, 1), Vector3::up).normalize();
+	Vector3 bottomNormal = Vector3::cross(Vector3(0, y, 1), -Vector3::right).normalize();
+	Vector3 topNormal = Vector3::cross(Vector3(0, -y, 1), Vector3::right).normalize();
+	leftNormal = Quaternion::rotVector(virtualRotate, leftNormal);
+	rightNormal = Quaternion::rotVector(virtualRotate, rightNormal);
+	bottomNormal = Quaternion::rotVector(virtualRotate, bottomNormal);
+	topNormal = Quaternion::rotVector(virtualRotate, topNormal);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + leftNormal, Color::yellow);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + rightNormal, Color::yellow);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + bottomNormal, Color::yellow);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + topNormal, Color::yellow);
+
+
+	gpuCullingConstant.frustumPlanes[0] = leftNormal;
+	gpuCullingConstant.frustumPlanes[1] = rightNormal;
+	gpuCullingConstant.frustumPlanes[2] = bottomNormal;
+	gpuCullingConstant.frustumPlanes[3] = topNormal;
+	gpuCullingConstant.cameraPosition = positionV;
+
+	if (gpuDrivenStenby) {
+		gpuCullingCameraInfo.writeBufferData(&gpuCullingConstant, sizeof(gpuCullingConstant), 0);
+		gpuCullingCameraInfo.flashBufferData(_frameIndex);
+	}
 }
 
 void GraphicsCore::onRender() {
@@ -534,24 +589,9 @@ void GraphicsCore::onRender() {
 		computeCommandList->SetPipelineState(m_computeState.Get());
 		computeCommandList->SetComputeRootSignature(m_computeRootSignature.Get());
 
-		struct SceneConstant {
-			float xOffset;        // Half the width of the triangles.
-			float zOffset;        // The z offset for the triangle vertices.
-			float cullOffset;    // The culling plane offset in homogenous space.
-			float commandCount;    // The number of commands to be processed.
-		};
-
-		SceneConstant constant;
-
-		static float cullingX = 0.0f;
-		ImGui::Begin("GPUCulling");
-		ImGui::SliderFloat("CullingX", &cullingX, -5, 5);
-		ImGui::End();
-		constant.xOffset = cullingX;
-
 		computeCommandList->SetComputeRootDescriptorTable(0, srvView.gpuHandle);
 		computeCommandList->SetComputeRootDescriptorTable(1, uavView[_frameIndex].gpuHandle);
-		computeCommandList->SetComputeRoot32BitConstants(2, 4, reinterpret_cast<void*>(&constant), 0);
+		computeCommandList->SetComputeRootDescriptorTable(2, gpuCullingCameraInfo.constantBufferViews[_frameIndex].gpuHandle);
 
 		// Reset the UAV counter for this frame.
 		computeCommandList->CopyBufferRegion(out_processedCommandBuffer[_frameIndex].Get(), CommandBufferCounterOffset, out_processedCommandBufferCounterReset.Get(), 0, sizeof(UINT));
@@ -631,6 +671,8 @@ void GraphicsCore::onRender() {
 
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
+	//EXECUTION WARNING #1044: GPU_BASED_VALIDATION_RESOURCE_STATE_IMPRECISE
+	//IndirectAtgumentバッファに含まれるバーテックスバッファを一度UAVとして扱うのでGPUデバッグレイヤー上でリソースの追跡ができないと警告
 	commandList->ExecuteIndirect(
 		m_commandSignature.Get(),
 		1,
@@ -665,6 +707,8 @@ void GraphicsCore::onDestroy() {
 	for (int i = 0; i < FrameCount; ++i) {
 		_frameResources[i].shutdown();
 	}
+
+	gpuCullingCameraInfo.shutdown();
 
 	_gpuCommandArray.shutdown();
 	_debugGeometryRender.destroy();

@@ -7,7 +7,7 @@ ConstantBufferMaterial::ConstantBufferMaterial() :constantBufferViews{} {
 }
 
 ConstantBufferMaterial::~ConstantBufferMaterial() {
-	shutdown();
+	//shutdown();
 }
 
 void ConstantBufferMaterial::shutdown() {
@@ -66,6 +66,10 @@ void ConstantBufferMaterial::flashBufferData(uint32 frameIndex) {
 	}
 }
 
+void ConstantBufferMaterial::writeBufferData(const void* dataPtr, uint32 length, uint32 bufferIndex) {
+	memcpy(dataPtrs[bufferIndex], dataPtr, length);
+}
+
 Root32bitConstantMaterial::~Root32bitConstantMaterial(){
 	for (auto&& data : dataPtrs) {
 		delete data;
@@ -108,6 +112,9 @@ SharedMaterial::~SharedMaterial() {
 	if (_srvVertex.isEnable()) {
 		manager.discardShaderResourceView(_srvVertex);
 	}
+
+	_vertexConstantBuffer.shutdown();
+	_pixelConstantBuffer.shutdown();
 }
 
 void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
