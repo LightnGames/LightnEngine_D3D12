@@ -46,12 +46,12 @@ void CSMain(uint3 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		return;
 	}
 
-	OutputInfo info;
-	info.mtxWorld = float4x4(
-		0,0,0,0,
-		0,0,0,0,
-		0,0,0,0,
-		0,0,0,0);
-	info.color = inputCommands[index].color;
-	outputCommands.Append(info);
+	//OutputInfo info;
+	//info.mtxWorld = float4x4(
+	//	0,0,0,0,
+	//	0,0,0,0,
+	//	0,0,0,0,
+	//	0,0,0,0);
+	//info.color = inputCommands[index].color;
+	//outputCommands.Append(info);
 }

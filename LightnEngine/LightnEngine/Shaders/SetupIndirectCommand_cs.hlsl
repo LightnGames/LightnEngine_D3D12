@@ -3,8 +3,9 @@
 #define FrustumPlaneCount 4
 
 struct OutputInfo {
-	float4x4 mtxWorld;
-	float4 color;
+	uint id;
+	//float4x4 mtxWorld;
+	//float4 color;
 };
 
 //cbuffer RootConstants : register(b0)
@@ -37,18 +38,18 @@ void CSMain(uint3 groupId : SV_GroupThreadID, uint groupIndex : SV_GroupThreadID
 	//index = 0;
 
 	if (index == 0) {
-		uint numStructs;
-		uint stride;
-		objectDatas.GetDimensions(numStructs, stride);
+		uint numStructs = objectDatas[3072].id;
+		//uint stride;
+		//objectDatas.GetDimensions(numStructs, stride);
 
 		//ˆê‚Â‚à•`‰æ‚³‚ê‚È‚¢ê‡‚Í•`‰æƒRƒ}ƒ“ƒhŽ©‘Ì‚ð’Ç‰Á‚µ‚È‚¢
-		if (numStructs == 0) {
+		if (numStructs > 0) {
 			IndirectCommand command = (IndirectCommand)0;
 			command.vbAddress = inputCommands[index].vbAddress;
 			command.sizeInBytes = inputCommands[index].sizeInBytes;
 			command.strideInBytes = inputCommands[index].strideInBytes;
 			command.drawArguments.x = inputCommands[index].drawArguments.x;
-			command.drawArguments.y = 128;
+			command.drawArguments.y = numStructs;
 			command.drawArguments.z = 0;
 			command.drawArguments.w = 0;
 			command.padding = 0;
