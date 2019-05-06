@@ -76,7 +76,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 
 		debugController->QueryInterface(IID_PPV_ARGS(&debugControllerGpu));
-		debugControllerGpu->SetEnableGPUBasedValidation(true);
+		//debugControllerGpu->SetEnableGPUBasedValidation(true);
 	}
 #endif // DEBUG
 
@@ -276,30 +276,30 @@ void GraphicsCore::onInit(HWND hwnd) {
 		uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
 		uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		D3D12_ROOT_PARAMETER1 parameterDesc[4] = {};
+		D3D12_ROOT_PARAMETER1 parameterDesc[3] = {};
 		parameterDesc[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 		parameterDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[0].Descriptor.ShaderRegister = 0;
-		parameterDesc[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		parameterDesc[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
 
 		parameterDesc[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 		parameterDesc[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[1].Descriptor.ShaderRegister = 1;
-		parameterDesc[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		parameterDesc[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
 
 		parameterDesc[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		parameterDesc[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[2].DescriptorTable.NumDescriptorRanges = 1;
 		parameterDesc[2].DescriptorTable.pDescriptorRanges = &uavRange;
 
-		parameterDesc[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		parameterDesc[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		parameterDesc[3].Descriptor.ShaderRegister = 0;
-		parameterDesc[3].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		//parameterDesc[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		//parameterDesc[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		//parameterDesc[3].Descriptor.ShaderRegister = 0;
+		//parameterDesc[3].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSignatureDesc.Desc_1_1.NumParameters = 4;
+		rootSignatureDesc.Desc_1_1.NumParameters = 3;
 		rootSignatureDesc.Desc_1_1.pParameters = parameterDesc;
 		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 0;
 		rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -310,22 +310,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 		throwIfFailed(_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_setupCommandComputeRootSignature)));
 		NAME_D3D12_OBJECT(_setupCommandComputeRootSignature);
 
-		ComPtr<ID3DBlob> cullingComputeShader;
-		ComPtr<ID3DBlob> cullingShaderError;
-		throwIfFailed(D3DCompileFromFile(L"Shaders/GpuCulling_cs.hlsl", nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &cullingComputeShader, &cullingShaderError));
-
-		D3D12_SHADER_BYTECODE cullingShaderByteCode;
-		cullingShaderByteCode.pShaderBytecode = cullingComputeShader->GetBufferPointer();
-		cullingShaderByteCode.BytecodeLength = cullingComputeShader->GetBufferSize();
-
-		// Describe and create the compute pipeline state object (PSO).
-		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
-		computePsoDesc.pRootSignature = _setupCommandComputeRootSignature.Get();
-		computePsoDesc.CS = cullingShaderByteCode;
-
-		throwIfFailed(_device->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&_setupCommandComputeState)));
-		NAME_D3D12_OBJECT(_setupCommandComputeState);
-
 		ComPtr<ID3DBlob> setupCommandComputeShader;
 		ComPtr<ID3DBlob> setupCommandShaderError;
 		throwIfFailed(D3DCompileFromFile(L"Shaders/SetupIndirectCommand_cs.hlsl", nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &setupCommandComputeShader, &setupCommandShaderError));
@@ -333,6 +317,14 @@ void GraphicsCore::onInit(HWND hwnd) {
 		D3D12_SHADER_BYTECODE setupCommandByteCode;
 		setupCommandByteCode.pShaderBytecode = setupCommandComputeShader->GetBufferPointer();
 		setupCommandByteCode.BytecodeLength = setupCommandComputeShader->GetBufferSize();
+
+		// Describe and create the compute pipeline state object (PSO).
+		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
+		computePsoDesc.pRootSignature = _setupCommandComputeRootSignature.Get();
+		computePsoDesc.CS = setupCommandByteCode;
+
+		throwIfFailed(_device->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&_setupCommandComputeState)));
+		NAME_D3D12_OBJECT(_setupCommandComputeState);
 	}
 
 
@@ -426,15 +418,13 @@ void GraphicsCore::onInit(HWND hwnd) {
 	}
 
 	VectorArray<IndirectCommand> commands(FrameCount);
-
 	ComPtr<ID3D12Resource> indirectCommandUpload[FrameCount];
-	const UINT commandBufferSize = CommandBufferCounterOffset2 + sizeof(UINT);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		{
 			D3D12_RESOURCE_DESC bufferDesc = {};
 			bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-			bufferDesc.Width = commandBufferSize;
+			bufferDesc.Width = CommandBufferCounterOffset2 + sizeof(UINT);
 			bufferDesc.Height = 1;
 			bufferDesc.DepthOrArraySize = 1;
 			bufferDesc.MipLevels = 1;
@@ -448,7 +438,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 				D3D12_RESOURCE_STATE_COPY_DEST,
 				nullptr,
 				IID_PPV_ARGS(&out_commandBuffer[i])));
-			commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[i].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 		}
 
 		{
@@ -484,9 +473,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 			uavVertexBufferView.SizeInBytes = CommandBufferCounterOffset + sizeof(UINT);
 
 			commands[i].vertexBufferView = uavVertexBufferView;
-			commands[i].drawArguments.BaseVertexLocation = 0;
 			commands[i].drawArguments.IndexCountPerInstance = viBuffer->indexBuffer._indexCount;
 			commands[i].drawArguments.InstanceCount = TriangleCount;
+			commands[i].drawArguments.BaseVertexLocation = 0;
 			commands[i].drawArguments.StartIndexLocation = 0;
 			commands[i].drawArguments.StartInstanceLocation = 0;
 
@@ -495,9 +484,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 			memcpy(mapPtr, &commands[i], sizeof(IndirectCommand));
 
 			commandList->CopyBufferRegion(in_commandBuffer[i].Get(), 0, indirectCommandUpload[i].Get(), 0, sizeof(IndirectCommand));
-
+			commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(in_commandBuffer[i].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 			//カッコカリ
-			commandList->CopyBufferRegion(out_commandBuffer[i].Get(), 0, indirectCommandUpload[i].Get(), 0, sizeof(IndirectCommand));
+			//commandList->CopyBufferRegion(out_commandBuffer[i].Get(), 0, indirectCommandUpload[i].Get(), 0, sizeof(IndirectCommand));
 		}
 	}
 
@@ -508,7 +497,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;
-		uavDesc.Buffer.NumElements = 1;
+		uavDesc.Buffer.NumElements = 10;
 		uavDesc.Buffer.StructureByteStride = sizeof(IndirectCommand);
 		uavDesc.Buffer.CounterOffsetInBytes = CommandBufferCounterOffset2;
 		uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
@@ -700,23 +689,21 @@ void GraphicsCore::onRender() {
 
 		//ExecuteIndirectコマンド構築
 		{
-			//computeCommandList->SetPipelineState(_setupCommandComputeState.Get());
-			//computeCommandList->SetComputeRootSignature(_setupCommandComputeRootSignature.Get());
+			computeCommandList->SetPipelineState(_setupCommandComputeState.Get());
+			computeCommandList->SetComputeRootSignature(_setupCommandComputeRootSignature.Get());
 
-			//computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
-			//computeCommandList->SetComputeRootShaderResourceView(0, out_processedCommandBuffer[_frameIndex]->GetGPUVirtualAddress());
-			//computeCommandList->SetComputeRootShaderResourceView(1, in_commandBuffer[_frameIndex]->GetGPUVirtualAddress());
-			//computeCommandList->SetComputeRootDescriptorTable(2, setupCommandUavView[_frameIndex].gpuHandle);
-			//computeCommandList->SetComputeRootConstantBufferView(3, gpuCullingCameraInfo.constantBuffers[_frameIndex][0]->_resource->GetGPUVirtualAddress());
+			computeCommandList->SetComputeRootShaderResourceView(0, out_processedCommandBuffer[_frameIndex]->GetGPUVirtualAddress());
+			computeCommandList->SetComputeRootShaderResourceView(1, in_commandBuffer[_frameIndex]->GetGPUVirtualAddress());
+			computeCommandList->SetComputeRootDescriptorTable(2, setupCommandUavView[_frameIndex].gpuHandle);
+			////computeCommandList->SetComputeRootConstantBufferView(3, gpuCullingCameraInfo.constantBuffers[_frameIndex][0]->_resource->GetGPUVirtualAddress());
 
 			////AppendStructuredBufferのカウンタを0にリセットする
-			//computeCommandList->CopyBufferRegion(out_commandBuffer[_frameIndex].Get(), CommandBufferCounterOffset2, out_processedCommandBufferCounterReset.Get(), 0, sizeof(UINT));
+			computeCommandList->CopyBufferRegion(out_commandBuffer[_frameIndex].Get(), CommandBufferCounterOffset2, out_processedCommandBufferCounterReset.Get(), 0, sizeof(UINT));
 
-			//computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-			//computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
-			//computeCommandList->Dispatch(1, 1, 1);
+			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+			computeCommandList->Dispatch(1, 1, 1);
 		}
 
 		_commandContext.executeCommandList(computeCommandListSet);
@@ -785,11 +772,18 @@ void GraphicsCore::onRender() {
 
 	mat->setupRenderCommand(renderSettings);
 
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
+
+	//D3D12_VERTEX_BUFFER_VIEW uavVertexBufferView;
+	//uavVertexBufferView.BufferLocation = out_processedCommandBuffer[_frameIndex]->GetGPUVirtualAddress();
+	//uavVertexBufferView.StrideInBytes = sizeof(PerInstanceIndirect);
+	//uavVertexBufferView.SizeInBytes = CommandBufferCounterOffset + sizeof(UINT);
+
+	//D3D12_VERTEX_BUFFER_VIEW views[2] = { viBuffer->vertexBuffer._vertexBufferView ,uavVertexBufferView };
+	//commandList->IASetVertexBuffers(0, 2, views);
 	commandList->IASetVertexBuffers(0, 1, &viBuffer->vertexBuffer._vertexBufferView);
 	commandList->IASetIndexBuffer(&viBuffer->indexBuffer._indexBufferView);
-
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
 	//EXECUTION WARNING #1044: GPU_BASED_VALIDATION_RESOURCE_STATE_IMPRECISE
 	//IndirectAtgumentバッファに含まれるバーテックスバッファを一度UAVとして扱うのでGPUデバッグレイヤー上でリソースの追跡ができないと警告
@@ -798,11 +792,12 @@ void GraphicsCore::onRender() {
 		1,
 		out_commandBuffer[_frameIndex].Get(),
 		0,
-		nullptr,
-		0);
+		out_commandBuffer[_frameIndex].Get(),
+		CommandBufferCounterOffset2);
+	//commandList->DrawIndexedInstanced(viBuffer->indexBuffer._indexCount, 128, 0, 0, 0);
 
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_processedCommandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST));
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(out_commandBuffer[_frameIndex].Get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);
