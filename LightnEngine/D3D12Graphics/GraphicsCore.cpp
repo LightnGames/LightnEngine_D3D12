@@ -286,19 +286,17 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_setupCommandComputeState.createCompute(_device.Get(), computePsoDesc);
 	}
 
-
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		_gpuDrivenInstanceCulledBuffer[i].createDirectGpuOnlyEmpty(_device.Get(), CommandBufferCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	}
 
-	//NAME_D3D12_OBJECT_INDEXED(out_processedCommandBuffer, FrameCount);
-
 	ComPtr<ID3D12Resource> inCommandUploadBuffer;
+	ComPtr<ID3D12Resource> indirectCommandUpload[FrameCount];
 
 	auto commandListSet = _commandContext.requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
-
 	VectorArray<ObjectInfo> objectInfos(TriangleCount);
+
 	for (size_t i = 0; i < objectInfos.size(); ++i) {
 		Vector3 position(i * 1.2f - TriangleCount / 2, 0, 2);
 		objectInfos[i].mtxWorld = Matrix4::translateXYZ(position).transpose();
@@ -321,8 +319,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 			_descriptorHeapManager.createUnorederdAcsessView(_gpuDrivenInstanceCulledBuffer[i]._resource.GetAddressOf(), &_gpuDriventInstanceCulledUAV[i], 1, bufferUav);
 		}
 	}
-
-	ComPtr<ID3D12Resource> indirectCommandUpload[FrameCount];
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 
@@ -348,8 +344,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 			//commandList->CopyBufferRegion(out_commandBuffer[i].Get(), 0, indirectCommandUpload[i].Get(), 0, sizeof(IndirectCommand));
 		}
 	}
-
-	//NAME_D3D12_OBJECT_INDEXED(out_commandBuffer2._resource, FrameCount);
 
 	//IndirectArgumentバッファのUAVを作成
 	{
@@ -604,13 +598,6 @@ void GraphicsCore::onRender() {
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
-	//D3D12_VERTEX_BUFFER_VIEW uavVertexBufferView;
-	//uavVertexBufferView.BufferLocation = out_processedCommandBuffer[_frameIndex]->GetGPUVirtualAddress();
-	//uavVertexBufferView.StrideInBytes = sizeof(PerInstanceIndirect);
-	//uavVertexBufferView.SizeInBytes = CommandBufferCounterOffset + sizeof(UINT);
-
-	//D3D12_VERTEX_BUFFER_VIEW views[2] = { viBuffer->vertexBuffer._vertexBufferView ,uavVertexBufferView };
-	//commandList->IASetVertexBuffers(0, 2, views);
 	commandList->IASetVertexBuffers(0, 1, &viBuffer->vertexBuffer._vertexBufferView);
 	commandList->IASetIndexBuffer(&viBuffer->indexBuffer._indexBufferView);
 
