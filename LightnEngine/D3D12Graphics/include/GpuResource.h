@@ -50,6 +50,99 @@ struct Vertex {
 	float color[4];
 };
 
+class GpuBuffer :public GpuResource {
+public:
+	//GPUオンリーバッファを生成して、コマンドリストに引数配列データの初期化コマンドを記録
+	template<class T>
+	void createDeferredGpuOnly(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, RefAddressOf<ID3D12Resource> uploadHeap, const VectorArray<T>& initData) {
+		D3D12_HEAP_PROPERTIES defaultHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
+		D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
+
+		D3D12_RESOURCE_DESC bufferDesc = {};
+		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		bufferDesc.Width = initData.size() * sizeof(T);
+		bufferDesc.Height = 1;
+		bufferDesc.DepthOrArraySize = 1;
+		bufferDesc.MipLevels = 1;
+		bufferDesc.SampleDesc.Count = 1;
+		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+		throwIfFailed(device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(uploadHeap)));
+
+		throwIfFailed(device->CreateCommittedResource(
+			&defaultHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&_resource)));
+
+		NAME_D3D12_OBJECT(_resource);
+
+		T* mapPtrC = nullptr;
+		(*uploadHeap)->Map(0, nullptr, reinterpret_cast<void**>(&mapPtrC));
+		memcpy(mapPtrC, initData.data(), bufferDesc.Width);
+
+		commandList->CopyBufferRegion(_resource.Get(), 0, *uploadHeap, 0, bufferDesc.Width);
+	}
+
+	//GPUオンリーバッファを初期化の値を設定せずに生成する
+	void createDirectGpuOnlyEmpty(RefPtr<ID3D12Device> device, uint32 length, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE) {
+		D3D12_HEAP_PROPERTIES defaultHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
+
+		D3D12_RESOURCE_DESC bufferDesc = {};
+		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		bufferDesc.Width = length;
+		bufferDesc.Height = 1;
+		bufferDesc.DepthOrArraySize = 1;
+		bufferDesc.MipLevels = 1;
+		bufferDesc.SampleDesc.Count = 1;
+		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		bufferDesc.Flags = flags;
+
+		throwIfFailed(device->CreateCommittedResource(
+			&defaultHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&_resource)));
+	}
+
+	//CPU上で読み書き可能なバッファを生成する。CPUもGPUも読める中間メモリに配置されるのでGPUオンリーバッファに比べると読み書きが遅い
+	template<class T>
+	void createDirectCpuReadWrite(RefPtr<ID3D12Device> device, const VectorArray<T>& initData) {
+		D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
+
+		D3D12_RESOURCE_DESC bufferDesc = {};
+		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		bufferDesc.Width = initData.size() * sizeof(T);
+		bufferDesc.Height = 1;
+		bufferDesc.DepthOrArraySize = 1;
+		bufferDesc.MipLevels = 1;
+		bufferDesc.SampleDesc.Count = 1;
+		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+		throwIfFailed(device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&_resource)));
+
+		T* mapPtr = nullptr;
+		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr)));
+		memcpy(mapPtr, initData.data(), bufferDesc.Width);
+	}
+};
+
 class Texture2D :public GpuResource {
 public:
 	//バックバッファからテクスチャを生成

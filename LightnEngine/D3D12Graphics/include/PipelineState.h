@@ -327,10 +327,47 @@ public:
 	}
 };
 
+class ComputeShader :public Shader {
+public:
+	void create(const String& fileName) {
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &shader, nullptr));
+	}
+};
+
+class CommandSignature :private NonCopyable{
+public:
+	void create(RefPtr<ID3D12Device> device, uint32 byteStride, const VectorArray<D3D12_INDIRECT_ARGUMENT_DESC>& descs) {
+		D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
+		commandSignatureDesc.pArgumentDescs = descs.data();
+		commandSignatureDesc.NumArgumentDescs = static_cast<UINT>(descs.size());
+		commandSignatureDesc.ByteStride = byteStride;
+
+		throwIfFailed(device->CreateCommandSignature(&commandSignatureDesc, nullptr, IID_PPV_ARGS(&_commandSignature)));
+		//NAME_D3D12_OBJECT(_commandSignature);
+	}
+
+	ComPtr<ID3D12CommandSignature> _commandSignature;
+};
+
 class RootSignature :private NonCopyable{
 public:
-
 	RootSignature() {}
+
+	//StaticSamplerÇ»ÇµÅIÅIÅI
+	void create(RefPtr<ID3D12Device> device, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters) {
+		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		rootSignatureDesc.Desc_1_1.NumParameters = static_cast<UINT>(rootParameters.size());
+		rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
+		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 0;
+		rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		throwIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
+		throwIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_rootSignature)));
+		NAME_D3D12_OBJECT(_rootSignature);
+	}
 
 	void create(RefPtr<ID3D12Device> device, const VertexShader& vertexShader, const PixelShader& pixelShader) {
 		VectorArray<D3D12_ROOT_PARAMETER1> rootParameters;
@@ -484,6 +521,12 @@ public:
 		psoDesc.DSVFormat = DepthStencilFormat;
 		psoDesc.SampleDesc.Count = 1;
 		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
+		NAME_D3D12_OBJECT(_pipelineState);
+	}
+
+	//ComputePupelineStateÇçÏê¨
+	void createCompute(RefPtr<ID3D12Device> device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc) {
+		throwIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&_pipelineState)));
 		NAME_D3D12_OBJECT(_pipelineState);
 	}
 

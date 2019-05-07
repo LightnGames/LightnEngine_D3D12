@@ -205,7 +205,6 @@ void DescriptorHeapManager::createUnorederdAcsessView(ID3D12Resource** unorederd
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	for (uint32 i = 0; i < viewCount; ++i) {
-		auto desc = unorederdAcsess[i]->GetDesc();
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer = buffer;
