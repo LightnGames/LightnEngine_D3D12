@@ -4,7 +4,7 @@
 #include "D3D12Util.h"
 #include "D3D12Helper.h"
 #include "SharedMaterial.h"
-#include "RenderableEntity.h"
+#include "MeshRender.h"
 
 #include "ThirdParty/Imgui/imgui.h"
 

@@ -5,6 +5,7 @@
 #include <LMath.h>
 
 #define D3D12
+struct SharedMaterialCreateSettings;
 class GraphicsCore;
 class SharedMaterial;
 class Texture2D;

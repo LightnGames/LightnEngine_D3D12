@@ -2,10 +2,8 @@
 #include "GFXInterface.h"
 #include <LMath.h>
 #include <ThirdParty/Imgui/imgui.h>
-#include <ImguiWindow.h>
 #include <RenderableEntity.h>
 #include <SharedMaterial.h>
-#include <GpuResource.h>
 #include <Scene.h>
 #include <GraphicsCore.h>
 

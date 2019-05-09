@@ -108,6 +108,9 @@
     <ClInclude Include="include\DebugGeometry.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="include\MeshRender.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SharedMaterial.cpp">
@@ -168,6 +171,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="DebugGeometry.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshRender.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

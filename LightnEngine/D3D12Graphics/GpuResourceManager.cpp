@@ -6,7 +6,7 @@
 #include "SharedMaterial.h"
 #include "stdafx.h"
 #include "GpuResourceDataPool.h"
-#include <RenderableEntity.h>
+#include "MeshRender.h"
 #include <cassert>
 #include <LMath.h>
 
