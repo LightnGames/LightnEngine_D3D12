@@ -61,7 +61,8 @@ private:
 	Texture2D _depthStencil;
 	BufferView _dsv;
 
-	CommandContext _commandContext;
+	CommandContext _graphicsCommandContext;
+	CommandContext _computeCommandContext;
 	FrameResource _frameResources[FrameCount];
 	DescriptorHeapManager _descriptorHeapManager;
 	GpuResourceManager _gpuResourceManager;

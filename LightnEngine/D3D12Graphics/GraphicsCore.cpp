@@ -106,14 +106,15 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//デスクリプタヒープマネージャー
 	_descriptorHeapManager.create(_device.Get());
 
-	//コマンドキュー生成
-	_commandContext.create(_device.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
+	//コマンドコンテキスト生成
+	_graphicsCommandContext.create(_device.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
+	_computeCommandContext.create(_device.Get(), D3D12_COMMAND_LIST_TYPE_COMPUTE);
 
 	//Imgui初期化
 	_imguiWindow.init(hwnd, _device.Get());
 
 	//デバッグ描画機能初期化
-	_debugGeometryRender.create(_device.Get(), &_commandContext);
+	_debugGeometryRender.create(_device.Get(), &_graphicsCommandContext);
 
 	//GPUコマンド格納アロケータ初期化
 	_gpuCommandArray.init(163840);
@@ -130,7 +131,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		swapChainDesc.SampleDesc.Count = 1;
 
 		ComPtr<IDXGISwapChain1> swapChain;
-		throwIfFailed(factory->CreateSwapChainForHwnd(_commandContext.getDirectQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
+		throwIfFailed(factory->CreateSwapChainForHwnd(_graphicsCommandContext.getDirectQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
 
 
 		//フルスクリーンサポートをオフ
@@ -178,7 +179,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 			{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		};
 
-		_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _commandContext, { "cube.mesh" });
+		_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _graphicsCommandContext, { "cube.mesh" });
 		_gpuResourceManager.loadVertexAndIndexBuffer("cube.mesh", &viBuffer);
 
 		SharedMaterialCreateSettings materialSettings;
@@ -234,7 +235,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_cullingComputeRootSignature.create(_device.Get(), parameterDesc);
 
 		ComputeShader computeShader;
-		computeShader.create("Shaders/GpuCulling_cs.hlsl");
+		computeShader.create("Shaders/GpuCulling_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);
 
 		// Describe and create the compute pipeline state object (PSO).
 		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
@@ -277,7 +278,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_setupCommandComputeRootSignature.create(_device.Get(), parameterDesc);
 
 		ComputeShader computeShader;
-		computeShader.create("Shaders/SetupIndirectCommand_cs.hlsl");
+		computeShader.create("Shaders/SetupIndirectCommand_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);
 
 		// Describe and create the compute pipeline state object (PSO).
 		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
@@ -293,7 +294,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	ComPtr<ID3D12Resource> inCommandUploadBuffer;
 	ComPtr<ID3D12Resource> indirectCommandUpload[FrameCount];
 
-	auto commandListSet = _commandContext.requestCommandListSet();
+	auto commandListSet = _graphicsCommandContext.requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 	VectorArray<ObjectInfo> objectInfos(TriangleCount);
 
@@ -340,8 +341,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 			_indirectArgumentSourceBuffer[i].createDeferredGpuOnly<IndirectCommand>(_device.Get(), commandList, &indirectCommandUpload[i], { command });
 			commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer[i]._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-			//カッコカリ
-			//commandList->CopyBufferRegion(out_commandBuffer[i].Get(), 0, indirectCommandUpload[i].Get(), 0, sizeof(IndirectCommand));
 		}
 	}
 
@@ -359,11 +358,11 @@ void GraphicsCore::onInit(HWND hwnd) {
 	}
 
 	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
-	_commandContext.executeCommandList(commandList);
-	_commandContext.discardCommandListSet(commandListSet);
+	_graphicsCommandContext.executeCommandList(commandList);
+	_graphicsCommandContext.discardCommandListSet(commandListSet);
 
 	//コピーが終わるまでアップロードヒープを破棄しない
-	_commandContext.waitForIdle();
+	_graphicsCommandContext.waitForIdle();
 
 	//UAVカウンタをリセットするための(UINT)0のバッファを生成
 	_uavCounterReset.createDirectCpuReadWrite<UINT>(_device.Get(), { 0 });
@@ -486,7 +485,7 @@ void GraphicsCore::onUpdate() {
 
 void GraphicsCore::onRender() {
 	if (gpuDrivenStenby) {
-		auto computeCommandListSet = _commandContext.requestCommandListSet();
+		auto computeCommandListSet = _computeCommandContext.requestCommandListSet();
 		RefPtr<ID3D12GraphicsCommandList> computeCommandList = computeCommandListSet.commandList;
 
 		//デスクリプタヒープをセット
@@ -498,14 +497,14 @@ void GraphicsCore::onRender() {
 			computeCommandList->SetPipelineState(_cullingComputeState._pipelineState.Get());
 			computeCommandList->SetComputeRootSignature(_cullingComputeRootSignature._rootSignature.Get());
 
-			computeCommandList->SetComputeRootShaderResourceView(0, _gpuDrivenInstanceMatrixBuffer._resource->GetGPUVirtualAddress());
+			computeCommandList->SetComputeRootShaderResourceView(0, _gpuDrivenInstanceMatrixBuffer.getGpuVirtualAddress());
 			computeCommandList->SetComputeRootDescriptorTable(1, _gpuDriventInstanceCulledUAV[_frameIndex].gpuHandle);
 			computeCommandList->SetComputeRootConstantBufferView(2, gpuCullingCameraInfo.constantBuffers[_frameIndex][0]->_resource->GetGPUVirtualAddress());
 
 			//AppendStructuredBufferのカウンタを0にリセットする
-			computeCommandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffer[_frameIndex]._resource.Get(), CommandBufferCounterOffset, _uavCounterReset._resource.Get(), 0, sizeof(UINT));
+			computeCommandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffer[_frameIndex].get(), CommandBufferCounterOffset, _uavCounterReset._resource.Get(), 0, sizeof(UINT));
 
-			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
 			computeCommandList->Dispatch(1, 1, 1);
 		}
@@ -517,26 +516,26 @@ void GraphicsCore::onRender() {
 
 			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
-			computeCommandList->SetComputeRootShaderResourceView(0, _gpuDrivenInstanceCulledBuffer[_frameIndex]._resource->GetGPUVirtualAddress());
-			computeCommandList->SetComputeRootShaderResourceView(1, _indirectArgumentSourceBuffer[_frameIndex]._resource->GetGPUVirtualAddress());
+			computeCommandList->SetComputeRootShaderResourceView(0, _gpuDrivenInstanceCulledBuffer[_frameIndex].getGpuVirtualAddress());
+			computeCommandList->SetComputeRootShaderResourceView(1, _indirectArgumentSourceBuffer[_frameIndex].getGpuVirtualAddress());
 			computeCommandList->SetComputeRootDescriptorTable(2, setupCommandUavView[_frameIndex].gpuHandle);
 			////computeCommandList->SetComputeRootConstantBufferView(3, gpuCullingCameraInfo.constantBuffers[_frameIndex][0]->_resource->GetGPUVirtualAddress());
 
 			////AppendStructuredBufferのカウンタを0にリセットする
-			computeCommandList->CopyBufferRegion(_indirectArgumentDstBuffer[_frameIndex]._resource.Get(), CommandBufferCounterOffset2, _uavCounterReset._resource.Get(), 0, sizeof(UINT));
+			computeCommandList->CopyBufferRegion(_indirectArgumentDstBuffer[_frameIndex].get(), CommandBufferCounterOffset2, _uavCounterReset._resource.Get(), 0, sizeof(UINT));
 
-			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+			computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 			computeCommandList->Dispatch(1, 1, 1);
 		}
 
-		_commandContext.executeCommandList(computeCommandListSet);
-		_commandContext.discardCommandListSet(computeCommandListSet);
+		_computeCommandContext.executeCommandList(computeCommandListSet);
+		_computeCommandContext.discardCommandListSet(computeCommandListSet);
 
-		_commandContext.waitForIdle();
+		_computeCommandContext.waitForIdle();
 	}
 
 
-	auto commandListSet = _commandContext.requestCommandListSet();
+	auto commandListSet = _graphicsCommandContext.requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 	//デスクリプタヒープをセット
@@ -595,8 +594,8 @@ void GraphicsCore::onRender() {
 
 	mat->setupRenderCommand(renderSettings);
 
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex].get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex].get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
 	commandList->IASetVertexBuffers(0, 1, &viBuffer->vertexBuffer._vertexBufferView);
 	commandList->IASetIndexBuffer(&viBuffer->indexBuffer._indexBufferView);
@@ -606,14 +605,14 @@ void GraphicsCore::onRender() {
 	commandList->ExecuteIndirect(
 		_commandSignature._commandSignature.Get(),
 		1,
-		_indirectArgumentDstBuffer[_frameIndex]._resource.Get(),
+		_indirectArgumentDstBuffer[_frameIndex].get(),
 		0,
-		_indirectArgumentDstBuffer[_frameIndex]._resource.Get(),
+		_indirectArgumentDstBuffer[_frameIndex].get(),
 		CommandBufferCounterOffset2);
 	//commandList->DrawIndexedInstanced(viBuffer->indexBuffer._indexCount, 128, 0, 0, 0);
 
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST));
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex]._resource.Get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[_frameIndex].get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[_frameIndex].get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);
@@ -622,8 +621,8 @@ void GraphicsCore::onRender() {
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	//コマンドキューにコマンドリストを渡して実行
-	_commandContext.executeCommandList(commandListSet);
-	_commandContext.discardCommandListSet(commandListSet);
+	_graphicsCommandContext.executeCommandList(commandListSet);
+	_graphicsCommandContext.discardCommandListSet(commandListSet);
 
 	//画面表示
 	throwIfFailed(_swapChain->Present(1, 0));
@@ -634,7 +633,7 @@ void GraphicsCore::onRender() {
 
 void GraphicsCore::onDestroy() {
 	//描画中に破棄してしまうと困るので待つ
-	_commandContext.waitForIdle();
+	_graphicsCommandContext.waitForIdle();
 
 	for (int i = 0; i < FrameCount; ++i) {
 		_frameResources[i].shutdown();
@@ -661,7 +660,8 @@ void GraphicsCore::onDestroy() {
 	_imguiWindow.shutdown();
 	_gpuResourceManager.shutdown();
 
-	_commandContext.shutdown();
+	_graphicsCommandContext.shutdown();
+	_computeCommandContext.shutdown();
 	_descriptorHeapManager.shutdown();
 
 	_swapChain = nullptr;
@@ -669,11 +669,11 @@ void GraphicsCore::onDestroy() {
 }
 
 void GraphicsCore::createTextures(const VectorArray<String>& textureNames) {
-	_gpuResourceManager.createTextures(_device.Get(), _commandContext, textureNames);
+	_gpuResourceManager.createTextures(_device.Get(), _graphicsCommandContext, textureNames);
 }
 
 void GraphicsCore::createMeshSets(const VectorArray<String>& fileNames) {
-	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _commandContext, fileNames);
+	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _graphicsCommandContext, fileNames);
 }
 
 void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& settings) {
@@ -723,7 +723,7 @@ RefPtr<DebugGeometryRender> GraphicsCore::getDebugGeometryRender() {
 }
 
 void GraphicsCore::moveToNextFrame() {
-	RefPtr<CommandQueue> commandQueue = _commandContext.getCommandQueue();
+	RefPtr<CommandQueue> commandQueue = _graphicsCommandContext.getCommandQueue();
 	const UINT64 currentFenceValue = _frameResources[_frameIndex]._fenceValue;
 	commandQueue->waitForFence(currentFenceValue);
 

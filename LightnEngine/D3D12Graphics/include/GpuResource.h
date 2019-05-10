@@ -141,6 +141,12 @@ public:
 		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr)));
 		memcpy(mapPtr, initData.data(), bufferDesc.Width);
 	}
+
+	//GPUの仮想アドレスを取得
+	D3D12_GPU_VIRTUAL_ADDRESS getGpuVirtualAddress() const {
+		return _resource->GetGPUVirtualAddress();
+	}
+	
 };
 
 class Texture2D :public GpuResource {

@@ -286,7 +286,7 @@ public:
 class VertexShader :public Shader {
 public:
 	void create(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& layouts) {
-		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &shader, nullptr));
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "VSMain", "vs_5_1", 0, 0, &shader, nullptr));
 		inputLayouts = layouts;
 
 		shaderReflectionResult = getShaderReflection(getByteCode());
@@ -310,7 +310,7 @@ public:
 class PixelShader :public Shader {
 public:
 	void create(const String& fileName) {
-		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &shader, nullptr));
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "PSMain", "ps_5_1", 0, 0, &shader, nullptr));
 		shaderReflectionResult = getShaderReflection(getByteCode());
 	}
 
@@ -329,8 +329,8 @@ public:
 
 class ComputeShader :public Shader {
 public:
-	void create(const String& fileName) {
-		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &shader, nullptr));
+	void create(const String& fileName, UINT flags = 0) {
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "CSMain", "cs_5_1", flags, 0, &shader, nullptr));
 	}
 };
 
