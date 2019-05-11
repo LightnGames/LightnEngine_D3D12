@@ -41,6 +41,9 @@ public:
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 	RefPtr<DebugGeometryRender> getDebugGeometryRender();
 
+	void Barrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter);
+	void Reset(RefPtr<ID3D12GraphicsCommandList> commandList);
+
 public:
 	UINT _width;
 	UINT _height;

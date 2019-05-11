@@ -44,11 +44,12 @@ public:
 	void create(RefPtr<ID3D12Device> device);
 	void shutdown();
 
-	void createRenderTargetView(ID3D12Resource** textureBuffers, RefPtr<BufferView> dstView, uint32 viewCount);
-	void createConstantBufferView(ID3D12Resource** constantBuffers, RefPtr<BufferView> dstView, uint32 viewCount);
-	void createShaderResourceView(ID3D12Resource** shaderResources, RefPtr<BufferView> dstView, uint32 viewCount);
-	void createDepthStencilView(ID3D12Resource** depthStencils, RefPtr<BufferView> dstView, uint32 viewCount);
-	void createUnorederdAcsessView(ID3D12Resource** unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer);
+	void createRenderTargetView(RefAddressOf<ID3D12Resource> textureBuffers, RefPtr<BufferView> dstView, uint32 viewCount);
+	void createConstantBufferView(RefAddressOf<ID3D12Resource> constantBuffers, RefPtr<BufferView> dstView, uint32 viewCount);
+	void createShaderResourceView(RefAddressOf<ID3D12Resource> shaderResources, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_SRV& buffer);
+	void createTextureShaderResourceView(RefAddressOf<ID3D12Resource> textureResources, RefPtr<BufferView> dstView, uint32 viewCount);
+	void createDepthStencilView(RefAddressOf<ID3D12Resource> depthStencils, RefPtr<BufferView> dstView, uint32 viewCount);
+	void createUnorederdAcsessView(RefAddressOf<ID3D12Resource> unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer);
 
 	void discardRenderTargetView(const BufferView& bufferView);
 	void discardConstantBufferView(const BufferView& bufferView);

@@ -18,8 +18,17 @@ struct OutputInfo {
 struct IndirectCommand
 {
 	uint2 vbAddress;
-	uint sizeInBytes;
-	uint strideInBytes;
+	uint vbSizeInBytes;
+	uint vbStrideInBytes;
+
+	uint2 ibAddress;
+	uint ibSizeInBytes;
+	uint ibFormat;
+	
+	uint2 perInstanceVbAddress;
+	uint perInstanceSizeInBytes;
+	uint perInstanceStrideInBytes;
+	
 	uint4 drawArguments;
 	uint2 padding;
 };
@@ -28,31 +37,24 @@ StructuredBuffer<IndirectCommand> inputCommands            : register(t0);    //
 StructuredBuffer<OutputInfo> objectDatas[]            : register(t1);
 AppendStructuredBuffer<IndirectCommand> outputCommands    : register(u0);    // UAV: Processed indirect commands
 
-[numthreads(ThreadBlockSize, 1, 1)]
-void CSMain(uint3 groupId : SV_GroupThreadID, uint groupIndex : SV_GroupThreadID)
+[numthreads(1, 1, 1)]
+void CSMain(uint3 groupId : SV_GroupID)
 {	
-	// Each thread of the CS operates on one of the indirect commands.
-	uint index = (groupId.x * ThreadBlockSize) + groupIndex;
+	uint argumentIndex = groupId.x;
 	//uint totalLengthA = totalLength;
 	//totalLengthA = 1;
 	//index = 0;
 
-	if (index == 0) {
-		uint numStructs = objectDatas[0][3072].id;//AppendStructuredBufferのカウントに直接アクセス
+	uint numStructs = objectDatas[argumentIndex][3072].id;//AppendStructuredBufferのカウントに直接アクセス
 
-		//一つも描画されない場合は描画コマンド自体を追加しない
-		if (numStructs > 0) {
-			IndirectCommand command = (IndirectCommand)0;
-			command.vbAddress = inputCommands[index].vbAddress;
-			command.sizeInBytes = inputCommands[index].sizeInBytes;
-			command.strideInBytes = inputCommands[index].strideInBytes;
-			command.drawArguments.x = inputCommands[index].drawArguments.x;
-			command.drawArguments.y = numStructs;
-			command.drawArguments.z = 0;
-			command.drawArguments.w = 0;
-			command.padding = 0;
+	//一つも描画されない場合は描画コマンド自体を追加しない
+	if (numStructs > 0) {
+		IndirectCommand command = inputCommands[argumentIndex];
+		command.drawArguments.y = numStructs;
+		command.drawArguments.z = 0;
+		command.drawArguments.w = 0;
+		command.padding = 0;
 
-			outputCommands.Append(command);
-		}
+		outputCommands.Append(command);
 	}
 }

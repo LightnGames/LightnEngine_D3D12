@@ -96,7 +96,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			textures[i] = texturePtr->get();
 		}
 		//settings.vsTextures.size()
-		manager.createShaderResourceView(textures.data(), &material._srvVertex, static_cast<uint32>(settings.vsTextures.size()));
+		manager.createTextureShaderResourceView(textures.data(), &material._srvVertex, static_cast<uint32>(settings.vsTextures.size()));
 	}
 	//assert(vertexShader->shaderReflectionResult.srvRangeDescs.size()== settings.vsTextures.size() && "頂点シェーダー定義と指定したテクスチャ枚数が異なります！");
 
@@ -111,7 +111,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			textures[i] = texturePtr->get();
 		}
 
-		manager.createShaderResourceView(textures.data(), &material._srvPixel, static_cast<uint32>(settings.psTextures.size()));
+		manager.createTextureShaderResourceView(textures.data(), &material._srvPixel, static_cast<uint32>(settings.psTextures.size()));
 	}
 	//assert(pixelShader->shaderReflectionResult.srvRangeDescs.size() == settings.psTextures.size() && "ピクセルシェーダー定義と指定したテクスチャ枚数が異なります！");
 

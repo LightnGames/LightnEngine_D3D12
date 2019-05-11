@@ -94,7 +94,7 @@ void DescriptorHeapManager::create(RefPtr<ID3D12Device> device) {
 void DescriptorHeapManager::shutdown() {
 }
 
-void DescriptorHeapManager::createRenderTargetView(ID3D12Resource ** textureBuffers, RefPtr<BufferView> dstView, uint32 viewCount) {
+void DescriptorHeapManager::createRenderTargetView(RefAddressOf<ID3D12Resource> textureBuffers, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request RenderTarget View 0");
 	_rtvHeap.allocateBufferView(dstView, viewCount);
 
@@ -119,7 +119,7 @@ void DescriptorHeapManager::createRenderTargetView(ID3D12Resource ** textureBuff
 	device->Release();
 }
 
-void DescriptorHeapManager::createConstantBufferView(ID3D12Resource ** constantBuffers, RefPtr<BufferView> dstView, uint32 viewCount) {
+void DescriptorHeapManager::createConstantBufferView(RefAddressOf<ID3D12Resource> constantBuffers, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request ConstantBuffer View 0");
 	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
@@ -140,7 +140,7 @@ void DescriptorHeapManager::createConstantBufferView(ID3D12Resource ** constantB
 	device->Release();
 }
 
-void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderResources, RefPtr<BufferView> dstView, uint32 viewCount) {
+void DescriptorHeapManager::createShaderResourceView(RefAddressOf<ID3D12Resource> shaderResources, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_SRV& buffer){
 	assert(viewCount > 0 && "Request ShaderResource View 0");
 	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
@@ -148,9 +148,31 @@ void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderRes
 	shaderResources[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
 
 	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = dstView->cpuHandle;
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Buffer = buffer;
+
+	for (uint32 i = 0; i < viewCount; ++i) {
+		device->CreateShaderResourceView(shaderResources[i], &srvDesc, descriptorHandle);
+		descriptorHandle.ptr += _cbvSrvHeap.incrimentSize();
+	}
+
+	device->Release();
+}
+
+void DescriptorHeapManager::createTextureShaderResourceView(RefAddressOf<ID3D12Resource> textureResources, RefPtr<BufferView> dstView, uint32 viewCount) {
+	assert(viewCount > 0 && "Request Texture ShaderResource View 0");
+	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
+
+	ID3D12Device* device = nullptr;
+	textureResources[0]->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
+
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = dstView->cpuHandle;
 	for (uint32 i = 0; i < viewCount; ++i) {
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		auto desc = shaderResources[i]->GetDesc();
+		auto desc = textureResources[i]->GetDesc();
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = desc.Format;
 
@@ -164,14 +186,14 @@ void DescriptorHeapManager::createShaderResourceView(ID3D12Resource ** shaderRes
 			srvDesc.Texture2D.MipLevels = desc.MipLevels;
 		}
 
-		device->CreateShaderResourceView(shaderResources[i], &srvDesc, descriptorHandle);
+		device->CreateShaderResourceView(textureResources[i], &srvDesc, descriptorHandle);
 		descriptorHandle.ptr += _cbvSrvHeap.incrimentSize();
 	}
 
 	device->Release();
 }
 
-void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStencils, RefPtr<BufferView> dstView, uint32 viewCount) {
+void DescriptorHeapManager::createDepthStencilView(RefAddressOf<ID3D12Resource> depthStencils, RefPtr<BufferView> dstView, uint32 viewCount) {
 	assert(viewCount > 0 && "Request DepthStencil View 0");
 	_dsvHeap.allocateBufferView(dstView, viewCount);
 
@@ -194,7 +216,7 @@ void DescriptorHeapManager::createDepthStencilView(ID3D12Resource ** depthStenci
 	device->Release();
 }
 
-void DescriptorHeapManager::createUnorederdAcsessView(ID3D12Resource** unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer){
+void DescriptorHeapManager::createUnorederdAcsessView(RefAddressOf<ID3D12Resource> unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer){
 	assert(viewCount > 0 && "Request UnorederdAcsess View 0");
 	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
