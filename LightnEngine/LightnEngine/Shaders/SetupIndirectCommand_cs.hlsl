@@ -24,8 +24,8 @@ struct IndirectCommand
 	uint2 padding;
 };
 
-StructuredBuffer<OutputInfo> objectDatas            : register(t0);
-StructuredBuffer<IndirectCommand> inputCommands            : register(t1);    // SRV: Indirect commands
+StructuredBuffer<IndirectCommand> inputCommands            : register(t0);    // SRV: Indirect commands
+StructuredBuffer<OutputInfo> objectDatas[]            : register(t1);
 AppendStructuredBuffer<IndirectCommand> outputCommands    : register(u0);    // UAV: Processed indirect commands
 
 [numthreads(ThreadBlockSize, 1, 1)]
@@ -38,9 +38,7 @@ void CSMain(uint3 groupId : SV_GroupThreadID, uint groupIndex : SV_GroupThreadID
 	//index = 0;
 
 	if (index == 0) {
-		uint numStructs = objectDatas[3072].id;
-		//uint stride;
-		//objectDatas.GetDimensions(numStructs, stride);
+		uint numStructs = objectDatas[0][3072].id;//AppendStructuredBufferのカウントに直接アクセス
 
 		//一つも描画されない場合は描画コマンド自体を追加しない
 		if (numStructs > 0) {
