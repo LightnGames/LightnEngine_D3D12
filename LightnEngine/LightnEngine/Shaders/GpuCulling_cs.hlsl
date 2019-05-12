@@ -30,6 +30,14 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadGroupId : SV_GroupThreadID)
 	uint meshIndex = groupId.x;
 	uint index = threadGroupId.x;
 
+	uint numStructure;
+	uint stride;
+	inputCommands[meshIndex].GetDimensions(numStructure, stride);
+
+	if (index >= numStructure) {
+		return;
+	}
+
 	ObjectInfo objectInfo = inputCommands[meshIndex][index];
 	float3 viewPosition = objectInfo.startPosAABB - cameraPosition.xyz;
 	uint inCount = 0;

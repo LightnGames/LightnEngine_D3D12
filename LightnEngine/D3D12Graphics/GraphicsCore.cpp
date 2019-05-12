@@ -197,7 +197,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	indirectMeshes[1].vertexBufferView = viBuffer2->vertexBuffer._vertexBufferView;
 	indirectMeshes[1].indexBufferView = viBuffer2->indexBuffer._indexBufferView;
 	indirectMeshes[1].indexCount = viBuffer2->indexBuffer._indexCount;
-	indirectMeshes[1].instanceCount = 128;
+	indirectMeshes[1].instanceCount = 12;
 	indirectMeshes[1].counterOffset = AlignForUavCounter(indirectMeshes[1].instanceCount * sizeof(PerInstanceVertex));
 
 	VectorArray<VectorArray<ObjectInfo>> objectInfos(IndirectArgumentCount);
@@ -453,11 +453,13 @@ void GraphicsCore::onInit(HWND hwnd) {
 		_descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer[i].getAdressOf(), &setupCommandUavView[i], 1, { bufferUav });
 	}
 
+	//CulledBufferのカウンタまでのバイトオフセットを格納するバッファ
 	ComPtr<ID3D12Resource> offsetsUpload;
 	VectorArray<uint32> counterOffsets(IndirectArgumentCount);
 	for (size_t i = 0; i < counterOffsets.size(); ++i) {
 		counterOffsets[i] = indirectMeshes[i].counterOffset;
 	}
+
 	_indirectArgumentOffsetsBuffer.createDeferredGpuOnly<uint32>(_device.Get(), commandList, &offsetsUpload, counterOffsets);
 
 	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
@@ -587,10 +589,17 @@ void GraphicsCore::onUpdate() {
 }
 
 void GraphicsCore::Barrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter){
+	VectorArray<D3D12_RESOURCE_BARRIER> barriers(IndirectArgumentCount);
 	for (uint32 i = 0; i < IndirectArgumentCount; ++i) {
 		uint32 index = _frameIndex * IndirectArgumentCount + i;
-		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceCulledBuffer[index].get(), StateBefore, StateAfter));
+		barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		barriers[i].Transition.StateBefore = StateBefore;
+		barriers[i].Transition.StateAfter = StateAfter;
+		barriers[i].Transition.pResource = _gpuDrivenInstanceCulledBuffer[index].get();
 	}
+
+	commandList->ResourceBarrier(IndirectArgumentCount, barriers.data());
 }
 
 void GraphicsCore::Reset(RefPtr<ID3D12GraphicsCommandList> commandList){
