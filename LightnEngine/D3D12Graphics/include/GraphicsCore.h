@@ -18,11 +18,6 @@
 
 using namespace Microsoft::WRL;
 
-struct SceneConstant {
-	Vector4 cameraPosition;
-	Vector4 frustumPlanes[4];
-};
-
 class GraphicsCore :private NonCopyable {
 public:
 	GraphicsCore();
@@ -40,9 +35,6 @@ public:
 	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 	RefPtr<DebugGeometryRender> getDebugGeometryRender();
-
-	void Barrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter);
-	void Reset(RefPtr<ID3D12GraphicsCommandList> commandList);
 
 public:
 	UINT _width;
@@ -76,7 +68,5 @@ private:
 
 	uint32 _gpuCommandCount;
 	LinerAllocator _gpuCommandArray;
-
-	SceneConstant gpuCullingConstant;
 };
 

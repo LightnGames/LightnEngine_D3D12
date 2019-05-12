@@ -8,7 +8,7 @@
 
 //マテリアルの描画範囲定義
 struct MaterialDrawRange {
-	MaterialDrawRange() {}
+	MaterialDrawRange() :indexCount(0), indexOffset(0) {}
 	MaterialDrawRange(uint32 indexCount, uint32 indexOffset) :indexCount(indexCount), indexOffset(indexOffset) {}
 
 	uint32 indexCount;
@@ -72,4 +72,81 @@ struct VertexAndIndexBuffer {
 	VertexBuffer vertexBuffer;
 	IndexBuffer indexBuffer;
 	VectorArray<MaterialDrawRange> materialDrawRanges;
+};
+
+struct IndirectCommand
+{
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
+	D3D12_INDEX_BUFFER_VIEW indexBufferView;
+	D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView;
+	D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
+};
+
+struct ObjectInfo {
+	Matrix4 mtxWorld;
+	Vector3 startPosAABB;
+	Vector3 endposAABB;
+	Color color;
+};
+
+struct PerInstanceVertex {
+	Matrix4 mtxWorld;
+	Color color;
+};
+
+struct PerInstanceIndirectArgument {
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
+	D3D12_INDEX_BUFFER_VIEW indexBufferView;
+	uint32 indexCount;
+	uint32 counterOffset;
+	uint32 instanceCount;
+};
+
+struct SceneConstant {
+	Vector4 cameraPosition;
+	Vector4 frustumPlanes[4];
+};
+
+struct IndirectMeshInfo {
+	uint32 maxInstanceCount;
+	RefPtr<VertexAndIndexBuffer> vertexAndIndexBuffer;
+	VectorArray<ObjectInfo> matrices;
+};
+
+class StaticMultiMeshRCG {
+public:
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo>& meshes);
+	void onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex);
+	void setupRenderCommand(RenderSettings& settings);
+	void updateCullingCameraInfo(const SceneConstant& constant, uint32 frameIndex);
+	void destroy();
+
+private:
+	void culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex);
+
+private:
+
+	UINT _indirectArgumentCount;
+	UINT _indirectArgumentDstCounterOffset;
+
+	ConstantBufferMaterial gpuCullingCameraInfo;
+	VectorArray<PerInstanceIndirectArgument> _indirectMeshes;
+
+	CommandSignature _commandSignature;
+	RootSignature _cullingComputeRootSignature;
+	PipelineState _cullingComputeState;
+	RootSignature _setupCommandComputeRootSignature;
+	PipelineState _setupCommandComputeState;
+
+	GpuBuffer* _gpuDrivenInstanceMatrixBuffer;//カリング前のシーンに配置されているインスタンスのワールド行列
+	GpuBuffer* _gpuDrivenInstanceCulledBuffer;//GPUカリング後の描画対象のインスタンスのワールド行列
+	GpuBuffer _indirectArgumentDstBuffer[FrameCount];//GPUカリング後のExecuteIndirectに渡される描画引数
+	GpuBuffer _indirectArgumentSourceBuffer[FrameCount];//カリング前のシーンに配置されているインスタンスの描画引数
+	GpuBuffer _indirectArgumentOffsetsBuffer;
+	GpuBuffer _uavCounterReset;//UAVのAppendStructuredBufferのカウント引数を０に戻すためのUINT１つのバッファ
+
+	BufferView _setupCommandUavView[FrameCount];
+	BufferView _gpuDriventInstanceCulledSRV[FrameCount];//GPUカリング後の情報を読み込むバッファのSRV
+	BufferView _gpuDriventInstanceCulledUAV[FrameCount];//GPUカリング後の情報を書き込むバッファのUAV
+	BufferView _gpuDrivenInstanceMatrixView;
 };
