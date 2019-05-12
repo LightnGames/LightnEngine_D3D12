@@ -140,7 +140,7 @@ void DescriptorHeapManager::createConstantBufferView(RefAddressOf<ID3D12Resource
 	device->Release();
 }
 
-void DescriptorHeapManager::createShaderResourceView(RefAddressOf<ID3D12Resource> shaderResources, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_SRV& buffer){
+void DescriptorHeapManager::createShaderResourceView(RefAddressOf<ID3D12Resource> shaderResources, RefPtr<BufferView> dstView, uint32 viewCount, const VectorArray<D3D12_BUFFER_SRV>& buffers) {
 	assert(viewCount > 0 && "Request ShaderResource View 0");
 	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
@@ -149,12 +149,13 @@ void DescriptorHeapManager::createShaderResourceView(RefAddressOf<ID3D12Resource
 
 	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = dstView->cpuHandle;
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Buffer = buffer;
 
 	for (uint32 i = 0; i < viewCount; ++i) {
+		srvDesc.Format = buffers[i].Flags == D3D12_BUFFER_SRV_FLAG_RAW ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
+		srvDesc.Buffer = buffers[i];
+
 		device->CreateShaderResourceView(shaderResources[i], &srvDesc, descriptorHandle);
 		descriptorHandle.ptr += _cbvSrvHeap.incrimentSize();
 	}
@@ -216,7 +217,7 @@ void DescriptorHeapManager::createDepthStencilView(RefAddressOf<ID3D12Resource> 
 	device->Release();
 }
 
-void DescriptorHeapManager::createUnorederdAcsessView(RefAddressOf<ID3D12Resource> unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const D3D12_BUFFER_UAV& buffer){
+void DescriptorHeapManager::createUnorederdAcsessView(RefAddressOf<ID3D12Resource> unorederdAcsess, RefPtr<BufferView> dstView, uint32 viewCount, const VectorArray<D3D12_BUFFER_UAV>& buffers){
 	assert(viewCount > 0 && "Request UnorederdAcsess View 0");
 	_cbvSrvHeap.allocateBufferView(dstView, viewCount);
 
@@ -229,7 +230,7 @@ void DescriptorHeapManager::createUnorederdAcsessView(RefAddressOf<ID3D12Resourc
 	for (uint32 i = 0; i < viewCount; ++i) {
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-		uavDesc.Buffer = buffer;
+		uavDesc.Buffer = buffers[i];
 		uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 		device->CreateUnorderedAccessView(unorederdAcsess[i], unorederdAcsess[i], &uavDesc, uavHandle);

@@ -356,7 +356,7 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 			std::make_tuple(fileName),
 			std::make_tuple(materialRanges));
 
-		VertexAndIndexBuffer & buffers = (*itr.first).second;
+		VertexAndIndexBuffer& buffers = (*itr.first).second;
 
 		//頂点バッファ生成
 		buffers.vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);

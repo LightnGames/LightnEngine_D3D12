@@ -52,6 +52,7 @@ struct Vertex {
 
 class GpuBuffer :public GpuResource {
 public:
+
 	//GPUオンリーバッファを生成して、コマンドリストに引数配列データの初期化コマンドを記録
 	template<class T>
 	void createDeferredGpuOnly(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, RefAddressOf<ID3D12Resource> uploadHeap, const VectorArray<T>& initData) {
@@ -146,7 +147,6 @@ public:
 	D3D12_GPU_VIRTUAL_ADDRESS getGpuVirtualAddress() const {
 		return _resource->GetGPUVirtualAddress();
 	}
-	
 };
 
 class Texture2D :public GpuResource {

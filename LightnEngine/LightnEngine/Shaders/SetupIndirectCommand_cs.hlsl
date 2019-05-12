@@ -1,20 +1,3 @@
-
-#define ThreadBlockSize 128
-#define FrustumPlaneCount 4
-
-struct OutputInfo {
-	uint id;
-	//float4x4 mtxWorld;
-	//float4 color;
-};
-
-//cbuffer RootConstants : register(b0)
-//{
-//	//uint totalLength;
-//	float4 cameraPosition;
-//	float4 frustumPlanes[FrustumPlaneCount];//Right Left Top Bottom Near Far[-Near]
-//};
-
 struct IndirectCommand
 {
 	uint2 vbAddress;
@@ -33,19 +16,17 @@ struct IndirectCommand
 	uint2 padding;
 };
 
-StructuredBuffer<IndirectCommand> inputCommands            : register(t0);    // SRV: Indirect commands
-StructuredBuffer<OutputInfo> objectDatas[]            : register(t1);
-AppendStructuredBuffer<IndirectCommand> outputCommands    : register(u0);    // UAV: Processed indirect commands
+StructuredBuffer<IndirectCommand> inputCommands : register(t0);    // SRV: Indirect commands
+StructuredBuffer<uint> countBufferOffsets : register(t1);
+ByteAddressBuffer objectDatas[] : register(t2);
+AppendStructuredBuffer<IndirectCommand> outputCommands : register(u0);    // UAV: Processed indirect commands
 
 [numthreads(1, 1, 1)]
 void CSMain(uint3 groupId : SV_GroupID)
 {	
 	uint argumentIndex = groupId.x;
-	//uint totalLengthA = totalLength;
-	//totalLengthA = 1;
-	//index = 0;
-
-	uint numStructs = objectDatas[argumentIndex][3072].id;//AppendStructuredBufferのカウントに直接アクセス
+	uint offsetCounterNum = countBufferOffsets[argumentIndex];
+	uint numStructs = objectDatas[argumentIndex].Load(offsetCounterNum);//AppendStructuredBufferのカウントに直接アクセス
 
 	//一つも描画されない場合は描画コマンド自体を追加しない
 	if (numStructs > 0) {
