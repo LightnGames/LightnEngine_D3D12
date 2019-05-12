@@ -83,6 +83,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	DescriptorHeapManager& _descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& _gpuResourceManager = GpuResourceManager::instance();
 
+	//描画元情報からGPUカリングとIndirect描画に必要な情報をまとめる
 	_indirectArgumentCount = static_cast<uint32>(meshes.size());
 	_indirectMeshes.resize(_indirectArgumentCount);
 	for (size_t i = 0; i < _indirectMeshes.size(); ++i) {
@@ -152,9 +153,8 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		_cullingComputeRootSignature.create(device, parameterDesc);
 
 		ComputeShader computeShader;
-		computeShader.create("Shaders/GpuCulling_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);
+		computeShader.create("Shaders/GpuCulling_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);//DynamicIndexingを使用
 
-		// Describe and create the compute pipeline state object (PSO).
 		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
 		computePsoDesc.pRootSignature = _cullingComputeRootSignature._rootSignature.Get();
 		computePsoDesc.CS = computeShader.getByteCode();
@@ -203,9 +203,8 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		_setupCommandComputeRootSignature.create(device, parameterDesc);
 
 		ComputeShader computeShader;
-		computeShader.create("Shaders/SetupIndirectCommand_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);
+		computeShader.create("Shaders/SetupIndirectCommand_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);//DynamicIndexingを使用
 
-		// Describe and create the compute pipeline state object (PSO).
 		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
 		computePsoDesc.pRootSignature = _setupCommandComputeRootSignature._rootSignature.Get();
 		computePsoDesc.CS = computeShader.getByteCode();

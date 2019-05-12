@@ -12,8 +12,7 @@ struct IndirectCommand
 	uint perInstanceSizeInBytes;
 	uint perInstanceStrideInBytes;
 	
-	uint4 drawArguments;
-	uint2 padding;
+	uint drawArguments[6];
 };
 
 StructuredBuffer<IndirectCommand> inputCommands : register(t0);    // SRV: Indirect commands
@@ -31,10 +30,11 @@ void CSMain(uint3 groupId : SV_GroupID)
 	//ˆê‚Â‚à•`‰æ‚³‚ê‚È‚¢ê‡‚Í•`‰æƒRƒ}ƒ“ƒhŽ©‘Ì‚ð’Ç‰Á‚µ‚È‚¢
 	if (numStructs > 0) {
 		IndirectCommand command = inputCommands[argumentIndex];
-		command.drawArguments.y = numStructs;
-		command.drawArguments.z = 0;
-		command.drawArguments.w = 0;
-		command.padding = 0;
+		command.drawArguments[1] = numStructs;
+		command.drawArguments[2] = 0;
+		command.drawArguments[3] = 0;
+		command.drawArguments[4] = 0;
+		command.drawArguments[5] = 0;
 
 		outputCommands.Append(command);
 	}

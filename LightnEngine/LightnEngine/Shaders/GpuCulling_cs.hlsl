@@ -17,7 +17,7 @@ struct OutputInfo {
 cbuffer RootConstants : register(b0)
 {
 	float4 cameraPosition;
-	float4 frustumPlanes[FrustumPlaneCount];//Right Left Top Bottom Near Far[-Near]
+	float4 frustumPlanes[FrustumPlaneCount];//Right Left Top Bottom
 };
 
 StructuredBuffer<ObjectInfo> inputCommands            : register(t0);    // SRV: Indirect commands
