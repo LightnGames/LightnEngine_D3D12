@@ -14,7 +14,9 @@
 
 #include <LinerAllocator.h>
 
+#ifdef _DEBUG
 #define DEBUG
+#endif
 
 using namespace Microsoft::WRL;
 

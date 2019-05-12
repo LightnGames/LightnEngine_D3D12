@@ -1,5 +1,4 @@
-
-#define ThreadBlockSize 128
+#define ThreadBlockSize 256
 #define FrustumPlaneCount 4
 
 struct ObjectInfo {
@@ -7,6 +6,7 @@ struct ObjectInfo {
 	float3 startPosAABB;
 	float3 endposAABB;
 	float4 color;
+	uint indirectArgumentIndex;
 };
 
 struct OutputInfo {
@@ -20,25 +20,23 @@ cbuffer RootConstants : register(b0)
 	float4 frustumPlanes[FrustumPlaneCount];//Right Left Top Bottom Near Far[-Near]
 };
 
-StructuredBuffer<ObjectInfo> inputCommands[]            : register(t0);    // SRV: Indirect commands
+StructuredBuffer<ObjectInfo> inputCommands            : register(t0);    // SRV: Indirect commands
 AppendStructuredBuffer<OutputInfo> outputCommands[]    : register(u0);    // UAV: Processed indirect commands
 
 [numthreads(ThreadBlockSize, 1, 1)]
 void CSMain(uint3 groupId : SV_GroupID, uint3 threadGroupId : SV_GroupThreadID)
 {
-	// Each thread of the CS operates on one of the indirect commands.
-	uint meshIndex = groupId.x;
-	uint index = threadGroupId.x;
+	uint index = groupId.x * ThreadBlockSize + threadGroupId.x;
 
 	uint numStructure;
 	uint stride;
-	inputCommands[meshIndex].GetDimensions(numStructure, stride);
+	inputCommands.GetDimensions(numStructure, stride);
 
 	if (index >= numStructure) {
 		return;
 	}
 
-	ObjectInfo objectInfo = inputCommands[meshIndex][index];
+	ObjectInfo objectInfo = inputCommands[index];
 	float3 viewPosition = objectInfo.startPosAABB - cameraPosition.xyz;
 	uint inCount = 0;
 
@@ -55,6 +53,6 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadGroupId : SV_GroupThreadID)
 		info.mtxWorld = objectInfo.mtxWorld;
 		info.color = objectInfo.color;
 
-		outputCommands[meshIndex].Append(info);
+		outputCommands[objectInfo.indirectArgumentIndex].Append(info);
 	}
 }

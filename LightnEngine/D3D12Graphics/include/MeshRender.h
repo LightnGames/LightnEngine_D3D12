@@ -87,6 +87,7 @@ struct ObjectInfo {
 	Vector3 startPosAABB;
 	Vector3 endposAABB;
 	Color color;
+	uint32 indirectArgumentIndex;
 };
 
 struct PerInstanceVertex {
@@ -128,6 +129,7 @@ private:
 
 	UINT _indirectArgumentCount;
 	UINT _indirectArgumentDstCounterOffset;
+	UINT _gpuCullingDispatchCount;
 
 	ConstantBufferMaterial gpuCullingCameraInfo;
 	VectorArray<PerInstanceIndirectArgument> _indirectMeshes;
@@ -138,8 +140,8 @@ private:
 	RootSignature _setupCommandComputeRootSignature;
 	PipelineState _setupCommandComputeState;
 
-	GpuBuffer* _gpuDrivenInstanceMatrixBuffer;//カリング前のシーンに配置されているインスタンスのワールド行列
 	GpuBuffer* _gpuDrivenInstanceCulledBuffer;//GPUカリング後の描画対象のインスタンスのワールド行列
+	GpuBuffer _gpuDrivenInstanceMatrixBuffer;//カリング前のシーンに配置されているインスタンスのワールド行列
 	GpuBuffer _indirectArgumentDstBuffer[FrameCount];//GPUカリング後のExecuteIndirectに渡される描画引数
 	GpuBuffer _indirectArgumentSourceBuffer[FrameCount];//カリング前のシーンに配置されているインスタンスの描画引数
 	GpuBuffer _indirectArgumentOffsetsBuffer;

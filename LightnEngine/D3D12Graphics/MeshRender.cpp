@@ -96,8 +96,6 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	//コマンドシグネチャ生成
 	{
 		_gpuDrivenInstanceCulledBuffer = new GpuBuffer[_indirectArgumentCount * FrameCount];
-		_gpuDrivenInstanceMatrixBuffer = new GpuBuffer[_indirectArgumentCount];
-
 		_indirectArgumentDstCounterOffset = AlignForUavCounter(_indirectArgumentCount * sizeof(IndirectCommand));
 
 		// Each command consists of a CBV update and a DrawInstanced call.
@@ -121,7 +119,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 		D3D12_DESCRIPTOR_RANGE1 srvRange = {};
 		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRange.NumDescriptors = _indirectArgumentCount;
+		srvRange.NumDescriptors = 1;
 		srvRange.BaseShaderRegister = 0;
 		srvRange.RegisterSpace = 0;
 		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -214,31 +212,39 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		_setupCommandComputeState.createCompute(device, computePsoDesc);
 	}
 
-	VectorArray<ComPtr<ID3D12Resource>> inCommandUploadBuffers(_indirectArgumentCount);
+	ComPtr<ID3D12Resource> inCommandUploadBuffers;
 	ComPtr<ID3D12Resource> indirectCommandUploadBuffers[FrameCount];
 
 	auto commandListSet = commandContext->requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 	//カリング前のシーンに配置されているオブジェクトの行列バッファ
-	VectorArray<RefPtr<ID3D12Resource>> ppMatrixBuffers(_indirectArgumentCount);
+	uint32 totalMaxInstanceCount = 0;
+	for (const auto& indirectMesh : meshes) {
+		totalMaxInstanceCount += indirectMesh.maxInstanceCount;
+	}
+
+	size_t mergedMatricsOffset = 0;
+	VectorArray<ObjectInfo> mergedMatrices(totalMaxInstanceCount);
 	for (uint32 i = 0; i < _indirectArgumentCount; ++i) {
-		_gpuDrivenInstanceMatrixBuffer[i].createDeferredGpuOnly<ObjectInfo>(device, commandList, &inCommandUploadBuffers[i], meshes[i].matrices);
-		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceMatrixBuffer[i].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-
-		ppMatrixBuffers[i] = _gpuDrivenInstanceMatrixBuffer[i].get();
+		memcpy(mergedMatrices.data() + mergedMatricsOffset, meshes[i].matrices.data(), meshes[i].matrices.size() * sizeof(ObjectInfo));
+		mergedMatricsOffset += meshes[i].matrices.size();
 	}
 
-	VectorArray<D3D12_BUFFER_SRV> matrixSrvDesc(_indirectArgumentCount);
-	for (size_t i = 0; i < matrixSrvDesc.size(); ++i) {
-		D3D12_BUFFER_SRV& srvDesc = matrixSrvDesc[i];
-		srvDesc.FirstElement = 0;
-		srvDesc.NumElements = _indirectMeshes[i].instanceCount;
-		srvDesc.StructureByteStride = sizeof(ObjectInfo);
-		srvDesc.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	}
+	//トータルのインスタンス数を256の数(Thread X Num)でアラインして何回Dispatchするか決める
+	constexpr uint32 THREAD_BLOCK_SIZE = 256;
+	_gpuCullingDispatchCount = ((mergedMatrices.size() + (THREAD_BLOCK_SIZE - 1)) & ~(THREAD_BLOCK_SIZE - 1)) / THREAD_BLOCK_SIZE;
 
-	_descriptorHeapManager.createShaderResourceView(ppMatrixBuffers.data(), &_gpuDrivenInstanceMatrixView, _indirectArgumentCount, matrixSrvDesc);
+	_gpuDrivenInstanceMatrixBuffer.createDeferredGpuOnly<ObjectInfo>(device, commandList, &inCommandUploadBuffers, mergedMatrices);
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceMatrixBuffer.get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+
+	D3D12_BUFFER_SRV matrixSrvDesc = {};
+	matrixSrvDesc.FirstElement = 0;
+	matrixSrvDesc.NumElements = static_cast<UINT>(mergedMatrices.size());
+	matrixSrvDesc.StructureByteStride = sizeof(ObjectInfo);
+	matrixSrvDesc.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+	_descriptorHeapManager.createShaderResourceView(_gpuDrivenInstanceMatrixBuffer.getAdressOf(), &_gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
 
 	//インスタンス用行列頂点バッファとそのUAVを生成
 	VectorArray<D3D12_BUFFER_UAV> gpuDrivenInstanceCulledBufferUavs(_indirectArgumentCount);
@@ -252,9 +258,10 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		bufferUav.CounterOffsetInBytes = _indirectMeshes[i].counterOffset;
 
 		//ByteAddressBufferとして読み込んでAppendStructuredBufferのカウンタの値を読み取る
+		constexpr UINT CountLength = 1;
 		D3D12_BUFFER_SRV& bufferSrv = gpuDrivenInstanceCulledBufferSrvs[i];
 		bufferSrv.FirstElement = 0;
-		bufferSrv.NumElements = bufferUav.CounterOffsetInBytes / sizeof(UINT) + 1;//4byteオフセットの数で指定する
+		bufferSrv.NumElements =static_cast<UINT>(bufferUav.CounterOffsetInBytes / sizeof(UINT) + CountLength);//4byteオフセットの数で指定する
 		bufferSrv.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 	}
 
@@ -276,7 +283,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		VectorArray<IndirectCommand> commands(_indirectArgumentCount);
 
 		for (size_t j = 0; j < _indirectMeshes.size(); ++j) {
-			const uint32 culledBufferIndex = i * _indirectArgumentCount + j;
+			const uint32 culledBufferIndex = i * _indirectArgumentCount + static_cast<uint32>(j);
 			PerInstanceIndirectArgument& mesh = _indirectMeshes[j];
 
 			D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
@@ -354,10 +361,10 @@ void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32
 			uint32 index = frameIndex * _indirectArgumentCount + i;
 			computeCommandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffer[index].get(), _indirectMeshes[i].counterOffset, _uavCounterReset.get(), 0, sizeof(UINT));
 		}
-		
+
 		culledBufferBarrier(computeCommandList, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, frameIndex);
-		
-		computeCommandList->Dispatch(_indirectArgumentCount, 1, 1);
+
+		computeCommandList->Dispatch(_gpuCullingDispatchCount, 1, 1);
 	}
 
 	//ExecuteIndirectコマンド構築
@@ -366,12 +373,12 @@ void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32
 		computeCommandList->SetComputeRootSignature(_setupCommandComputeRootSignature._rootSignature.Get());
 
 		culledBufferBarrier(computeCommandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, frameIndex);
-		
+
 		computeCommandList->SetComputeRootShaderResourceView(0, _indirectArgumentSourceBuffer[frameIndex].getGpuVirtualAddress());
 		computeCommandList->SetComputeRootShaderResourceView(1, _indirectArgumentOffsetsBuffer.getGpuVirtualAddress());
 		computeCommandList->SetComputeRootDescriptorTable(2, _gpuDriventInstanceCulledSRV[frameIndex].gpuHandle);
 		computeCommandList->SetComputeRootDescriptorTable(3, _setupCommandUavView[frameIndex].gpuHandle);
-		
+
 		//AppendStructuredBufferのカウンタを0にリセットする
 		computeCommandList->CopyBufferRegion(_indirectArgumentDstBuffer[frameIndex].get(), _indirectArgumentDstCounterOffset, _uavCounterReset.get(), 0, sizeof(UINT));
 
@@ -414,17 +421,16 @@ void StaticMultiMeshRCG::destroy() {
 	}
 
 	delete[] _gpuDrivenInstanceCulledBuffer;
-	delete[] _gpuDrivenInstanceMatrixBuffer;
 	_uavCounterReset._resource = nullptr;
-
 
 	_cullingComputeRootSignature._rootSignature = nullptr;
 	_cullingComputeState._pipelineState = nullptr;
 	_setupCommandComputeRootSignature._rootSignature = nullptr;
 	_setupCommandComputeState._pipelineState = nullptr;
 	_commandSignature._commandSignature = nullptr;
-	_indirectArgumentOffsetsBuffer.destroy();
 
+	_indirectArgumentOffsetsBuffer.destroy();
+	_gpuDrivenInstanceMatrixBuffer.destroy();
 	gpuCullingCameraInfo.shutdown();
 }
 

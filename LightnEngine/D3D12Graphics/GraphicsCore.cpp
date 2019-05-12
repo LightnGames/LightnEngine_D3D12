@@ -164,7 +164,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	indirectMeshes[1].maxInstanceCount = 12;
 
 	indirectMeshes[2].vertexAndIndexBuffer = viBuffer;
-	indirectMeshes[2].maxInstanceCount = 48;
+	indirectMeshes[2].maxInstanceCount = 35;
 
 	for (size_t i = 0; i < indirectMeshes.size(); ++i) {
 		const uint32 instanceCount = indirectMeshes[i].maxInstanceCount;
@@ -172,10 +172,11 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 		//シーンに配置されているオブジェクトのワールド行列をマップ
 		for (size_t j = 0; j < objectArray.size(); ++j) {
-			Vector3 position(j * 1.2f - instanceCount / 2, (float)i, 2);
+			Vector3 position(j * 1.2f, (float)i, 2);
 			objectArray[j].mtxWorld = Matrix4::translateXYZ(position).transpose();
 			objectArray[j].startPosAABB = position;
-			objectArray[j].color = Color(j * 0.01f, 0, 0, 1);
+			objectArray[j].color = Color(j * 0.02f, 0, 0, 1);
+			objectArray[j].indirectArgumentIndex = static_cast<uint32>(i);
 		}
 
 		indirectMeshes[i].matrices = objectArray;
