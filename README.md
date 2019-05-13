@@ -8,10 +8,10 @@ Frostbyte3.0 DisnyDiffuse改良版 https://seblagarde.files.wordpress.com/2015/0
 Real Shading in Unreal Engine4  https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
 
 ## Rendering Pipeline
-Depth Pre Pass
-Clusterd Forward
-Draw Mesh(GPU Driven Rendering)
-Post Effect
+Depth Pre Pass  
+Clusterd Forward  
+Draw Mesh(GPU Driven Rendering)  
+Post Effect  
 
 ## Editor
 Visual Studio 2019 https://visualstudio.microsoft.com/ja/free-developer-offers/
