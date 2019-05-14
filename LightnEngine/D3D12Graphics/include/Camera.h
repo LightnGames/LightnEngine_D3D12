@@ -1,7 +1,12 @@
 #pragma once
 
+#include <Utility.h>
 #include <LMath.h>
 #include <Type.h>
+
+struct FrustumPlanes {
+	Vector3 normals[4];
+};
 
 class Camera {
 public:
@@ -16,112 +21,57 @@ public:
 		_farZ(0) {
 	}
 
-	void setFieldOfView(float fieldOfViewDegree) {
-		_fieldOfView = radianFromDegree(fieldOfViewDegree);
-	}
-
-	void setAspectRate(float aspectRate) {
-		_aspectRate = aspectRate;
-	}
+	//視野角を設定(デグリー)
+	void setFieldOfView(float fieldOfViewDegree);
 
 	//横幅と縦の解像度からアスペクト比を計算
-	void setAspectRate(uint32 width, uint32 height) {
-		_aspectRate = width / static_cast<float>(height);
-	}
+	void setAspectRate(uint32 width, uint32 height);
+	void setAspectRate(float aspectRate);
 
-	void setNearZ(float nearZ) {
-		_nearZ = nearZ;
-	}
+	void setNearZ(float nearZ);
+	void setFarZ(float farZ);
 
-	void setFarZ(float farZ) {
-		_farZ = farZ;
-	}
+	void setPosition(const Vector3& position);
+	void setPosition(float x, float y, float z);
 
-	void setPosition(const Vector3& position) {
-		_position = position;
-	}
-
-	void setPosition(float x, float y, float z) {
-		_position = Vector3(x, y, z);
-	}
-
-	void setRotation(const Quaternion& rotation) {
-		_rotation = rotation;
-	}
+	void setRotation(const Quaternion& rotation);
 
 	//オイラー角度から回転を設定
-	void setRotationEuler(float x, float y, float z, float isRadian = false) {
-		_rotation = Quaternion::euler(Vector3(x, y, z), isRadian);
-	}
+	void setRotationEuler(float x, float y, float z, float isRadian = false);
 
 	//射影変換行列を生成
-	void computeProjectionMatrix() {
-		_mtxProj = Matrix4::perspectiveFovLH(_fieldOfView, _aspectRate, _nearZ, _farZ);
-		_mtxProjTransposed = _mtxProj.transpose();
-	}
+	void computeProjectionMatrix();
 
 	//ビュー行列を計算
-	void computeViewMatrix() {
-		_mtxView = Matrix4::createWorldMatrix(_position, _rotation, Vector3::one).inverse();
-		_mtxViewTransposed = _mtxView.transpose();
-	}
+	void computeViewMatrix();
 
-	void computeFlustomNormals() {
-		Matrix4 virtualProj = getProjectionMatrix();
-		float x = 1 / virtualProj[0][0];
-		float y = 1 / virtualProj[1][1];
+	//視錐台平面の法線ベクトルを現在のビュー行列から計算する
+	void computeFlustomNormals();
 
-		Vector3 leftNormal = Vector3::cross(Vector3(-x, 0, 1), -Vector3::up).normalize();
-		Vector3 rightNormal = Vector3::cross(Vector3(x, 0, 1), Vector3::up).normalize();
-		Vector3 bottomNormal = Vector3::cross(Vector3(0, y, 1), -Vector3::right).normalize();
-		Vector3 topNormal = Vector3::cross(Vector3(0, -y, 1), Vector3::right).normalize();
-		leftNormal = Quaternion::rotVector(_rotation, leftNormal);
-		rightNormal = Quaternion::rotVector(_rotation, rightNormal);
-		bottomNormal = Quaternion::rotVector(_rotation, bottomNormal);
-		topNormal = Quaternion::rotVector(_rotation, topNormal);
-
-
-		_frustumPlanes[0] = leftNormal;
-		_frustumPlanes[1] = rightNormal;
-		_frustumPlanes[2] = bottomNormal;
-		_frustumPlanes[3] = topNormal;
-	}
+	void debugDrawFlustom();
 
 	//転置済みビュー行列を取得
-	Matrix4 getViewMatrixTransposed() const {
-		return _mtxViewTransposed;
-	}
+	Matrix4 getViewMatrixTransposed() const;
 
 	//転置済みプロジェクション行列を取得
-	Matrix4 getProjectionMatrixTransposed() const {
-		return _mtxProjTransposed;
-	}
+	Matrix4 getProjectionMatrixTransposed() const;
 
-	Matrix4 getViewMatrix() const {
-		return _mtxView;
-	}
+	//カメラ情報を取得
+	Matrix4 getViewMatrix() const;
+	Matrix4 getProjectionMatrix() const;
+	Vector3 getPosition() const;
+	Quaternion getRotation() const;
 
-	Matrix4 getProjectionMatrix() const {
-		return _mtxProj;
-	}
+	float getFarZ() const;
+	float getNearZ() const;
 
-	Vector3 getPosition() const {
-		return _position;
-	}
+	//視錐台平面の法線ベクトルを取得
+	const FrustumPlanes& getFrustumPlaneNormals() const;
+	Vector3 getFrustumPlaneNormal(uint32 index) const;
 
-	Quaternion getRotation() const {
-		return _rotation;
-	}
+	//現在のFOVにおける1/Tan(fov/2)を取得する
+	Vector2 getTanHeightXY() const;
 
-	float getFarZ() const {
-		return _farZ;
-	}
-
-	float getNearZ() const {
-		return _nearZ;
-	}
-
-	Vector3 _frustumPlanes[4];
 private:
 	float _fieldOfView;
 	float _aspectRate;
@@ -134,4 +84,5 @@ private:
 	Matrix4 _mtxViewTransposed;
 	Vector3 _position;
 	Quaternion _rotation;
+	FrustumPlanes _frustumPlanes;
 };

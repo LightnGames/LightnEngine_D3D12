@@ -3,6 +3,7 @@
 #include "CommandContext.h"
 #include "SharedMaterial.h"
 
+DebugGeometryRender* Singleton<DebugGeometryRender>::_singleton = 0;
 
 void DebugLineRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext){
 	GpuResourceManager& manager = GpuResourceManager::instance();

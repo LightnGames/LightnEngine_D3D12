@@ -92,7 +92,7 @@ private:
 	VertexBuffer _geometryVertexBuffer;
 };
 
-class DebugGeometryRender :private NonCopyable {
+class DebugGeometryRender :public Singleton<DebugGeometryRender> {
 public:
 	DebugGeometryRender();
 

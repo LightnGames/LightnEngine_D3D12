@@ -63,6 +63,7 @@
     <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="ImguiWindow.cpp" />
+    <ClCompile Include="include\Camera.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MeshRender.cpp" />
     <ClCompile Include="RenderableEntity.cpp" />

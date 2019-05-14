@@ -118,7 +118,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	D3D12_HEAP_PROPERTIES defaultHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
 	D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 	{
-		gpuCullingCameraInfo.create(device, { sizeof(SceneConstant) });
+		_gpuCullingCameraConstantBuffers.create(device, { sizeof(GpuCullingCameraConstant) });
 
 		D3D12_DESCRIPTOR_RANGE1 srvRange = {};
 		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -355,7 +355,7 @@ void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32
 
 		computeCommandList->SetComputeRootDescriptorTable(0, _gpuDrivenInstanceMatrixView.gpuHandle);
 		computeCommandList->SetComputeRootDescriptorTable(1, _gpuDriventInstanceCulledUAV[frameIndex].gpuHandle);
-		computeCommandList->SetComputeRootConstantBufferView(2, gpuCullingCameraInfo.constantBuffers[frameIndex][0]->_resource->GetGPUVirtualAddress());
+		computeCommandList->SetComputeRootConstantBufferView(2, _gpuCullingCameraConstantBuffers.constantBuffers[frameIndex][0]->_resource->GetGPUVirtualAddress());
 
 		//AppendStructuredBufferのカウンタを0にリセットする
 		for (uint32 i = 0; i < _indirectArgumentCount; ++i) {
@@ -434,19 +434,19 @@ void StaticMultiMeshRCG::destroy() {
 
 	_indirectArgumentOffsetsBuffer.destroy();
 	_gpuDrivenInstanceMatrixBuffer.destroy();
-	gpuCullingCameraInfo.shutdown();
+	_gpuCullingCameraConstantBuffers.shutdown();
 }
 
 void StaticMultiMeshRCG::updateCullingCameraInfo(const Camera& virtualCamera, uint32 frameIndex) {
-	SceneConstant gpuCullingConstant;
-	gpuCullingConstant.frustumPlanes[0] = virtualCamera._frustumPlanes[0];
-	gpuCullingConstant.frustumPlanes[1] = virtualCamera._frustumPlanes[1];
-	gpuCullingConstant.frustumPlanes[2] = virtualCamera._frustumPlanes[2];
-	gpuCullingConstant.frustumPlanes[3] = virtualCamera._frustumPlanes[3];
+	GpuCullingCameraConstant gpuCullingConstant;
 	gpuCullingConstant.cameraPosition = virtualCamera.getPosition();
 
-	gpuCullingCameraInfo.writeBufferData(&gpuCullingConstant, sizeof(gpuCullingConstant), 0);
-	gpuCullingCameraInfo.flashBufferData(frameIndex);
+	for (uint32 i = 0; i < 4; ++i) {
+		gpuCullingConstant.frustumPlanes[i] = virtualCamera.getFrustumPlaneNormal(i);
+	}
+
+	_gpuCullingCameraConstantBuffers.writeBufferData(&gpuCullingConstant, sizeof(gpuCullingConstant), 0);
+	_gpuCullingCameraConstantBuffers.flashBufferData(frameIndex);
 }
 
 void StaticMultiMeshRCG::culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex) {

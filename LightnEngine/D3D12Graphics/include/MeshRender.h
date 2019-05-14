@@ -104,7 +104,7 @@ struct PerInstanceIndirectArgument {
 	uint32 instanceCount;
 };
 
-struct SceneConstant {
+struct GpuCullingCameraConstant {
 	Vector4 cameraPosition;
 	Vector4 frustumPlanes[4];
 };
@@ -117,13 +117,23 @@ struct IndirectMeshInfo {
 
 class StaticMultiMeshRCG {
 public:
+	//カリング対象の行列データと描画情報を渡して初期化
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo>& meshes, const String& materialName);
-	void onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex);
-	void setupRenderCommand(RenderSettings& settings);
+
+	//GPUカリングで使用するカメラ情報を更新
 	void updateCullingCameraInfo(const Camera& camera, uint32 frameIndex);
+	
+	//ComputeShaderでGPUカリングを実行
+	void onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex);
+
+	//GPUカリング後の情報で描画
+	void setupRenderCommand(RenderSettings& settings);
+
+	//破棄
 	void destroy();
 
 private:
+	//GPUカリングの結果を格納するバッファのリソースバリアを設定
 	void culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex);
 
 private:
@@ -133,7 +143,7 @@ private:
 	UINT _indirectArgumentDstCounterOffset;
 	UINT _gpuCullingDispatchCount;
 
-	ConstantBufferMaterial gpuCullingCameraInfo;
+	ConstantBufferMaterial _gpuCullingCameraConstantBuffers;
 	VectorArray<PerInstanceIndirectArgument> _indirectMeshes;
 
 	CommandSignature _commandSignature;

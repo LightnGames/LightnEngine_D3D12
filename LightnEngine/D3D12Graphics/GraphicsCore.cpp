@@ -8,7 +8,7 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-SceneConstant gpuCullingConstant;
+GpuCullingCameraConstant gpuCullingConstant;
 StaticMultiMeshRCG multiRCG;
 
 bool gpuDrivenStenby = false;
@@ -243,49 +243,8 @@ void GraphicsCore::onUpdate() {
 	virtualCamera.computeProjectionMatrix();
 	virtualCamera.computeViewMatrix();
 
-	Quaternion virtualRotate = virtualCamera.getRotation();
-	Matrix4 virtualView = virtualCamera.getViewMatrix();
-	Matrix4 virtualProj = virtualCamera.getProjectionMatrix();
-	float x = 1 / virtualProj[0][0];
-	float y = 1 / virtualProj[1][1];
-	Color lineColor = Color::blue;
-
-	Vector3 forwardNear = Quaternion::rotVector(virtualRotate, Vector3::forward);
-	Vector3 topLeft = Quaternion::rotVector(virtualRotate, Vector3(-x, y, 1));
-	Vector3 topRight = Quaternion::rotVector(virtualRotate, Vector3(x, y, 1));
-	Vector3 bottomLeft = Quaternion::rotVector(virtualRotate, Vector3(-x, -y, 1));
-	Vector3 bottomRight = Quaternion::rotVector(virtualRotate, Vector3(x, -y, 1));
-
-	Vector3 farTopLeft = topLeft * farZV + positionV;
-	Vector3 farTopRight = topRight * farZV + positionV;
-	Vector3 farBottomLeft = bottomLeft * farZV + positionV;
-	Vector3 farBottomRight = bottomRight * farZV + positionV;
-
-	Vector3 nearTopLeft = topLeft * nearZV + positionV;
-	Vector3 nearTopRight = topRight * nearZV + positionV;
-	Vector3 nearBottomLeft = bottomLeft * nearZV + positionV;
-	Vector3 nearBottomRight = bottomRight * nearZV + positionV;
-
-	_debugGeometryRender.debugDrawLine(positionV, farTopLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(positionV, farTopRight, lineColor);
-	_debugGeometryRender.debugDrawLine(positionV, farBottomLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(positionV, farBottomRight, lineColor);
-
-	_debugGeometryRender.debugDrawLine(farTopRight, farTopLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(farTopLeft, farBottomLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(farBottomRight, farBottomLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(farBottomRight, farTopRight, lineColor);
-
-	_debugGeometryRender.debugDrawLine(nearTopRight, nearTopLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(nearTopLeft, nearBottomLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(nearBottomRight, nearBottomLeft, lineColor);
-	_debugGeometryRender.debugDrawLine(nearBottomRight, nearTopRight, lineColor);
-
 	virtualCamera.computeFlustomNormals();
-	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[0], Color::yellow);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[1], Color::yellow);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[2], Color::yellow);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[3], Color::yellow);
+	virtualCamera.debugDrawFlustom();
 
 	if (gpuDrivenStenby) {
 		multiRCG.updateCullingCameraInfo(virtualCamera, _frameIndex);
