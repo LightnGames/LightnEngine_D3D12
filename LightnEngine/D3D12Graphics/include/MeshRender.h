@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "GpuResource.h"
 #include "SharedMaterial.h"
+#include "Camera.h"
 
 //マテリアルの描画範囲定義
 struct MaterialDrawRange {
@@ -116,16 +117,17 @@ struct IndirectMeshInfo {
 
 class StaticMultiMeshRCG {
 public:
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo>& meshes);
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo>& meshes, const String& materialName);
 	void onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex);
 	void setupRenderCommand(RenderSettings& settings);
-	void updateCullingCameraInfo(const SceneConstant& constant, uint32 frameIndex);
+	void updateCullingCameraInfo(const Camera& camera, uint32 frameIndex);
 	void destroy();
 
 private:
 	void culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex);
 
 private:
+	RefPtr<SharedMaterial> _material;
 
 	UINT _indirectArgumentCount;
 	UINT _indirectArgumentDstCounterOffset;

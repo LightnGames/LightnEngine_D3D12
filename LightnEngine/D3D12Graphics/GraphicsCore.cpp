@@ -8,10 +8,6 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-RefPtr<SharedMaterial> mat;
-RefPtr<VertexAndIndexBuffer> viBuffer;
-RefPtr<VertexAndIndexBuffer> viBuffer2;
-
 SceneConstant gpuCullingConstant;
 StaticMultiMeshRCG multiRCG;
 
@@ -149,8 +145,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 	materialSettings.inputLayouts = inputLayouts;
 	materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
-	_gpuResourceManager.loadSharedMaterial("TestI", &mat);
 
+	RefPtr<VertexAndIndexBuffer> viBuffer;
+	RefPtr<VertexAndIndexBuffer> viBuffer2;
 	VectorArray<IndirectMeshInfo> indirectMeshes(3);
 
 	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _graphicsCommandContext, { "cube.mesh", "sphere.mesh" });
@@ -182,7 +179,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		indirectMeshes[i].matrices = objectArray;
 	}
 
-	multiRCG.create(_device.Get(), &_graphicsCommandContext, indirectMeshes);
+	multiRCG.create(_device.Get(), &_graphicsCommandContext, indirectMeshes, "TestI");
 
 	gpuDrivenStenby = true;
 }
@@ -236,9 +233,19 @@ void GraphicsCore::onUpdate() {
 	ImGui::SliderFloat("FarZ", &farZV, 10, 1000);
 	ImGui::End();
 
-	Quaternion virtualRotate = Quaternion::euler({ pitchV,yawV,rollV }, true);
-	Matrix4 virtualView = Matrix4::createWorldMatrix(positionV, virtualRotate, Vector3::one);
-	Matrix4 virtualProj = Matrix4::perspectiveFovLH(radianFromDegree(fovV), _width / static_cast<float>(_height), nearZV, farZV);
+	Camera virtualCamera;
+	virtualCamera.setPosition(positionV);
+	virtualCamera.setRotationEuler(pitchV, yawV, rollV, true);
+	virtualCamera.setFieldOfView(fovV);
+	virtualCamera.setNearZ(nearZV);
+	virtualCamera.setFarZ(farZV);
+	virtualCamera.setAspectRate(_width, _height);
+	virtualCamera.computeProjectionMatrix();
+	virtualCamera.computeViewMatrix();
+
+	Quaternion virtualRotate = virtualCamera.getRotation();
+	Matrix4 virtualView = virtualCamera.getViewMatrix();
+	Matrix4 virtualProj = virtualCamera.getProjectionMatrix();
 	float x = 1 / virtualProj[0][0];
 	float y = 1 / virtualProj[1][1];
 	Color lineColor = Color::blue;
@@ -274,28 +281,14 @@ void GraphicsCore::onUpdate() {
 	_debugGeometryRender.debugDrawLine(nearBottomRight, nearBottomLeft, lineColor);
 	_debugGeometryRender.debugDrawLine(nearBottomRight, nearTopRight, lineColor);
 
-	Vector3 leftNormal = Vector3::cross(Vector3(-x, 0, 1), -Vector3::up).normalize();
-	Vector3 rightNormal = Vector3::cross(Vector3(x, 0, 1), Vector3::up).normalize();
-	Vector3 bottomNormal = Vector3::cross(Vector3(0, y, 1), -Vector3::right).normalize();
-	Vector3 topNormal = Vector3::cross(Vector3(0, -y, 1), Vector3::right).normalize();
-	leftNormal = Quaternion::rotVector(virtualRotate, leftNormal);
-	rightNormal = Quaternion::rotVector(virtualRotate, rightNormal);
-	bottomNormal = Quaternion::rotVector(virtualRotate, bottomNormal);
-	topNormal = Quaternion::rotVector(virtualRotate, topNormal);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + leftNormal, Color::yellow);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + rightNormal, Color::yellow);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + bottomNormal, Color::yellow);
-	_debugGeometryRender.debugDrawLine(positionV, positionV + topNormal, Color::yellow);
-
-
-	gpuCullingConstant.frustumPlanes[0] = leftNormal;
-	gpuCullingConstant.frustumPlanes[1] = rightNormal;
-	gpuCullingConstant.frustumPlanes[2] = bottomNormal;
-	gpuCullingConstant.frustumPlanes[3] = topNormal;
-	gpuCullingConstant.cameraPosition = positionV;
+	virtualCamera.computeFlustomNormals();
+	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[0], Color::yellow);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[1], Color::yellow);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[2], Color::yellow);
+	_debugGeometryRender.debugDrawLine(positionV, positionV + virtualCamera._frustumPlanes[3], Color::yellow);
 
 	if (gpuDrivenStenby) {
-		multiRCG.updateCullingCameraInfo(gpuCullingConstant, _frameIndex);
+		multiRCG.updateCullingCameraInfo(virtualCamera, _frameIndex);
 	}
 }
 
@@ -361,7 +354,6 @@ void GraphicsCore::onRender() {
 	_debugGeometryRender.setupRenderCommand(renderSettings);
 	_debugGeometryRender.clearDebugDatas();
 
-	mat->setupRenderCommand(renderSettings);
 	multiRCG.setupRenderCommand(renderSettings);
 	
 	//ImguiWindow•`‰æ

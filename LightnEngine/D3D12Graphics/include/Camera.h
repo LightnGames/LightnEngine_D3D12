@@ -66,6 +66,27 @@ public:
 		_mtxViewTransposed = _mtxView.transpose();
 	}
 
+	void computeFlustomNormals() {
+		Matrix4 virtualProj = getProjectionMatrix();
+		float x = 1 / virtualProj[0][0];
+		float y = 1 / virtualProj[1][1];
+
+		Vector3 leftNormal = Vector3::cross(Vector3(-x, 0, 1), -Vector3::up).normalize();
+		Vector3 rightNormal = Vector3::cross(Vector3(x, 0, 1), Vector3::up).normalize();
+		Vector3 bottomNormal = Vector3::cross(Vector3(0, y, 1), -Vector3::right).normalize();
+		Vector3 topNormal = Vector3::cross(Vector3(0, -y, 1), Vector3::right).normalize();
+		leftNormal = Quaternion::rotVector(_rotation, leftNormal);
+		rightNormal = Quaternion::rotVector(_rotation, rightNormal);
+		bottomNormal = Quaternion::rotVector(_rotation, bottomNormal);
+		topNormal = Quaternion::rotVector(_rotation, topNormal);
+
+
+		_frustumPlanes[0] = leftNormal;
+		_frustumPlanes[1] = rightNormal;
+		_frustumPlanes[2] = bottomNormal;
+		_frustumPlanes[3] = topNormal;
+	}
+
 	//転置済みビュー行列を取得
 	Matrix4 getViewMatrixTransposed() const {
 		return _mtxViewTransposed;
@@ -76,12 +97,20 @@ public:
 		return _mtxProjTransposed;
 	}
 
+	Matrix4 getViewMatrix() const {
+		return _mtxView;
+	}
+
 	Matrix4 getProjectionMatrix() const {
 		return _mtxProj;
 	}
 
 	Vector3 getPosition() const {
 		return _position;
+	}
+
+	Quaternion getRotation() const {
+		return _rotation;
 	}
 
 	float getFarZ() const {
@@ -92,6 +121,7 @@ public:
 		return _nearZ;
 	}
 
+	Vector3 _frustumPlanes[4];
 private:
 	float _fieldOfView;
 	float _aspectRate;

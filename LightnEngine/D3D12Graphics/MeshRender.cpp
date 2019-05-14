@@ -79,9 +79,11 @@ void StaticSingleMeshRCG::updateWorldMatrix(const Matrix4 & worldMatrix) {
 	_worldMatrix = worldMatrix;
 }
 
-void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo> & meshes) {
-	DescriptorHeapManager& _descriptorHeapManager = DescriptorHeapManager::instance();
-	GpuResourceManager& _gpuResourceManager = GpuResourceManager::instance();
+void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo> & meshes, const String& materialName) {
+	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
+	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
+
+	gpuResourceManager.loadSharedMaterial(materialName, &_material);
 
 	//描画元情報からGPUカリングとIndirect描画に必要な情報をまとめる
 	_indirectArgumentCount = static_cast<uint32>(meshes.size());
@@ -243,7 +245,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	matrixSrvDesc.StructureByteStride = sizeof(ObjectInfo);
 	matrixSrvDesc.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-	_descriptorHeapManager.createShaderResourceView(_gpuDrivenInstanceMatrixBuffer.getAdressOf(), &_gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
+	descriptorHeapManager.createShaderResourceView(_gpuDrivenInstanceMatrixBuffer.getAdressOf(), &_gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
 
 	//インスタンス用行列頂点バッファとそのUAVを生成
 	VectorArray<D3D12_BUFFER_UAV> gpuDrivenInstanceCulledBufferUavs(_indirectArgumentCount);
@@ -273,8 +275,8 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 			ppCulledBuffers[j] = _gpuDrivenInstanceCulledBuffer[index].get();
 		}
 
-		_descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[i], _indirectArgumentCount, gpuDrivenInstanceCulledBufferUavs);
-		_descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[i], _indirectArgumentCount, gpuDrivenInstanceCulledBufferSrvs);
+		descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[i], _indirectArgumentCount, gpuDrivenInstanceCulledBufferUavs);
+		descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[i], _indirectArgumentCount, gpuDrivenInstanceCulledBufferSrvs);
 	}
 
 	//ExecuteIndirectに渡すIndirectBufferを生成
@@ -313,7 +315,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		bufferUav.StructureByteStride = sizeof(IndirectCommand);
 		bufferUav.CounterOffsetInBytes = _indirectArgumentDstCounterOffset;
 
-		_descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer[i].getAdressOf(), &_setupCommandUavView[i], 1, { bufferUav });
+		descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer[i].getAdressOf(), &_setupCommandUavView[i], 1, { bufferUav });
 	}
 
 	//CulledBufferのカウンタまでのバイトオフセットを格納するバッファ
@@ -395,6 +397,8 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
+	_material->setupRenderCommand(settings);
+
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, frameIndex);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
@@ -433,8 +437,15 @@ void StaticMultiMeshRCG::destroy() {
 	gpuCullingCameraInfo.shutdown();
 }
 
-void StaticMultiMeshRCG::updateCullingCameraInfo(const SceneConstant & constant, uint32 frameIndex) {
-	gpuCullingCameraInfo.writeBufferData(&constant, sizeof(constant), 0);
+void StaticMultiMeshRCG::updateCullingCameraInfo(const Camera& virtualCamera, uint32 frameIndex) {
+	SceneConstant gpuCullingConstant;
+	gpuCullingConstant.frustumPlanes[0] = virtualCamera._frustumPlanes[0];
+	gpuCullingConstant.frustumPlanes[1] = virtualCamera._frustumPlanes[1];
+	gpuCullingConstant.frustumPlanes[2] = virtualCamera._frustumPlanes[2];
+	gpuCullingConstant.frustumPlanes[3] = virtualCamera._frustumPlanes[3];
+	gpuCullingConstant.cameraPosition = virtualCamera.getPosition();
+
+	gpuCullingCameraInfo.writeBufferData(&gpuCullingConstant, sizeof(gpuCullingConstant), 0);
 	gpuCullingCameraInfo.flashBufferData(frameIndex);
 }
 
