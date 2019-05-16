@@ -142,12 +142,17 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 }
 
 //テクスチャをまとめて生成する。まとめて送るのでCPUオーバーヘッドが少ない
-void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& settings) {
+void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& settings) {	
 	VectorArray<ComPtr<ID3D12Resource>> uploadHeaps(settings.size());
 	auto commandListSet = commandContext.requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 	for (size_t i = 0; i < settings.size(); ++i) {
+		//すでにその名目のテクスチャが存在するなら生成はスキップ
+		if (_resourcePool->textures.count(settings[i]) > 0) {
+			continue;
+		}
+
 		const String fullPath = "Resources/" + settings[i];
 
 		//テクスチャをキャッシュに生成

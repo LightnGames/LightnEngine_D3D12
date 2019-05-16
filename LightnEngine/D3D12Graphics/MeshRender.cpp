@@ -83,7 +83,79 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
 
-	gpuResourceManager.loadSharedMaterial(materialName, &_material);
+	//gpuResourceManager.loadSharedMaterial(materialName, &_material);
+
+	String albedo("Cerberus/Cerberus_A.dds");
+	String normal("Cerberus/Cerberus_N.dds");
+	String metallic("Cerberus/Cerberus_M.dds");
+	gpuResourceManager.createTextures(device, *commandContext, { albedo,normal,metallic });
+	gpuResourceManager.loadTexture(albedo, &texs[0]);
+	gpuResourceManager.loadTexture(normal, &texs[1]);
+	gpuResourceManager.loadTexture(metallic, &texs[2]);
+
+	ID3D12Resource* ppTextures[3] = { texs[0]->get(), texs[1]->get(), texs[2]->get() };
+	descriptorHeapManager.createTextureShaderResourceView(ppTextures, &srv, 3);
+
+	cb.create(device, { sizeof(CameraConstantRaw) });
+
+	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+		{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+		{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+		{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+		{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+	};
+
+	VertexShader vs;
+	PixelShader ps;
+	vs.create("Shaders/Indirect.hlsl", inputLayouts);
+	ps.create("Shaders/Indirect.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);
+
+	D3D12_DESCRIPTOR_RANGE1 cbvRange = {};
+	cbvRange.BaseShaderRegister = 0;
+	cbvRange.NumDescriptors = 1;
+	cbvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	cbvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_DESCRIPTOR_RANGE1 srvRange = {};
+	srvRange.BaseShaderRegister = 0;
+	srvRange.NumDescriptors = 3;
+	srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	
+	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(2);
+	parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	parameterDescs[0].DescriptorTable.NumDescriptorRanges = 1;
+	parameterDescs[0].DescriptorTable.pDescriptorRanges = &cbvRange;
+
+	parameterDescs[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	parameterDescs[1].DescriptorTable.NumDescriptorRanges = 1;
+	parameterDescs[1].DescriptorTable.pDescriptorRanges = &srvRange;
+
+	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.MipLODBias = 0;
+	samplerDesc.MaxAnisotropy = 0;
+	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	samplerDesc.MinLOD = 0.0f;
+	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+	samplerDesc.ShaderRegister = 0;
+	samplerDesc.RegisterSpace = 0;
+	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	rootSignature.create(device, parameterDescs, &samplerDesc);
+	pipelineState.create(device, &rootSignature, vs, ps);
 
 	//描画元情報からGPUカリングとIndirect描画に必要な情報をまとめる
 	_indirectArgumentCount = static_cast<uint32>(meshes.size());
@@ -397,7 +469,13 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
-	_material->setupRenderCommand(settings);
+	//_material->setupRenderCommand(settings);
+	commandList->SetGraphicsRootSignature(rootSignature._rootSignature.Get());
+	commandList->SetPipelineState(pipelineState._pipelineState.Get());
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	commandList->SetGraphicsRootDescriptorTable(0, cb.constantBufferViews[frameIndex].gpuHandle);
+	commandList->SetGraphicsRootDescriptorTable(1, srv.gpuHandle);
 
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, frameIndex);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));

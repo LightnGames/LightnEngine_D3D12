@@ -115,6 +115,12 @@ struct IndirectMeshInfo {
 	VectorArray<ObjectInfo> matrices;
 };
 
+struct CameraConstantRaw {
+	Matrix4 mtxView;
+	Matrix4 mtxProj;
+	Vector3 cameraPosition;
+};
+
 class StaticMultiMeshRCG {
 public:
 	//カリング対象の行列データと描画情報を渡して初期化
@@ -132,12 +138,20 @@ public:
 	//破棄
 	void destroy();
 
+	ConstantBufferMaterial cb;
+
+	RootSignature rootSignature;
+	PipelineState pipelineState;
+
+	RefPtr<Texture2D> texs[3];
+	BufferView srv;
+
 private:
 	//GPUカリングの結果を格納するバッファのリソースバリアを設定
 	void culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex);
 
 private:
-	RefPtr<SharedMaterial> _material;
+	//RefPtr<SharedMaterial> _material;
 
 	UINT _indirectArgumentCount;
 	UINT _indirectArgumentDstCounterOffset;

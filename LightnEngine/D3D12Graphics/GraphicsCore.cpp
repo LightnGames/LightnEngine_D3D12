@@ -127,7 +127,10 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_currentFrameResource = &_frameResources[_frameIndex];
 
 	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-	{ "POSITION",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,   0 },
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
@@ -135,15 +138,15 @@ void GraphicsCore::onInit(HWND hwnd) {
 	{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	};
 
-	SharedMaterialCreateSettings materialSettings;
-	materialSettings.name = "TestI";
-	materialSettings.vertexShaderName = "Indirect.hlsl";
-	materialSettings.pixelShaderName = "Indirect.hlsl";
-	materialSettings.vsTextures = {};
-	materialSettings.psTextures = {};
-	materialSettings.inputLayouts = inputLayouts;
-	materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
+	//SharedMaterialCreateSettings materialSettings;
+	//materialSettings.name = "TestI";
+	//materialSettings.vertexShaderName = "Indirect.hlsl";
+	//materialSettings.pixelShaderName = "Indirect.hlsl";
+	//materialSettings.vsTextures = {};
+	//materialSettings.psTextures = {};
+	//materialSettings.inputLayouts = inputLayouts;
+	//materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
 
 	RefPtr<VertexAndIndexBuffer> viBuffer;
 	RefPtr<VertexAndIndexBuffer> viBuffer2;
@@ -311,6 +314,14 @@ void GraphicsCore::onRender() {
 	_debugGeometryRender.updatePerInstanceData(_frameIndex);
 	_debugGeometryRender.setupRenderCommand(renderSettings);
 	_debugGeometryRender.clearDebugDatas();
+
+	CameraConstantRaw cr;
+	cr.mtxView = mainCamera->getViewMatrixTransposed();
+	cr.mtxProj = mainCamera->getProjectionMatrixTransposed();
+	cr.cameraPosition = mainCamera->getPosition();
+
+	multiRCG.cb.writeBufferData(&cr, sizeof(CameraConstantRaw), 0);
+	multiRCG.cb.flashBufferData(_frameIndex);
 
 	multiRCG.setupRenderCommand(renderSettings);
 	
