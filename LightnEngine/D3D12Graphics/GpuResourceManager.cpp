@@ -373,6 +373,15 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 	commandContext.waitForIdle();
 }
 
+void GpuResourceManager::createRootSignature(RefPtr<ID3D12Device> device, const String& name, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters, RefPtr<D3D12_STATIC_SAMPLER_DESC> staticSampler){
+	auto itr = _resourcePool->rootSignatures.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
+
+	RefPtr<RootSignature> rootSignature = &(*itr.first).second;
+	rootSignature->create(device, rootParameters, staticSampler);
+}
+
 RefPtr<VertexShader> GpuResourceManager::createVertexShader(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& inputLayouts){
 	auto itr = _resourcePool->vertexShaders.emplace(std::piecewise_construct,
 		std::make_tuple(fileName),

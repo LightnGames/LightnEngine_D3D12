@@ -8,7 +8,6 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-GpuCullingCameraConstant gpuCullingConstant;
 StaticMultiMeshRCG multiRCG;
 
 bool gpuDrivenStenby = false;

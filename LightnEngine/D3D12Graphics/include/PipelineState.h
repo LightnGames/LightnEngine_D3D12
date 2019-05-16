@@ -353,14 +353,18 @@ class RootSignature :private NonCopyable{
 public:
 	RootSignature() {}
 
-	//StaticSamplerなし！！！
-	void create(RefPtr<ID3D12Device> device, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters) {
+	void create(RefPtr<ID3D12Device> device, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters, RefPtr<D3D12_STATIC_SAMPLER_DESC> staticSampler = nullptr) {
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		rootSignatureDesc.Desc_1_1.NumParameters = static_cast<UINT>(rootParameters.size());
 		rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
 		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 0;
 		rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		if (staticSampler != nullptr) {
+			rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
+			rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSampler;
+		}
 
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
@@ -429,19 +433,7 @@ public:
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 		}
 
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-		rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSignatureDesc.Desc_1_1.NumParameters = static_cast<UINT>(rootParameters.size());
-		rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
-		rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
-		rootSignatureDesc.Desc_1_1.pStaticSamplers = &samplerDesc;
-		rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-		ComPtr<ID3DBlob> signature;
-		ComPtr<ID3DBlob> error;
-		throwIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-		throwIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_rootSignature)));
-		NAME_D3D12_OBJECT(_rootSignature);
+		create(device, rootParameters, &samplerDesc);
 	}
 
 	//参照のみのコピーオブジェクトを取得

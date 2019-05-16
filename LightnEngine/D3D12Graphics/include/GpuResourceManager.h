@@ -26,6 +26,7 @@ public:
 	void createSharedMaterial(RefPtr<ID3D12Device> device, const SharedMaterialCreateSettings& settings);
 	void createTextures(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& settings);
 	void createVertexAndIndexBuffer(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& fileName);
+	void createRootSignature(RefPtr<ID3D12Device> device, const String& name, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters, RefPtr<D3D12_STATIC_SAMPLER_DESC> staticSampler = nullptr);
 	
 	RefPtr<VertexShader> createVertexShader(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& inputLayouts);
 	RefPtr<PixelShader> createPixelShader(const String& fileName);
