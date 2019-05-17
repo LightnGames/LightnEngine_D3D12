@@ -25,9 +25,6 @@ cbuffer CameraInfo : register(b0)
 	float3 cameraPos;
 }
 
-Texture2D t_albedo[] : register(t0);
-SamplerState t_sampler : register(s0);
-
 PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 {
 	PSInput result;
@@ -48,9 +45,16 @@ PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 	return result;
 }
 
+Texture2D t_albedo[] : register(t0);
+SamplerState t_sampler : register(s0);
+
+cbuffer TextureIndices: register(b0) {
+	uint4 textureIndices;
+}
+
 float4 PSMain(PSInput input) : SV_Target
 {
-	float4 color = t_albedo[0].Sample(t_sampler, input.uv);
+	float4 color = t_albedo[textureIndices.x].Sample(t_sampler, input.uv);
 	//float4 color = input.color;
 	return pow(color, 1.0f / 2.2f);
 }

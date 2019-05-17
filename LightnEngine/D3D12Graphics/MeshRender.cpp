@@ -128,7 +128,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	
-	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(2);
+	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(3);
 	parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	parameterDescs[0].DescriptorTable.NumDescriptorRanges = 1;
@@ -138,6 +138,11 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	parameterDescs[1].DescriptorTable.NumDescriptorRanges = 1;
 	parameterDescs[1].DescriptorTable.pDescriptorRanges = &srvRange;
+
+	parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	parameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	parameterDescs[2].Constants.Num32BitValues = 4;
+	parameterDescs[2].Constants.ShaderRegister = 0;
 
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
 	samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
@@ -174,16 +179,20 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		_indirectArgumentDstCounterOffset = AlignForUavCounter(_indirectArgumentCount * sizeof(IndirectCommand));
 
 		// Each command consists of a CBV update and a DrawInstanced call.
-		VectorArray<D3D12_INDIRECT_ARGUMENT_DESC> argumentDescs(4);
+		VectorArray<D3D12_INDIRECT_ARGUMENT_DESC> argumentDescs(5);
 		argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
 		argumentDescs[0].VertexBuffer.Slot = 0;
 		argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
 		argumentDescs[1].VertexBuffer.Slot = 0;
 		argumentDescs[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
 		argumentDescs[2].VertexBuffer.Slot = 1;
-		argumentDescs[3].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+		argumentDescs[3].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+		argumentDescs[3].Constant.Num32BitValuesToSet = 4;
+		argumentDescs[3].Constant.DestOffsetIn32BitValues = 0;
+		argumentDescs[3].Constant.RootParameterIndex = 2;
+		argumentDescs[4].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
-		_commandSignature.create(device, sizeof(IndirectCommand), argumentDescs);
+		_commandSignature.create(device, sizeof(IndirectCommand), argumentDescs, rootSignature._rootSignature.Get());
 	}
 
 	//GPUカリングステート
@@ -367,6 +376,10 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 			commands[j].vertexBufferView = mesh.vertexBufferView;
 			commands[j].indexBufferView = mesh.indexBufferView;
 			commands[j].perInstanceVertexBufferView = perInstanceVertexBufferView;
+			commands[j].textureIndices[0] = j;
+			commands[j].textureIndices[1] = j;
+			commands[j].textureIndices[2] = j;
+			commands[j].textureIndices[3] = j;
 			commands[j].drawArguments.IndexCountPerInstance = mesh.indexCount;
 			commands[j].drawArguments.InstanceCount = 0;
 			commands[j].drawArguments.BaseVertexLocation = 0;
@@ -497,18 +510,25 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 
 void StaticMultiMeshRCG::destroy() {
 	for (int i = 0; i < FrameCount; ++i) {
-		_indirectArgumentSourceBuffer[i]._resource = nullptr;
-		_indirectArgumentDstBuffer[i]._resource = nullptr;
+		_indirectArgumentSourceBuffer[i].destroy();
+		_indirectArgumentDstBuffer[i].destroy();
 	}
 
 	delete[] _gpuDrivenInstanceCulledBuffer;
-	_uavCounterReset._resource = nullptr;
+	_uavCounterReset.destroy();
 
-	_cullingComputeRootSignature._rootSignature = nullptr;
-	_cullingComputeState._pipelineState = nullptr;
-	_setupCommandComputeRootSignature._rootSignature = nullptr;
-	_setupCommandComputeState._pipelineState = nullptr;
-	_commandSignature._commandSignature = nullptr;
+	_cullingComputeRootSignature.destroy();
+	_cullingComputeState.destroy();
+	_setupCommandComputeRootSignature.destroy();
+	_setupCommandComputeState.destroy();
+	_commandSignature.destroy();
+
+	DescriptorHeapManager& _descriptorHeapManager = DescriptorHeapManager::instance();
+	_descriptorHeapManager.discardShaderResourceView(srv);
+
+	rootSignature.destroy();
+	pipelineState.destroy();
+	cb.shutdown();
 
 	_indirectArgumentOffsetsBuffer.destroy();
 	_gpuDrivenInstanceMatrixBuffer.destroy();

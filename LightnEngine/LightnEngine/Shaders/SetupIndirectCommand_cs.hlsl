@@ -12,6 +12,7 @@ struct IndirectCommand
 	uint perInstanceSizeInBytes;
 	uint perInstanceStrideInBytes;
 	
+	uint4 textureIndices;
 	uint drawArguments[6];
 };
 

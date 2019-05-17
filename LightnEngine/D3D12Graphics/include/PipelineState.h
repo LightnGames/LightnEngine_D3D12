@@ -336,14 +336,18 @@ public:
 
 class CommandSignature :private NonCopyable{
 public:
-	void create(RefPtr<ID3D12Device> device, uint32 byteStride, const VectorArray<D3D12_INDIRECT_ARGUMENT_DESC>& descs) {
+	void create(RefPtr<ID3D12Device> device, uint32 byteStride, const VectorArray<D3D12_INDIRECT_ARGUMENT_DESC>& descs, RefPtr<ID3D12RootSignature> rootSignature = nullptr) {
 		D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
 		commandSignatureDesc.pArgumentDescs = descs.data();
 		commandSignatureDesc.NumArgumentDescs = static_cast<UINT>(descs.size());
 		commandSignatureDesc.ByteStride = byteStride;
 
-		throwIfFailed(device->CreateCommandSignature(&commandSignatureDesc, nullptr, IID_PPV_ARGS(&_commandSignature)));
+		throwIfFailed(device->CreateCommandSignature(&commandSignatureDesc, rootSignature, IID_PPV_ARGS(&_commandSignature)));
 		//NAME_D3D12_OBJECT(_commandSignature);
+	}
+
+	void destroy() {
+		_commandSignature = nullptr;
 	}
 
 	ComPtr<ID3D12CommandSignature> _commandSignature;
@@ -441,6 +445,10 @@ public:
 		return RefRootsignature(_rootSignature.Get());
 	}
 
+	void destroy() {
+		_rootSignature = nullptr;
+	}
+
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootSignature;
 };
 
@@ -525,6 +533,10 @@ public:
 	//参照のみのコピーオブジェクトを取得
 	RefPipelineState getRefPipelineState() const {
 		return RefPipelineState(_pipelineState.Get());
+	}
+
+	void destroy() {
+		_pipelineState = nullptr;
 	}
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState;
