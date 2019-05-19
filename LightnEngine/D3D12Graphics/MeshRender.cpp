@@ -164,7 +164,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	//コマンドシグネチャ生成
 	{
-		_gpuDrivenInstanceCulledBuffer = new GpuBuffer[_indirectArgumentCount * FrameCount];
+		_gpuDrivenInstanceCulledBuffer = new GpuBuffer[_meshCount * FrameCount];
 		_indirectArgumentDstCounterOffset = AlignForUavCounter(_indirectArgumentCount * sizeof(IndirectCommand));
 
 		// Each command consists of a CBV update and a DrawInstanced call.
@@ -200,7 +200,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 		D3D12_DESCRIPTOR_RANGE1 uavRange = {};
 		uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-		uavRange.NumDescriptors = _indirectArgumentCount;
+		uavRange.NumDescriptors = _meshCount;
 		uavRange.BaseShaderRegister = 0;
 		uavRange.RegisterSpace = 0;
 		uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
@@ -297,7 +297,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	size_t mergedMatricsOffset = 0;
 	VectorArray<ObjectInfo> mergedMatrices(totalMaxInstanceCount);
-	for (uint32 i = 0; i < _indirectArgumentCount; ++i) {
+	for (uint32 i = 0; i < _meshCount; ++i) {
 		memcpy(mergedMatrices.data() + mergedMatricsOffset, meshes[i].matrices.data(), meshes[i].matrices.size() * sizeof(ObjectInfo));
 		mergedMatricsOffset += meshes[i].matrices.size();
 	}
@@ -318,8 +318,8 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	descriptorHeapManager.createShaderResourceView(_gpuDrivenInstanceMatrixBuffer.getAdressOf(), &_gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
 
 	//インスタンス用行列頂点バッファとそのUAVを生成
-	VectorArray<D3D12_BUFFER_UAV> gpuDrivenInstanceCulledBufferUavs(_indirectArgumentCount);
-	VectorArray<D3D12_BUFFER_SRV> gpuDrivenInstanceCulledBufferSrvs(_indirectArgumentCount);
+	VectorArray<D3D12_BUFFER_UAV> gpuDrivenInstanceCulledBufferUavs(_meshCount);
+	VectorArray<D3D12_BUFFER_SRV> gpuDrivenInstanceCulledBufferSrvs(_meshCount);
 
 	for (size_t i = 0; i < gpuDrivenInstanceCulledBufferUavs.size(); ++i) {
 		D3D12_BUFFER_UAV& bufferUav = gpuDrivenInstanceCulledBufferUavs[i];
@@ -337,16 +337,16 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	}
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
-		VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_indirectArgumentCount);
+		VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_meshCount);
 
-		for (uint32 j = 0; j < _indirectArgumentCount; ++j) {
-			uint32 index = i * _indirectArgumentCount + j;
+		for (uint32 j = 0; j < _meshCount; ++j) {
+			uint32 index = i * _meshCount + j;
 			_gpuDrivenInstanceCulledBuffer[index].createDirectGpuOnlyEmpty(device, _indirectMeshes[j].counterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 			ppCulledBuffers[j] = _gpuDrivenInstanceCulledBuffer[index].get();
 		}
 
-		descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[i], _indirectArgumentCount, gpuDrivenInstanceCulledBufferUavs);
-		descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[i], _indirectArgumentCount, gpuDrivenInstanceCulledBufferSrvs);
+		descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[i], _meshCount, gpuDrivenInstanceCulledBufferUavs);
+		descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[i], _meshCount, gpuDrivenInstanceCulledBufferSrvs);
 	}
 
 	//ExecuteIndirectに渡すIndirectBufferを生成
@@ -395,7 +395,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	//CulledBufferのカウンタまでのバイトオフセットを格納するバッファ
 	ComPtr<ID3D12Resource> offsetsUpload;
-	VectorArray<uint32> counterOffsets(_indirectArgumentCount);
+	VectorArray<uint32> counterOffsets(_meshCount);
 	for (size_t i = 0; i < counterOffsets.size(); ++i) {
 		counterOffsets[i] = _indirectMeshes[i].counterOffset;
 	}
