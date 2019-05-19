@@ -114,7 +114,6 @@ struct PerInstanceIndirectArgument {
 	D3D12_INDEX_BUFFER_VIEW indexBufferView;
 	TextureIndex textureIndices;
 	uint32 indexCount;
-	uint32 counterOffset;
 	uint32 instanceCount;
 };
 
@@ -179,6 +178,7 @@ private:
 
 	ConstantBufferMaterial _gpuCullingCameraConstantBuffers;
 	VectorArray<PerInstanceIndirectArgument> _indirectMeshes;
+	VectorArray<uint32> _uavCounters;
 
 	CommandSignature _commandSignature;
 	RootSignature _cullingComputeRootSignature;
