@@ -140,16 +140,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 	{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	};
 
-	//SharedMaterialCreateSettings materialSettings;
-	//materialSettings.name = "TestI";
-	//materialSettings.vertexShaderName = "Indirect.hlsl";
-	//materialSettings.pixelShaderName = "Indirect.hlsl";
-	//materialSettings.vsTextures = {};
-	//materialSettings.psTextures = {};
-	//materialSettings.inputLayouts = inputLayouts;
-	//materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//_gpuResourceManager.createSharedMaterial(_device.Get(), materialSettings);
-
 	String fullPath = "Resources/Environment/meshes.scene";
 	std::ifstream fin(fullPath.c_str(), std::ios::in | std::ios::binary);
 	fin.exceptions(std::ios::badbit);
@@ -209,9 +199,33 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	fin.close();
 
+	VectorArray<IndirectMeshInfo> indirectMeshes(meshCount);
+
 	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _graphicsCommandContext, meshNames);
+
+	for (size_t i = 0; i < indirectMeshes.size(); ++i) {
+		RefPtr<VertexAndIndexBuffer> viBuffer;
+		_gpuResourceManager.loadVertexAndIndexBuffer(meshNames[i], &viBuffer);
+		indirectMeshes[i].vertexAndIndexBuffer = viBuffer;
+		indirectMeshes[i].maxInstanceCount = meshDatas[i].perInstanceVertex.size();
+
+		const uint32 instanceCount = indirectMeshes[i].maxInstanceCount;
+		VectorArray<ObjectInfo> objectArray(instanceCount);
+
+		//シーンに配置されているオブジェクトのワールド行列をマップ
+		for (size_t j = 0; j < objectArray.size(); ++j) {
+			objectArray[j].mtxWorld = meshDatas[i].perInstanceVertex[j].mtxWorld;
+			objectArray[j].startPosAABB = meshDatas[i].perInstanceVertex[j].startPosAABB;
+			objectArray[j].color = Color(j * 0.02f, 0, 0, 1);
+			objectArray[j].indirectArgumentIndex = static_cast<uint32>(i);
+		}
+
+		indirectMeshes[i].matrices = objectArray;
+		indirectMeshes[i].textureIndices = meshDatas[i].textureIndices;
+	}
+
 	_gpuResourceManager.createTextures(_device.Get(), _graphicsCommandContext, textureNames);
-	
+
 	VectorArray<RefPtr<ID3D12Resource>> ppTextureResources(textureNames.size());
 	for (size_t i = 0; i < textureNames.size(); ++i) {
 		RefPtr<Texture2D> texture;
@@ -221,16 +235,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_descriptorHeapManager.createTextureShaderResourceView(ppTextureResources.data(), &multiRCG.srv, textureCount);
 
-	VectorArray<IndirectMeshInfo> indirectMeshes(meshCount);
-	for (uint32 i = 0; i < meshCount; ++i) {
-		RefPtr<VertexAndIndexBuffer> viBuffer;
-		_gpuResourceManager.loadVertexAndIndexBuffer(meshNames[i], &viBuffer);
-		indirectMeshes[i].vertexAndIndexBuffer = viBuffer;
-		indirectMeshes[i].matrices = meshDatas[i].perInstanceVertex;
-		indirectMeshes[i].maxInstanceCount = meshDatas[i].perInstanceVertex.size();
-		indirectMeshes[i].textureIndices = meshDatas[i].textureIndices;
-	}
-
 	multiRCG.create(_device.Get(), &_graphicsCommandContext, indirectMeshes, "TestI");
 
 	gpuDrivenStenby = true;
@@ -239,7 +243,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 void GraphicsCore::onUpdate() {
 	_imguiWindow.startFrame();
 
-	static Vector3 positionC = -Vector3::forward * 10;
+	static Vector3 positionC = -Vector3::forward * 30 + Vector3::up * 10;
 	static float pitchC = 0;
 	static float yawC = 0;
 	static float rollC = 0;
@@ -267,7 +271,7 @@ void GraphicsCore::onUpdate() {
 	mainCamera->computeProjectionMatrix();
 	mainCamera->computeViewMatrix();
 
-	static Vector3 positionV = -Vector3::forward * 5;
+	static Vector3 positionV = -Vector3::forward * 30;
 	static float pitchV = 0;
 	static float yawV = 0;
 	static float rollV = 0;

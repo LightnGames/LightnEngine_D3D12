@@ -97,9 +97,17 @@ struct PerInstanceVertex {
 	Color color;
 };
 
+struct TextureIndex {
+	uint32 t1;
+	uint32 t2;
+	uint32 t3;
+	uint32 t4;
+};
+
 struct PerInstanceIndirectArgument {
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView;
+	TextureIndex textureIndices;
 	uint32 indexCount;
 	uint32 counterOffset;
 	uint32 instanceCount;
@@ -110,10 +118,16 @@ struct GpuCullingCameraConstant {
 	Vector4 frustumPlanes[4];
 };
 
+struct PerMeshData {
+	VectorArray<ObjectInfo> perInstanceVertex;
+	VectorArray<TextureIndex> textureIndices;
+};
+
 struct IndirectMeshInfo {
 	uint32 maxInstanceCount;
 	RefPtr<VertexAndIndexBuffer> vertexAndIndexBuffer;
 	VectorArray<ObjectInfo> matrices;
+	VectorArray<TextureIndex> textureIndices;
 };
 
 struct CameraConstantRaw {
@@ -144,7 +158,6 @@ public:
 	RootSignature rootSignature;
 	PipelineState pipelineState;
 
-	RefPtr<Texture2D> texs[3];
 	BufferView srv;
 
 private:

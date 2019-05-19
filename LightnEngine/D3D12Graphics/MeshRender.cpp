@@ -83,19 +83,6 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
 
-	//gpuResourceManager.loadSharedMaterial(materialName, &_material);
-
-	String albedo("Cerberus/Cerberus_A.dds");
-	String normal("Cerberus/Cerberus_N.dds");
-	String metallic("Cerberus/Cerberus_M.dds");
-	gpuResourceManager.createTextures(device, *commandContext, { albedo,normal,metallic });
-	gpuResourceManager.loadTexture(albedo, &texs[0]);
-	gpuResourceManager.loadTexture(normal, &texs[1]);
-	gpuResourceManager.loadTexture(metallic, &texs[2]);
-
-	ID3D12Resource* ppTextures[3] = { texs[0]->get(), texs[1]->get(), texs[2]->get() };
-	descriptorHeapManager.createTextureShaderResourceView(ppTextures, &srv, 3);
-
 	cb.create(device, { sizeof(CameraConstantRaw) });
 
 	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
@@ -123,7 +110,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	D3D12_DESCRIPTOR_RANGE1 srvRange = {};
 	srvRange.BaseShaderRegister = 0;
-	srvRange.NumDescriptors = 3;
+	srvRange.NumDescriptors = 18;
 	srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -171,6 +158,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		_indirectMeshes[i].indexCount = meshes[i].vertexAndIndexBuffer->indexBuffer._indexCount;
 		_indirectMeshes[i].instanceCount = meshes[i].maxInstanceCount;
 		_indirectMeshes[i].counterOffset = AlignForUavCounter(meshes[i].maxInstanceCount * sizeof(PerInstanceVertex));
+		_indirectMeshes[i].textureIndices = meshes[i].textureIndices[0];
 	}
 
 	//コマンドシグネチャ生成
@@ -376,10 +364,10 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 			commands[j].vertexBufferView = mesh.vertexBufferView;
 			commands[j].indexBufferView = mesh.indexBufferView;
 			commands[j].perInstanceVertexBufferView = perInstanceVertexBufferView;
-			commands[j].textureIndices[0] = j;
-			commands[j].textureIndices[1] = j;
-			commands[j].textureIndices[2] = j;
-			commands[j].textureIndices[3] = j;
+			commands[j].textureIndices[0] = mesh.textureIndices.t1;
+			commands[j].textureIndices[1] = mesh.textureIndices.t2;
+			commands[j].textureIndices[2] = mesh.textureIndices.t3;
+			commands[j].textureIndices[3] = mesh.textureIndices.t4;
 			commands[j].drawArguments.IndexCountPerInstance = mesh.indexCount;
 			commands[j].drawArguments.InstanceCount = 0;
 			commands[j].drawArguments.BaseVertexLocation = 0;
