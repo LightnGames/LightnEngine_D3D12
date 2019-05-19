@@ -6,9 +6,24 @@
 #include "MeshRender.h"]
 #include "DebugGeometry.h"
 
-void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo>& meshes, const String& materialName) {
+void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const StaticMultiMeshInitInfo& initInfo) {
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
+
+	const String& materialName = initInfo.materialName;
+	const auto& meshes = initInfo.meshes;
+	const auto& textureNames = initInfo.textureNames;
+
+	//Shader Resource ViewçÏê¨
+	VectorArray<RefPtr<ID3D12Resource>> ppTextureResources(textureNames.size());
+	for (size_t i = 0; i < textureNames.size(); ++i) {
+		RefPtr<Texture2D> texture;
+		gpuResourceManager.loadTexture(textureNames[i], &texture);
+		ppTextureResources[i] = texture->get();
+	}
+
+	uint32 textureCount = static_cast<uint32>(textureNames.size());
+	descriptorHeapManager.createTextureShaderResourceView(ppTextureResources.data(), &srv, textureCount);
 
 	cb.create(device, { sizeof(CameraConstantRaw) });
 
@@ -37,7 +52,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	D3D12_DESCRIPTOR_RANGE1 srvRange = {};
 	srvRange.BaseShaderRegister = 0;
-	srvRange.NumDescriptors = 18;
+	srvRange.NumDescriptors = textureCount;
 	srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 	srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;

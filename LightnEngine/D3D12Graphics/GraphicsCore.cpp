@@ -221,17 +221,13 @@ void GraphicsCore::onInit(HWND hwnd) {
 	}
 
 	_gpuResourceManager.createTextures(_device.Get(), _graphicsCommandContext, textureNames);
+	
+	StaticMultiMeshInitInfo initInfo;
+	initInfo.materialName = "TestI";
+	initInfo.meshes = indirectMeshes;
+	initInfo.textureNames = textureNames;
 
-	VectorArray<RefPtr<ID3D12Resource>> ppTextureResources(textureNames.size());
-	for (size_t i = 0; i < textureNames.size(); ++i) {
-		RefPtr<Texture2D> texture;
-		_gpuResourceManager.loadTexture(textureNames[i], &texture);
-		ppTextureResources[i] = texture->get();
-	}
-
-	_descriptorHeapManager.createTextureShaderResourceView(ppTextureResources.data(), &multiRCG.srv, textureCount);
-
-	multiRCG.create(_device.Get(), &_graphicsCommandContext, indirectMeshes, "TestI");
+	multiRCG.create(_device.Get(), &_graphicsCommandContext, initInfo);
 
 	gpuDrivenStenby = true;
 }

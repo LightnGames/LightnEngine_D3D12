@@ -61,10 +61,16 @@ struct CameraConstantRaw {
 	Vector3 cameraPosition;
 };
 
+struct StaticMultiMeshInitInfo {
+	String materialName;
+	VectorArray<IndirectMeshInfo> meshes;
+	VectorArray<String> textureNames;
+};
+
 class StaticMultiMeshRCG {
 public:
 	//カリング対象の行列データと描画情報を渡して初期化
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<IndirectMeshInfo>& meshes, const String& materialName);
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const StaticMultiMeshInitInfo& initInfo);
 
 	//GPUカリングで使用するカメラ情報を更新
 	void updateCullingCameraInfo(const Camera& camera, uint32 frameIndex);
