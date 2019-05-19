@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\AABB.h" />
     <ClInclude Include="include\BufferView.h" />
     <ClInclude Include="include\Camera.h" />
     <ClInclude Include="include\CommandAllocatorPool.h" />
@@ -40,6 +41,7 @@
     <ClInclude Include="include\PipelineState.h" />
     <ClInclude Include="include\RenderableEntity.h" />
     <ClInclude Include="include\SharedMaterial.h" />
+    <ClInclude Include="include\StaticMultiMesh.h" />
     <ClInclude Include="include\stdafx.h" />
     <ClInclude Include="include\ThirdParty\DirectXTex\DDSTextureLoader12.h" />
     <ClInclude Include="ThirdParty\DirectXTex\DDSTextureLoader12.h" />
@@ -64,6 +66,8 @@
     <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="ImguiWindow.cpp" />
+    <ClCompile Include="AABB.cpp" />
+    <ClCompile Include="StaticMultiMesh.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MeshRender.cpp" />
     <ClCompile Include="RenderableEntity.cpp" />

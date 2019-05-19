@@ -21,10 +21,10 @@ struct InIndirectCommand {
 	IndirectCommand indirectCommand;
 };
 
-StructuredBuffer<InIndirectCommand> inputCommands : register(t0);    // SRV: Indirect commands
-StructuredBuffer<uint> countBufferOffsets : register(t1);
-ByteAddressBuffer objectDatas[] : register(t2);
-AppendStructuredBuffer<IndirectCommand> outputCommands : register(u0);    // UAV: Processed indirect commands
+StructuredBuffer<InIndirectCommand> inputCommands : register(t0);//元の描画コマンド　メッシュインデックス付き
+StructuredBuffer<uint> countBufferOffsets : register(t1);//AppendStructureBufferのカウント値までのオフセット数
+ByteAddressBuffer objectDatas[] : register(t2);//描画されるインスタシング用の行列が入っている。今回はカウント値を見るだけ
+AppendStructuredBuffer<IndirectCommand> outputCommands : register(u0);//ExecuteIndirectに渡すバッファ
 
 [numthreads(1, 1, 1)]
 void CSMain(uint3 groupId : SV_GroupID)

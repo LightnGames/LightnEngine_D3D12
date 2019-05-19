@@ -5,6 +5,7 @@
 #include "D3D12Helper.h"
 #include "SharedMaterial.h"
 #include "MeshRender.h"
+#include "StaticMultiMesh.h"
 
 #include "ThirdParty/Imgui/imgui.h"
 
@@ -128,16 +129,9 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
 
-	VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-	{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-	{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-	{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-	{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+	struct PerMeshData {
+		VectorArray<ObjectInfo> perInstanceVertex;
+		VectorArray<TextureIndex> textureIndices;
 	};
 
 	String fullPath = "Resources/Environment/meshes.scene";
@@ -190,9 +184,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 			fin.read(reinterpret_cast<char*>(&rotation), 16);
 			fin.read(reinterpret_cast<char*>(&scale), 12);
 
-			meshData.perInstanceVertex[j].mtxWorld = Matrix4::createWorldMatrix(position, rotation, scale).transpose();
-			meshData.perInstanceVertex[j].startPosAABB = position;
-			meshData.perInstanceVertex[j].color = Color(j * 0.02f, 0, 0, 1);
+			meshData.perInstanceVertex[j].mtxWorld = Matrix4::createWorldMatrix(position, rotation, scale);
 			meshData.perInstanceVertex[j].indirectArgumentIndex = static_cast<uint32>(i);
 		}
 	}
@@ -214,8 +206,12 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 		//シーンに配置されているオブジェクトのワールド行列をマップ
 		for (size_t j = 0; j < perInstance.size(); ++j) {
-			perInstance[j].mtxWorld = meshDatas[i].perInstanceVertex[j].mtxWorld;
-			perInstance[j].startPosAABB = meshDatas[i].perInstanceVertex[j].startPosAABB;
+			const Matrix4& mtxWorld = meshDatas[i].perInstanceVertex[j].mtxWorld;
+			AABB boundingBox = viBuffer->boundingBox.createTransformMatrix(mtxWorld);
+			boundingBox.translate(mtxWorld.translate());
+
+			perInstance[j].mtxWorld = mtxWorld.transpose();
+			perInstance[j].boundingBox = boundingBox;
 			perInstance[j].color = Color(j * 0.02f, 0, 0, 1);
 			perInstance[j].indirectArgumentIndex = static_cast<uint32>(i);
 		}
@@ -270,6 +266,7 @@ void GraphicsCore::onUpdate() {
 	mainCamera->setAspectRate(_width, _height);
 	mainCamera->computeProjectionMatrix();
 	mainCamera->computeViewMatrix();
+	mainCamera->computeFlustomNormals();
 
 	static Vector3 positionV = -Vector3::forward * 30;
 	static float pitchV = 0;
@@ -364,11 +361,6 @@ void GraphicsCore::onRender() {
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
-	//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
-	_debugGeometryRender.updatePerInstanceData(_frameIndex);
-	_debugGeometryRender.setupRenderCommand(renderSettings);
-	_debugGeometryRender.clearDebugDatas();
-
 	CameraConstantRaw cr;
 	cr.mtxView = mainCamera->getViewMatrixTransposed();
 	cr.mtxProj = mainCamera->getProjectionMatrixTransposed();
@@ -378,6 +370,11 @@ void GraphicsCore::onRender() {
 	multiRCG.cb.flashBufferData(_frameIndex);
 
 	multiRCG.setupRenderCommand(renderSettings);
+
+	//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
+	_debugGeometryRender.updatePerInstanceData(_frameIndex);
+	_debugGeometryRender.setupRenderCommand(renderSettings);
+	_debugGeometryRender.clearDebugDatas();
 
 	//ImguiWindow描画
 	_imguiWindow.renderFrame(commandList);

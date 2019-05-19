@@ -168,16 +168,31 @@ int main(int argc, char* argv[]) {
 			materialRanges.emplace_back(materialIndexSizes[i], materialIndexOffsets[i]);
 		}
 
+		//BoundingBoxのサイズを計算
+		Vector3 aabbMin;
+		Vector3 aabbMax;
+		for (auto&& v : vertices) {
+			const Vector3& p = v.position;
+			if (p.x < aabbMin.x) { aabbMin.x = p.x; }
+			if (p.x > aabbMax.x) { aabbMax.x = p.x; }
+			if (p.y < aabbMin.y) { aabbMin.y = p.y; }
+			if (p.y > aabbMax.y) { aabbMax.y = p.y; }
+			if (p.z < aabbMin.z) { aabbMin.z = p.z; }
+			if (p.z > aabbMax.z) { aabbMax.z = p.z; }
+		}
+
 		uint32 allFileSize = 0;
 		uint32 verticesCount = vertices.size();
 		uint32 indicesCount = indices.size();
 		uint32 verticesSize = verticesCount * sizeof(RawVertex);
 		uint32 indicesSize = indicesCount * sizeof(uint32);
 		uint32 materialSize = materialCount * sizeof(MaterialDrawRange);
+		uint32 boundingBoxSize = sizeof(Vector3) * 2;
 
 		allFileSize += verticesSize;
 		allFileSize += indicesSize;
 		allFileSize += materialSize;
+		allFileSize += boundingBoxSize;
 
 		std::string filePath(fileName.c_str());
 		size_t splitPoint = filePath.find('.');
@@ -194,6 +209,8 @@ int main(int argc, char* argv[]) {
 		fout.write(reinterpret_cast<const char*>(vertices.data()), verticesSize);
 		fout.write(reinterpret_cast<const char*>(indices.data()), indicesSize);
 		fout.write(reinterpret_cast<const char*>(materialRanges.data()), materialSize);
+		fout.write(reinterpret_cast<const char*>(&aabbMin), 12);
+		fout.write(reinterpret_cast<const char*>(&aabbMax), 12);
 
 		fout.close();
 	}

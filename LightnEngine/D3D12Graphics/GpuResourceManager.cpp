@@ -7,6 +7,7 @@
 #include "stdafx.h"
 #include "GpuResourceDataPool.h"
 #include "MeshRender.h"
+#include "AABB.h"
 #include <cassert>
 #include <LMath.h>
 
@@ -349,10 +350,12 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 		VectorArray<RawVertex> vertices(verticesCount);
 		VectorArray<uint32> indices(indicesCount);
 		VectorArray<MaterialDrawRange> materialRanges(materialCount);
+		AABB boundingBox;
 
 		fin.read(reinterpret_cast<char*>(vertices.data()), verticesSize);
 		fin.read(reinterpret_cast<char*>(indices.data()), indicesSize);
 		fin.read(reinterpret_cast<char*>(materialRanges.data()), materialSize);
+		fin.read(reinterpret_cast<char*>(&boundingBox), 24);
 
 		fin.close();
 
@@ -362,6 +365,7 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 			std::make_tuple(materialRanges));
 
 		VertexAndIndexBuffer& buffers = (*itr.first).second;
+		buffers.boundingBox = boundingBox;
 
 		//頂点バッファ生成
 		buffers.vertexBuffer.createDeferred<RawVertex>(device, commandList, &uploadHeaps[uploadHeapCounter++], vertices);
