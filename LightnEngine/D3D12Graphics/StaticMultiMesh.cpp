@@ -3,7 +3,7 @@
 #include "GpuResource.h"
 #include "DescriptorHeap.h"
 #include "GpuResourceManager.h"
-#include "MeshRender.h"]
+#include "MeshRender.h"
 #include "DebugGeometry.h"
 
 void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const StaticMultiMeshInitInfo& initInfo) {

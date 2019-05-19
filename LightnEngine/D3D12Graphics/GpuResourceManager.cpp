@@ -208,8 +208,8 @@ namespace std {
 }
 
 #include <fstream>
-#include <fbxsdk.h>
-using namespace fbxsdk;
+//#include <fbxsdk.h>
+//using namespace fbxsdk;
 void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device, CommandContext& commandContext, const VectorArray<String>& fileNames) {
 	VectorArray<ComPtr<ID3D12Resource>> uploadHeaps(fileNames.size() * 2);//読み込むファイル数×(頂点バッファ＋インデックスバッファ)
 	auto commandListSet = commandContext.requestCommandListSet();

@@ -39,7 +39,6 @@ PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 	result.uv = input.uv;
 	result.viewDir = normalize(cameraPos - worldPos.xyz);
 
-	//result.position = worldPos;
 	result.color = input.color;
 
 	return result;
