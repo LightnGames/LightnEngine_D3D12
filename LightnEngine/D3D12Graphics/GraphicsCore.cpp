@@ -207,7 +207,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		RefPtr<VertexAndIndexBuffer> viBuffer;
 		_gpuResourceManager.loadVertexAndIndexBuffer(meshNames[i], &viBuffer);
 		indirectMeshes[i].vertexAndIndexBuffer = viBuffer;
-		indirectMeshes[i].maxInstanceCount = meshDatas[i].perInstanceVertex.size();
+		indirectMeshes[i].maxInstanceCount = static_cast<uint32>(meshDatas[i].perInstanceVertex.size());
 
 		const uint32 instanceCount = indirectMeshes[i].maxInstanceCount;
 		VectorArray<ObjectInfo> perInstance(instanceCount);

@@ -109,14 +109,6 @@ struct TextureIndex {
 	uint32 t4;
 };
 
-struct PerInstanceIndirectArgument {
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-	D3D12_INDEX_BUFFER_VIEW indexBufferView;
-	TextureIndex textureIndices;
-	uint32 indexCount;
-	uint32 instanceCount;
-};
-
 struct GpuCullingCameraConstant {
 	Vector4 cameraPosition;
 	Vector4 frustumPlanes[4];
@@ -177,7 +169,6 @@ private:
 	UINT _gpuCullingDispatchCount;
 
 	ConstantBufferMaterial _gpuCullingCameraConstantBuffers;
-	VectorArray<PerInstanceIndirectArgument> _indirectMeshes;
 	VectorArray<uint32> _uavCounters;
 
 	CommandSignature _commandSignature;

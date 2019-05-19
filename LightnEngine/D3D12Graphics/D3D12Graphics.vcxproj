@@ -53,6 +53,7 @@
     <ClInclude Include="ThirdParty\Imgui\imstb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CommandAllocatorPool.cpp" />
     <ClCompile Include="CommandContext.cpp" />
     <ClCompile Include="CommandListPool.cpp" />
@@ -63,7 +64,6 @@
     <ClCompile Include="GpuResourceManager.cpp" />
     <ClCompile Include="GraphicsCore.cpp" />
     <ClCompile Include="ImguiWindow.cpp" />
-    <ClCompile Include="include\Camera.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MeshRender.cpp" />
     <ClCompile Include="RenderableEntity.cpp" />

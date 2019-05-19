@@ -9,7 +9,7 @@ class SharedMaterial;
 class CommandContext;
 struct RenderSettings;
 
-constexpr uint32 MAX_GIZMO = 256;
+constexpr uint32 MAX_GIZMO = 2048;
 
 struct DebugLineVertex {
 	DebugLineVertex(const Vector3& startPos, const Vector3& endPos, const Color& color) :
