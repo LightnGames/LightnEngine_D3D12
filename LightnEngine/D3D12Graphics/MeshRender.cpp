@@ -155,13 +155,15 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	_indirectArgumentCount = _meshCount;
 	_indirectMeshes.resize(_indirectArgumentCount);
-	for (size_t i = 0; i < _indirectMeshes.size(); ++i) {
-		_indirectMeshes[i].vertexBufferView = meshes[i].vertexAndIndexBuffer->vertexBuffer._vertexBufferView;
-		_indirectMeshes[i].indexBufferView = meshes[i].vertexAndIndexBuffer->indexBuffer._indexBufferView;
-		_indirectMeshes[i].indexCount = meshes[i].vertexAndIndexBuffer->indexBuffer._indexCount;
-		_indirectMeshes[i].instanceCount = meshes[i].maxInstanceCount;
-		_indirectMeshes[i].textureIndices = meshes[i].textureIndices[0];
+	for (size_t i = 0; i < _meshCount; ++i) {
+		PerInstanceIndirectArgument& argument = _indirectMeshes[i];
+		argument.vertexBufferView = meshes[i].vertexAndIndexBuffer->vertexBuffer._vertexBufferView;
+		argument.indexBufferView = meshes[i].vertexAndIndexBuffer->indexBuffer._indexBufferView;
+		argument.indexCount = meshes[i].vertexAndIndexBuffer->indexBuffer._indexCount;
+		argument.instanceCount = meshes[i].maxInstanceCount;
+		argument.textureIndices = meshes[i].textureIndices[0];
 	}
+
 	for (size_t i = 0; i < _meshCount; ++i) {
 		_uavCounters[i] = AlignForUavCounter(meshes[i].maxInstanceCount * sizeof(PerInstanceVertex));
 	}
@@ -340,35 +342,35 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		bufferSrv.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 	}
 
-	for (uint32 i = 0; i < FrameCount; ++i) {
+	for (uint32 frame = 0; frame < FrameCount; ++frame) {
 		VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_meshCount);
 
-		for (uint32 j = 0; j < _meshCount; ++j) {
-			uint32 index = i * _meshCount + j;
+		for (uint32 i = 0; i < _meshCount; ++i) {
+			uint32 index = frame * _meshCount + i;
 			_gpuDrivenInstanceCulledBuffer[index].createDirectGpuOnlyEmpty(device, _uavCounters[i] + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-			ppCulledBuffers[j] = _gpuDrivenInstanceCulledBuffer[index].get();
+			ppCulledBuffers[i] = _gpuDrivenInstanceCulledBuffer[index].get();
 		}
 
-		descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[i], _meshCount, gpuDrivenInstanceCulledBufferUavs);
-		descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[i], _meshCount, gpuDrivenInstanceCulledBufferSrvs);
+		descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[frame], _meshCount, gpuDrivenInstanceCulledBufferUavs);
+		descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[frame], _meshCount, gpuDrivenInstanceCulledBufferSrvs);
 	}
 
 	//ExecuteIndirectに渡すIndirectBufferを生成
-	for (uint32 i = 0; i < FrameCount; ++i) {
+	for (uint32 frame = 0; frame < FrameCount; ++frame) {
 		VectorArray<InIndirectCommand> commands(_indirectArgumentCount);
 
-		for (size_t j = 0; j < _indirectMeshes.size(); ++j) {
-			const uint32 culledBufferIndex = i * _indirectArgumentCount + static_cast<uint32>(j);
-			const PerInstanceIndirectArgument& perInstanceArgument = _indirectMeshes[j];
-			const IndirectMeshInfo& meshInfo = meshes[j];
+		for (size_t i = 0; i < _meshCount; ++i) {
+			const uint32 culledBufferIndex = frame * _indirectArgumentCount + static_cast<uint32>(i);
+			const PerInstanceIndirectArgument& perInstanceArgument = _indirectMeshes[i];
+			const IndirectMeshInfo& meshInfo = meshes[i];
 
 			D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
 			perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffer[culledBufferIndex].getGpuVirtualAddress();
 			perInstanceVertexBufferView.StrideInBytes = sizeof(PerInstanceVertex);
-			perInstanceVertexBufferView.SizeInBytes = _uavCounters[j] + sizeof(UINT);
+			perInstanceVertexBufferView.SizeInBytes = _uavCounters[i] + sizeof(UINT);
 
-			IndirectCommand& command = commands[j].indirectCommand;
-			commands[j].meshIndex[0] = j;
+			IndirectCommand& command = commands[i].indirectCommand;
+			commands[i].meshIndex[0] = i;
 			command.vertexBufferView = perInstanceArgument.vertexBufferView;
 			command.indexBufferView = perInstanceArgument.indexBufferView;
 			command.perInstanceVertexBufferView = perInstanceVertexBufferView;
@@ -383,11 +385,11 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 			command.drawArguments.StartInstanceLocation = 0;
 		}
 
-		_indirectArgumentSourceBuffer[i].createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers[i], commands);
-		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer[i].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+		_indirectArgumentSourceBuffer[frame].createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers[frame], commands);
+		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer[frame].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
 		//GPUカリング後のIndirectBuffer
-		_indirectArgumentDstBuffer[i].createDirectGpuOnlyEmpty(device, _indirectArgumentDstCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		_indirectArgumentDstBuffer[frame].createDirectGpuOnlyEmpty(device, _indirectArgumentDstCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 		//IndirectArgumentバッファのUAVを作成
 		D3D12_BUFFER_UAV bufferUav;
@@ -396,7 +398,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		bufferUav.StructureByteStride = sizeof(IndirectCommand);
 		bufferUav.CounterOffsetInBytes = _indirectArgumentDstCounterOffset;
 
-		descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer[i].getAdressOf(), &_setupCommandUavView[i], 1, { bufferUav });
+		descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer[frame].getAdressOf(), &_setupCommandUavView[frame], 1, { bufferUav });
 	}
 
 	//CulledBufferのカウンタまでのバイトオフセットを格納するバッファ
