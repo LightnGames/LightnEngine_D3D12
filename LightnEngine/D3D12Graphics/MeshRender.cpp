@@ -351,7 +351,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	//ExecuteIndirect‚É“n‚·IndirectBuffer‚ð¶¬
 	for (uint32 i = 0; i < FrameCount; ++i) {
-		VectorArray<IndirectCommand> commands(_indirectArgumentCount);
+		VectorArray<InIndirectCommand> commands(_indirectArgumentCount);
 
 		for (size_t j = 0; j < _indirectMeshes.size(); ++j) {
 			const uint32 culledBufferIndex = i * _indirectArgumentCount + static_cast<uint32>(j);
@@ -363,21 +363,23 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 			perInstanceVertexBufferView.StrideInBytes = sizeof(PerInstanceVertex);
 			perInstanceVertexBufferView.SizeInBytes = perInstanceArgument.counterOffset + sizeof(UINT);
 
-			commands[j].vertexBufferView = perInstanceArgument.vertexBufferView;
-			commands[j].indexBufferView = perInstanceArgument.indexBufferView;
-			commands[j].perInstanceVertexBufferView = perInstanceVertexBufferView;
-			commands[j].textureIndices[0] = perInstanceArgument.textureIndices.t1;
-			commands[j].textureIndices[1] = perInstanceArgument.textureIndices.t2;
-			commands[j].textureIndices[2] = perInstanceArgument.textureIndices.t3;
-			commands[j].textureIndices[3] = perInstanceArgument.textureIndices.t4;
-			commands[j].drawArguments.IndexCountPerInstance = meshInfo.vertexAndIndexBuffer->materialDrawRanges[0].indexCount;
-			commands[j].drawArguments.StartIndexLocation = meshInfo.vertexAndIndexBuffer->materialDrawRanges[0].indexOffset;
-			commands[j].drawArguments.InstanceCount = 0;
-			commands[j].drawArguments.BaseVertexLocation = 0;
-			commands[j].drawArguments.StartInstanceLocation = 0;
+			IndirectCommand& command = commands[j].indirectCommand;
+			commands[j].meshIndex[0] = j;
+			command.vertexBufferView = perInstanceArgument.vertexBufferView;
+			command.indexBufferView = perInstanceArgument.indexBufferView;
+			command.perInstanceVertexBufferView = perInstanceVertexBufferView;
+			command.textureIndices[0] = perInstanceArgument.textureIndices.t1;
+			command.textureIndices[1] = perInstanceArgument.textureIndices.t2;
+			command.textureIndices[2] = perInstanceArgument.textureIndices.t3;
+			command.textureIndices[3] = perInstanceArgument.textureIndices.t4;
+			command.drawArguments.IndexCountPerInstance = meshInfo.vertexAndIndexBuffer->materialDrawRanges[0].indexCount;
+			command.drawArguments.StartIndexLocation = meshInfo.vertexAndIndexBuffer->materialDrawRanges[0].indexOffset;
+			command.drawArguments.InstanceCount = 0;
+			command.drawArguments.BaseVertexLocation = 0;
+			command.drawArguments.StartInstanceLocation = 0;
 		}
 
-		_indirectArgumentSourceBuffer[i].createDeferredGpuOnly<IndirectCommand>(device, commandList, &indirectCommandUploadBuffers[i], commands);
+		_indirectArgumentSourceBuffer[i].createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers[i], commands);
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer[i].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
 		//GPUƒJƒŠƒ“ƒOŒã‚ÌIndirectBuffer

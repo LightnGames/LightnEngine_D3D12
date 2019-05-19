@@ -84,6 +84,11 @@ struct IndirectCommand
 	D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
 };
 
+struct InIndirectCommand {
+	uint32 meshIndex[4];
+	IndirectCommand indirectCommand;
+};
+
 struct ObjectInfo {
 	Matrix4 mtxWorld;
 	Vector3 startPosAABB;
