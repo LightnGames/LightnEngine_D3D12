@@ -32,10 +32,6 @@ void CSMain(uint3 groupId : SV_GroupID)
 	if (numStructs > 0) {
 		IndirectCommand command = inputCommands[argumentIndex];
 		command.drawArguments[1] = numStructs;
-		command.drawArguments[2] = 0;
-		command.drawArguments[3] = 0;
-		command.drawArguments[4] = 0;
-		command.drawArguments[5] = 0;
 
 		outputCommands.Append(command);
 	}

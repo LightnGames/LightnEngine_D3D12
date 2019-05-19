@@ -210,17 +210,17 @@ void GraphicsCore::onInit(HWND hwnd) {
 		indirectMeshes[i].maxInstanceCount = meshDatas[i].perInstanceVertex.size();
 
 		const uint32 instanceCount = indirectMeshes[i].maxInstanceCount;
-		VectorArray<ObjectInfo> objectArray(instanceCount);
+		VectorArray<ObjectInfo> perInstance(instanceCount);
 
 		//シーンに配置されているオブジェクトのワールド行列をマップ
-		for (size_t j = 0; j < objectArray.size(); ++j) {
-			objectArray[j].mtxWorld = meshDatas[i].perInstanceVertex[j].mtxWorld;
-			objectArray[j].startPosAABB = meshDatas[i].perInstanceVertex[j].startPosAABB;
-			objectArray[j].color = Color(j * 0.02f, 0, 0, 1);
-			objectArray[j].indirectArgumentIndex = static_cast<uint32>(i);
+		for (size_t j = 0; j < perInstance.size(); ++j) {
+			perInstance[j].mtxWorld = meshDatas[i].perInstanceVertex[j].mtxWorld;
+			perInstance[j].startPosAABB = meshDatas[i].perInstanceVertex[j].startPosAABB;
+			perInstance[j].color = Color(j * 0.02f, 0, 0, 1);
+			perInstance[j].indirectArgumentIndex = static_cast<uint32>(i);
 		}
 
-		indirectMeshes[i].matrices = objectArray;
+		indirectMeshes[i].matrices = perInstance;
 		indirectMeshes[i].textureIndices = meshDatas[i].textureIndices;
 	}
 
@@ -309,7 +309,7 @@ void GraphicsCore::onUpdate() {
 
 void GraphicsCore::onRender() {
 	if (gpuDrivenStenby) {
-		multiRCG.onCompute(&_computeCommandContext, _frameIndex);
+		multiRCG.onCompute(&_graphicsCommandContext, _frameIndex);
 	}
 
 	auto commandListSet = _graphicsCommandContext.requestCommandListSet();

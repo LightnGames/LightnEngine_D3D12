@@ -168,6 +168,7 @@ private:
 	//RefPtr<SharedMaterial> _material;
 
 	UINT _indirectArgumentCount;
+	UINT _meshCount;
 	UINT _indirectArgumentDstCounterOffset;
 	UINT _gpuCullingDispatchCount;
 

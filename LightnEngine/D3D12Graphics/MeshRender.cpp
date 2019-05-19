@@ -150,7 +150,8 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	pipelineState.create(device, &rootSignature, vs, ps);
 
 	//•`‰æŒ³î•ñ‚©‚çGPUƒJƒŠƒ“ƒO‚ÆIndirect•`‰æ‚É•K—v‚Èî•ñ‚ð‚Ü‚Æ‚ß‚é
-	_indirectArgumentCount = static_cast<uint32>(meshes.size());
+	_meshCount = static_cast<uint32>(meshes.size());
+	_indirectArgumentCount = _meshCount;
 	_indirectMeshes.resize(_indirectArgumentCount);
 	for (size_t i = 0; i < _indirectMeshes.size(); ++i) {
 		_indirectMeshes[i].vertexBufferView = meshes[i].vertexAndIndexBuffer->vertexBuffer._vertexBufferView;
@@ -354,24 +355,25 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 		for (size_t j = 0; j < _indirectMeshes.size(); ++j) {
 			const uint32 culledBufferIndex = i * _indirectArgumentCount + static_cast<uint32>(j);
-			PerInstanceIndirectArgument& mesh = _indirectMeshes[j];
+			const PerInstanceIndirectArgument& perInstanceArgument = _indirectMeshes[j];
+			const IndirectMeshInfo& meshInfo = meshes[j];
 
 			D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
 			perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffer[culledBufferIndex].getGpuVirtualAddress();
 			perInstanceVertexBufferView.StrideInBytes = sizeof(PerInstanceVertex);
-			perInstanceVertexBufferView.SizeInBytes = mesh.counterOffset + sizeof(UINT);
+			perInstanceVertexBufferView.SizeInBytes = perInstanceArgument.counterOffset + sizeof(UINT);
 
-			commands[j].vertexBufferView = mesh.vertexBufferView;
-			commands[j].indexBufferView = mesh.indexBufferView;
+			commands[j].vertexBufferView = perInstanceArgument.vertexBufferView;
+			commands[j].indexBufferView = perInstanceArgument.indexBufferView;
 			commands[j].perInstanceVertexBufferView = perInstanceVertexBufferView;
-			commands[j].textureIndices[0] = mesh.textureIndices.t1;
-			commands[j].textureIndices[1] = mesh.textureIndices.t2;
-			commands[j].textureIndices[2] = mesh.textureIndices.t3;
-			commands[j].textureIndices[3] = mesh.textureIndices.t4;
-			commands[j].drawArguments.IndexCountPerInstance = mesh.indexCount;
+			commands[j].textureIndices[0] = perInstanceArgument.textureIndices.t1;
+			commands[j].textureIndices[1] = perInstanceArgument.textureIndices.t2;
+			commands[j].textureIndices[2] = perInstanceArgument.textureIndices.t3;
+			commands[j].textureIndices[3] = perInstanceArgument.textureIndices.t4;
+			commands[j].drawArguments.IndexCountPerInstance = meshInfo.vertexAndIndexBuffer->materialDrawRanges[0].indexCount;
+			commands[j].drawArguments.StartIndexLocation = meshInfo.vertexAndIndexBuffer->materialDrawRanges[0].indexOffset;
 			commands[j].drawArguments.InstanceCount = 0;
 			commands[j].drawArguments.BaseVertexLocation = 0;
-			commands[j].drawArguments.StartIndexLocation = 0;
 			commands[j].drawArguments.StartInstanceLocation = 0;
 		}
 
@@ -459,6 +461,7 @@ void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32
 		computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 		computeCommandList->Dispatch(_indirectArgumentCount, 1, 1);
 	}
+
 
 	commandContext->executeCommandList(computeCommandListSet);
 	commandContext->discardCommandListSet(computeCommandListSet);
