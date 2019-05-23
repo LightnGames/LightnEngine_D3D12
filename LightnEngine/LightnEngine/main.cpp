@@ -2,10 +2,10 @@
 #include "GFXInterface.h"
 #include <LMath.h>
 #include <ThirdParty/Imgui/imgui.h>
-#include <RenderableEntity.h>
 #include <SharedMaterial.h>
 #include <Scene.h>
 #include <GraphicsCore.h>
+#include <fstream>
 
 VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
 { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -550,10 +550,118 @@ public:
 	StaticSingleMeshRender _sky;
 };
 
+
+class TestScene_StaticMultiMesh :public Scene {
+public:
+	void onStart() override {
+		Scene::onStart();
+
+		GFXInterface& gfx = GFXInterface::instance();
+
+		String skyName("skySphere.mesh");
+		String diffuseEnv("cubemapEnvHDR.dds");
+		String specularEnv("cubemapSpecularHDR.dds");
+		String specularBrdf("cubemapBrdf.dds");
+
+		//テクスチャ読み込み
+		gfx.createTextures({ diffuseEnv, specularEnv, specularBrdf });
+
+		String fullPath = "Resources/Environment/meshes.scene";
+		std::ifstream fin(fullPath.c_str(), std::ios::in | std::ios::binary);
+		fin.exceptions(std::ios::badbit);
+
+		assert(!fin.fail() && "メッシュファイルが読み込めません");
+
+		char materialName[64];
+		uint32 textureCount;
+		uint32 meshCount;
+
+		fin.read(reinterpret_cast<char*>(materialName), 64);
+		fin.read(reinterpret_cast<char*>(&textureCount), 4);
+		fin.read(reinterpret_cast<char*>(&meshCount), 4);
+
+		InitSettingsPerStaticMultiMesh initSettings;
+		initSettings.textureNames.resize(textureCount);
+		initSettings.meshNames.resize(meshCount);
+		initSettings.meshes.resize(meshCount);
+
+		for (uint32 i = 0; i < textureCount; ++i) {
+			char textureName[64];
+			fin.read(reinterpret_cast<char*>(textureName), 64);
+
+			initSettings.textureNames[i] = String("Environment/").append(String(textureName)).append(".dds");
+		}
+
+		for (uint32 i = 0; i < meshCount; ++i) {
+			uint32 subMeshCount;
+			uint32 instanceCount;
+			char meshName[64];
+			fin.read(reinterpret_cast<char*>(meshName), 64);
+			fin.read(reinterpret_cast<char*>(&instanceCount), 4);
+			fin.read(reinterpret_cast<char*>(&subMeshCount), 4);
+
+			initSettings.meshNames[i] = String("Environment/").append(String(meshName)).append(".mesh");
+
+			PerMeshData& meshData = initSettings.meshes[i];
+			meshData.matrices.resize(instanceCount);
+			meshData.textureIndices.resize(subMeshCount);
+
+			for (uint32 j = 0; j < subMeshCount; ++j) {
+				fin.read(reinterpret_cast<char*>(&meshData.textureIndices[j]), 16);
+			}
+
+			for (uint32 j = 0; j < instanceCount; ++j) {
+				Vector3 position;
+				Quaternion rotation;
+				Vector3 scale;
+				fin.read(reinterpret_cast<char*>(&position), 12);
+				fin.read(reinterpret_cast<char*>(&rotation), 16);
+				fin.read(reinterpret_cast<char*>(&scale), 12);
+
+				meshData.matrices[j] = Matrix4::createWorldMatrix(position, rotation, scale);
+			}
+		}
+
+		fin.close();
+
+		RefPtr<GraphicsCore> graphicsCore = GFXInterface::instance()._graphicsCore.get();
+
+		graphicsCore->createMeshSets(initSettings.meshNames);
+		graphicsCore->createTextures(initSettings.textureNames);
+		graphicsCore->createStaticMultiMeshRender(initSettings);
+
+		SharedMaterialCreateSettings skyMatSettings;
+		skyMatSettings.name = "TestS";
+		skyMatSettings.vertexShaderName = "skyShaders.hlsl";
+		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
+		skyMatSettings.vsTextures = {};
+		skyMatSettings.psTextures = { diffuseEnv };
+		skyMatSettings.inputLayouts = inputLayouts;
+		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		gfx.createSharedMaterial(skyMatSettings);
+
+		//メッシュデータ読み込み
+		gfx.createMeshSets({ skyName });
+		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+	}
+
+	void onUpdate() override {
+		Scene::onUpdate();
+
+		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
+		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+	}
+	void onDestroy() override {
+		Scene::onDestroy();
+	}
+
+	StaticSingleMeshRender _sky;
+};
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 	Win32Application app;
 	app.init(hInstance, nCmdShow);
-	app._sceneManager->changeScene<TestScene_Gun>();
+	app._sceneManager->changeScene<TestScene_StaticMultiMesh>();
 
 	return app.run();
 }

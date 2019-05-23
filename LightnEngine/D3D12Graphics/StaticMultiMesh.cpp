@@ -6,11 +6,11 @@
 #include "MeshRender.h"
 #include "DebugGeometry.h"
 
-void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const StaticMultiMeshInitInfo& initInfo) {
+void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerStaticMultiMesh& initInfo) {
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
 
-	const String& materialName = initInfo.materialName;
+	//const String& materialName = initInfo.materialName;
 	const auto& meshes = initInfo.meshes;
 	const auto& textureNames = initInfo.textureNames;
 
@@ -97,7 +97,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	for (uint32 i = 0; i < _meshCount; ++i) {
 		_indirectArgumentCount += static_cast<uint32>(meshes[i].textureIndices.size());
-		_uavCounterOffsets[i] = AlignForUavCounter(meshes[i].maxInstanceCount * sizeof(PerInstanceVertex));
+		_uavCounterOffsets[i] = AlignForUavCounter(static_cast<uint32>(meshes[i].matrices.size() * sizeof(InstacingVertexData)));
 	}
 
 	//コマンドシグネチャ生成
@@ -230,38 +230,55 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	//カリング前のシーンに配置されているオブジェクトの行列バッファ
 	uint32 totalMaxInstanceCount = 0;
 	for (const auto& indirectMesh : meshes) {
-		totalMaxInstanceCount += indirectMesh.maxInstanceCount;
+		totalMaxInstanceCount += static_cast<uint32>(indirectMesh.matrices.size());
 	}
 
-	size_t mergedMatricsOffset = 0;
-	VectorArray<ObjectInfo> mergedMatrices(totalMaxInstanceCount);
+	VectorArray<PerInstanceMeshInfo> mergedMatrices;
+	mergedMatrices.reserve(totalMaxInstanceCount);
+
+	#ifdef ENABLE_AABB_DEBUG_DRAW
+	_boundingBoxies.reserve(totalMaxInstanceCount);
+	#endif
+
 	for (uint32 i = 0; i < _meshCount; ++i) {
-		memcpy(mergedMatrices.data() + mergedMatricsOffset, meshes[i].matrices.data(), meshes[i].matrices.size() * sizeof(ObjectInfo));
-		mergedMatricsOffset += meshes[i].matrices.size();
+		for (uint32 j = 0; j < meshes[i].matrices.size(); ++j) {
+			//バウンディングボックス情報が必要なので取得
+			RefPtr<VertexAndIndexBuffer> meshVertexAndIndex;
+			gpuResourceManager.loadVertexAndIndexBuffer(initInfo.meshNames[i], &meshVertexAndIndex);
+
+			//AABB情報を集める
+			const Matrix4& mtxWorld = meshes[i].matrices[j];
+			AABB boundingBox = meshVertexAndIndex->boundingBox.createTransformMatrix(mtxWorld);
+			boundingBox.translate(mtxWorld.translate());
+
+			#ifdef ENABLE_AABB_DEBUG_DRAW
+			_boundingBoxies.emplace_back(boundingBox);//デバッグ用
+			#endif
+
+			PerInstanceMeshInfo info;
+			info.color = Color::white;
+			info.indirectArgumentIndex = i;
+			info.mtxWorld = mtxWorld.transpose();
+			info.boundingBox = boundingBox;
+
+			mergedMatrices.emplace_back(info);
+		}
 	}
 
 	//トータルのインスタンス数を256の数(Thread X Num)でアラインして何回Dispatchするか決める
 	constexpr uint32 THREAD_BLOCK_SIZE = 256;
 	_gpuCullingDispatchCount = ((mergedMatrices.size() + (THREAD_BLOCK_SIZE - 1)) & ~(THREAD_BLOCK_SIZE - 1)) / THREAD_BLOCK_SIZE;
 
-	_gpuDrivenInstanceMatrixBuffer.createDeferredGpuOnly<ObjectInfo>(device, commandList, &inCommandUploadBuffers, mergedMatrices);
+	_gpuDrivenInstanceMatrixBuffer.createDeferredGpuOnly<PerInstanceMeshInfo>(device, commandList, &inCommandUploadBuffers, mergedMatrices);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceMatrixBuffer.get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
 	D3D12_BUFFER_SRV matrixSrvDesc = {};
 	matrixSrvDesc.FirstElement = 0;
 	matrixSrvDesc.NumElements = static_cast<UINT>(mergedMatrices.size());
-	matrixSrvDesc.StructureByteStride = sizeof(ObjectInfo);
+	matrixSrvDesc.StructureByteStride = sizeof(PerInstanceMeshInfo);
 	matrixSrvDesc.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 	descriptorHeapManager.createShaderResourceView(_gpuDrivenInstanceMatrixBuffer.getAdressOf(), &_gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
-
-	//AABB情報を集める
-	_boundingBoxies.reserve(totalMaxInstanceCount);
-	for (uint32 i = 0; i < _meshCount; ++i) {
-		for (uint32 j = 0; j < meshes[i].matrices.size(); ++j) {
-			_boundingBoxies.emplace_back(meshes[i].matrices[j].boundingBox);
-		}
-	}
 
 	//インスタンス用行列頂点バッファとそのUAVを生成
 	VectorArray<D3D12_BUFFER_UAV> gpuDrivenInstanceCulledBufferUavs(_meshCount);
@@ -270,8 +287,8 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	for (size_t i = 0; i < gpuDrivenInstanceCulledBufferUavs.size(); ++i) {
 		D3D12_BUFFER_UAV& bufferUav = gpuDrivenInstanceCulledBufferUavs[i];
 		bufferUav.FirstElement = 0;
-		bufferUav.NumElements = meshes[i].maxInstanceCount;
-		bufferUav.StructureByteStride = sizeof(PerInstanceVertex);
+		bufferUav.NumElements = static_cast<uint32>(meshes[i].matrices.size());
+		bufferUav.StructureByteStride = sizeof(InstacingVertexData);
 		bufferUav.CounterOffsetInBytes = _uavCounterOffsets[i];
 
 		//ByteAddressBufferとして読み込んでAppendStructuredBufferのカウンタの値を読み取る
@@ -282,6 +299,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		bufferSrv.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 	}
 
+	//GPUカリング後のバッファをバインドするためのSRVとUAVを作成
 	for (uint32 frame = 0; frame < FrameCount; ++frame) {
 		VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_meshCount);
 
@@ -302,27 +320,31 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		uint32 counter = 0;
 		for (uint32 i = 0; i < _meshCount; ++i) {
 			const uint32 culledBufferIndex = frame * _meshCount + static_cast<uint32>(i);
-			const IndirectMeshInfo& meshInfo = meshes[i];
+			const PerMeshData& meshInfo = meshes[i];
 			D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
 			perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffer[culledBufferIndex].getGpuVirtualAddress();
-			perInstanceVertexBufferView.StrideInBytes = sizeof(PerInstanceVertex);
+			perInstanceVertexBufferView.StrideInBytes = sizeof(InstacingVertexData);
 			perInstanceVertexBufferView.SizeInBytes = _uavCounterOffsets[i] + sizeof(UINT);
 
+			//頂点バッファとインデックスバッファのリソースをロード
+			RefPtr<VertexAndIndexBuffer> meshVertexAndIndex;
+			gpuResourceManager.loadVertexAndIndexBuffer(initInfo.meshNames[i], &meshVertexAndIndex);
+
+			//メッシュ内のサブメッシュごとにIndirectArgument情報を構築
 			for (size_t j = 0; j < meshInfo.textureIndices.size(); ++j) {
 				const TextureIndex& textureIndices = meshInfo.textureIndices[j];
-				const RefPtr<VertexAndIndexBuffer> meshVertexInfo = meshInfo.vertexAndIndexBuffer;
 
 				IndirectCommand& command = commands[counter].indirectCommand;
 				commands[counter].meshIndex[0] = i;
-				command.vertexBufferView = meshVertexInfo->vertexBuffer._vertexBufferView;
-				command.indexBufferView = meshVertexInfo->indexBuffer._indexBufferView;
+				command.vertexBufferView = meshVertexAndIndex->vertexBuffer._vertexBufferView;
+				command.indexBufferView = meshVertexAndIndex->indexBuffer._indexBufferView;
 				command.perInstanceVertexBufferView = perInstanceVertexBufferView;
 				command.textureIndices[0] = textureIndices.t1;
 				command.textureIndices[1] = textureIndices.t2;
 				command.textureIndices[2] = textureIndices.t3;
 				command.textureIndices[3] = textureIndices.t4;
-				command.drawArguments.IndexCountPerInstance = meshVertexInfo->materialDrawRanges[j].indexCount;
-				command.drawArguments.StartIndexLocation = meshVertexInfo->materialDrawRanges[j].indexOffset;
+				command.drawArguments.IndexCountPerInstance = meshVertexAndIndex->materialDrawRanges[j].indexCount;
+				command.drawArguments.StartIndexLocation = meshVertexAndIndex->materialDrawRanges[j].indexOffset;
 				command.drawArguments.InstanceCount = 0;
 				command.drawArguments.BaseVertexLocation = 0;
 				command.drawArguments.StartInstanceLocation = 0;
@@ -446,10 +468,12 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST, frameIndex);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
 
+#ifdef ENABLE_AABB_DEBUG_DRAW
 	DebugGeometryRender& debug = DebugGeometryRender::instance();
 	for (const auto& aabb : _boundingBoxies) {
 		debug.debugDrawCube(aabb.center(), Quaternion::identity, aabb.size());
 	}
+#endif
 }
 
 void StaticMultiMeshRCG::destroy() {

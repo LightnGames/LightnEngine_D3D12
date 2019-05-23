@@ -2,6 +2,7 @@
 #include <Utility.h>
 #include <LMath.h>
 class StaticSingleMeshRCG;
+class StaticMultiMeshRCG;
 class SharedMaterial;
 
 class StaticSingleMeshRender {
@@ -20,4 +21,10 @@ public:
 
 	VectorArray<RefPtr<SharedMaterial>> _materials;
 	RefPtr<StaticSingleMeshRCG> _rcg;
+};
+
+class StaticMultiMeshRender {
+public:
+	StaticMultiMeshRender(RefPtr<StaticMultiMeshRCG> rcg);
+	RefPtr<StaticMultiMeshRCG> _rcg;
 };

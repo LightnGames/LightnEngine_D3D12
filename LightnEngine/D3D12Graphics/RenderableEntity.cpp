@@ -21,3 +21,6 @@ VectorArray<RefPtr<SharedMaterial>>& StaticSingleMeshRender::getMaterials(){
 void StaticSingleMeshRender::updateWorldMatrix(const Matrix4& worldMatrix){
 	_rcg->updateWorldMatrix(worldMatrix);
 }
+
+StaticMultiMeshRender::StaticMultiMeshRender(RefPtr<StaticMultiMeshRCG> rcg):_rcg(rcg){
+}

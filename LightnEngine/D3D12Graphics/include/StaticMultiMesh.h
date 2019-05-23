@@ -8,10 +8,11 @@
 #include "Camera.h"
 #include "AABB.h"
 
+#define ENABLE_AABB_DEBUG_DRAW
+
 struct VertexAndIndexBuffer;
 
-struct IndirectCommand
-{
+struct IndirectCommand{
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView;
 	D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView;
@@ -24,14 +25,14 @@ struct InIndirectCommand {
 	IndirectCommand indirectCommand;
 };
 
-struct ObjectInfo {
+struct PerInstanceMeshInfo {
 	Matrix4 mtxWorld;
 	AABB boundingBox;
 	Color color;
 	uint32 indirectArgumentIndex;
 };
 
-struct PerInstanceVertex {
+struct InstacingVertexData {
 	Matrix4 mtxWorld;
 	Color color;
 };
@@ -48,29 +49,27 @@ struct GpuCullingCameraConstant {
 	Vector4 frustumPlanes[4];
 };
 
-struct IndirectMeshInfo {
-	uint32 maxInstanceCount;
-	RefPtr<VertexAndIndexBuffer> vertexAndIndexBuffer;
-	VectorArray<ObjectInfo> matrices;
-	VectorArray<TextureIndex> textureIndices;
-};
-
 struct CameraConstantRaw {
 	Matrix4 mtxView;
 	Matrix4 mtxProj;
 	Vector3 cameraPosition;
 };
 
-struct StaticMultiMeshInitInfo {
-	String materialName;
-	VectorArray<IndirectMeshInfo> meshes;
+struct PerMeshData {
+	VectorArray<Matrix4> matrices;
+	VectorArray<TextureIndex> textureIndices;
+};
+
+struct InitSettingsPerStaticMultiMesh {
+	VectorArray<String> meshNames;
+	VectorArray<PerMeshData> meshes;
 	VectorArray<String> textureNames;
 };
 
 class StaticMultiMeshRCG {
 public:
 	//カリング対象の行列データと描画情報を渡して初期化
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const StaticMultiMeshInitInfo& initInfo);
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerStaticMultiMesh& initInfo);
 
 	//GPUカリングで使用するカメラ情報を更新
 	void updateCullingCameraInfo(const Camera& camera, uint32 frameIndex);
@@ -123,5 +122,7 @@ private:
 	BufferView _gpuDriventInstanceCulledUAV[FrameCount];//GPUカリング後の情報を書き込むバッファのUAV
 	BufferView _gpuDrivenInstanceMatrixView;
 
+#ifdef ENABLE_AABB_DEBUG_DRAW
 	VectorArray<AABB> _boundingBoxies;
+#endif
 };

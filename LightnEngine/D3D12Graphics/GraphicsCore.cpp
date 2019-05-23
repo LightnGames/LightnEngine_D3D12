@@ -9,12 +9,6 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-#include <fstream>
-
-StaticMultiMeshRCG multiRCG;
-
-bool gpuDrivenStenby = false;
-
 GraphicsCore::GraphicsCore() :
 	_width(1280),
 	_height(720),
@@ -38,7 +32,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 
 		debugController->QueryInterface(IID_PPV_ARGS(&debugControllerGpu));
-		debugControllerGpu->SetEnableGPUBasedValidation(true);
+		//debugControllerGpu->SetEnableGPUBasedValidation(true);
 	}
 #endif // DEBUG
 
@@ -128,116 +122,14 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
-
-	struct PerMeshData {
-		VectorArray<ObjectInfo> perInstanceVertex;
-		VectorArray<TextureIndex> textureIndices;
-	};
-
-	String fullPath = "Resources/Environment/meshes.scene";
-	std::ifstream fin(fullPath.c_str(), std::ios::in | std::ios::binary);
-	fin.exceptions(std::ios::badbit);
-
-	assert(!fin.fail() && "メッシュファイルが読み込めません");
-
-	char materialName[64];
-	uint32 textureCount;
-	uint32 meshCount;
-
-	fin.read(reinterpret_cast<char*>(materialName), 64);
-	fin.read(reinterpret_cast<char*>(&textureCount), 4);
-	fin.read(reinterpret_cast<char*>(&meshCount), 4);
-
-	VectorArray<String> textureNames(textureCount);
-	for (uint32 i = 0; i < textureCount; ++i) {
-		char textureName[64];
-		fin.read(reinterpret_cast<char*>(textureName), 64);
-
-		textureNames[i] = String("Environment/").append(String(textureName)).append(".dds");
-	}
-
-	VectorArray<String> meshNames(meshCount);
-	VectorArray<PerMeshData> meshDatas(meshCount);
-	for (uint32 i = 0; i < meshCount; ++i) {
-		uint32 subMeshCount;
-		uint32 instanceCount;
-		char meshName[64];
-		fin.read(reinterpret_cast<char*>(meshName), 64);
-		fin.read(reinterpret_cast<char*>(&instanceCount), 4);
-		fin.read(reinterpret_cast<char*>(&subMeshCount), 4);
-
-		meshNames[i] = String("Environment/").append(String(meshName)).append(".mesh");
-
-		PerMeshData& meshData = meshDatas[i];
-		meshData.perInstanceVertex.resize(instanceCount);
-		meshData.textureIndices.resize(subMeshCount);
-
-		for (uint32 j = 0; j < subMeshCount; ++j) {
-			fin.read(reinterpret_cast<char*>(&meshData.textureIndices[j]), 16);
-		}
-
-		for (uint32 j = 0; j < instanceCount; ++j) {
-			Vector3 position;
-			Quaternion rotation;
-			Vector3 scale;
-			fin.read(reinterpret_cast<char*>(&position), 12);
-			fin.read(reinterpret_cast<char*>(&rotation), 16);
-			fin.read(reinterpret_cast<char*>(&scale), 12);
-
-			meshData.perInstanceVertex[j].mtxWorld = Matrix4::createWorldMatrix(position, rotation, scale);
-			meshData.perInstanceVertex[j].indirectArgumentIndex = static_cast<uint32>(i);
-		}
-	}
-
-	fin.close();
-
-	VectorArray<IndirectMeshInfo> indirectMeshes(meshCount);
-
-	_gpuResourceManager.createVertexAndIndexBuffer(_device.Get(), _graphicsCommandContext, meshNames);
-
-	for (size_t i = 0; i < indirectMeshes.size(); ++i) {
-		RefPtr<VertexAndIndexBuffer> viBuffer;
-		_gpuResourceManager.loadVertexAndIndexBuffer(meshNames[i], &viBuffer);
-		indirectMeshes[i].vertexAndIndexBuffer = viBuffer;
-		indirectMeshes[i].maxInstanceCount = static_cast<uint32>(meshDatas[i].perInstanceVertex.size());
-
-		const uint32 instanceCount = indirectMeshes[i].maxInstanceCount;
-		VectorArray<ObjectInfo> perInstance(instanceCount);
-
-		//シーンに配置されているオブジェクトのワールド行列をマップ
-		for (size_t j = 0; j < perInstance.size(); ++j) {
-			const Matrix4& mtxWorld = meshDatas[i].perInstanceVertex[j].mtxWorld;
-			AABB boundingBox = viBuffer->boundingBox.createTransformMatrix(mtxWorld);
-			boundingBox.translate(mtxWorld.translate());
-
-			perInstance[j].mtxWorld = mtxWorld.transpose();
-			perInstance[j].boundingBox = boundingBox;
-			perInstance[j].color = Color(j * 0.02f, 0, 0, 1);
-			perInstance[j].indirectArgumentIndex = static_cast<uint32>(i);
-		}
-
-		indirectMeshes[i].matrices = perInstance;
-		indirectMeshes[i].textureIndices = meshDatas[i].textureIndices;
-	}
-
-	_gpuResourceManager.createTextures(_device.Get(), _graphicsCommandContext, textureNames);
-	
-	StaticMultiMeshInitInfo initInfo;
-	initInfo.materialName = "TestI";
-	initInfo.meshes = indirectMeshes;
-	initInfo.textureNames = textureNames;
-
-	multiRCG.create(_device.Get(), &_graphicsCommandContext, initInfo);
-
-	gpuDrivenStenby = true;
 }
 
 void GraphicsCore::onUpdate() {
 	_imguiWindow.startFrame();
 
-	static Vector3 positionC = -Vector3::forward * 30 + Vector3::up * 10;
-	static float pitchC = 0;
-	static float yawC = 0;
+	static Vector3 positionC = -Vector3::forward * 15 + Vector3::up * 2.5f + Vector3::right * -10;
+	static float pitchC = -0.2f;
+	static float yawC = 1.0f;
 	static float rollC = 0;
 	static float fov = 60;
 	static float farZ = 1000;
@@ -264,7 +156,7 @@ void GraphicsCore::onUpdate() {
 	mainCamera->computeViewMatrix();
 	mainCamera->computeFlustomNormals();
 
-	static Vector3 positionV = -Vector3::forward * 30;
+	static Vector3 positionV = -Vector3::forward * 23 + Vector3::up * 5;
 	static float pitchV = 0;
 	static float yawV = 0;
 	static float rollV = 0;
@@ -295,14 +187,14 @@ void GraphicsCore::onUpdate() {
 	virtualCamera.computeFlustomNormals();
 	virtualCamera.debugDrawFlustom();
 
-	if (gpuDrivenStenby) {
-		multiRCG.updateCullingCameraInfo(virtualCamera, _frameIndex);
+	for (auto&& multiRcg : _multiRcgs) {
+		multiRcg->updateCullingCameraInfo(virtualCamera, _frameIndex);
 	}
 }
 
 void GraphicsCore::onRender() {
-	if (gpuDrivenStenby) {
-		multiRCG.onCompute(&_graphicsCommandContext, _frameIndex);
+	for (auto&& multiRcg : _multiRcgs) {
+		multiRcg->onCompute(&_graphicsCommandContext, _frameIndex);
 	}
 
 	auto commandListSet = _graphicsCommandContext.requestCommandListSet();
@@ -362,10 +254,12 @@ void GraphicsCore::onRender() {
 	cr.mtxProj = mainCamera->getProjectionMatrixTransposed();
 	cr.cameraPosition = mainCamera->getPosition();
 
-	multiRCG.cb.writeBufferData(&cr, sizeof(CameraConstantRaw), 0);
-	multiRCG.cb.flashBufferData(_frameIndex);
+	for (auto&& multiRcg : _multiRcgs) {
+		multiRcg->cb.writeBufferData(&cr, sizeof(CameraConstantRaw), 0);
+		multiRcg->cb.flashBufferData(_frameIndex);
 
-	multiRCG.setupRenderCommand(renderSettings);
+		multiRcg->setupRenderCommand(renderSettings);
+	}
 
 	//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
 	_debugGeometryRender.updatePerInstanceData(_frameIndex);
@@ -397,7 +291,9 @@ void GraphicsCore::onDestroy() {
 		_frameResources[i].shutdown();
 	}
 
-	multiRCG.destroy();
+	for (auto&& multiRcg : _multiRcgs) {
+		multiRcg->destroy();
+	}
 
 	_gpuCommandArray.shutdown();
 	_debugGeometryRender.destroy();
@@ -457,6 +353,15 @@ StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& 
 		slots);
 
 	return StaticSingleMeshRender(materials, render);
+}
+
+StaticMultiMeshRender GraphicsCore::createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas){
+	StaticMultiMeshRCG* multiRCG = new StaticMultiMeshRCG();
+	multiRCG->create(_device.Get(), &_graphicsCommandContext, meshDatas);
+
+	_multiRcgs.emplace_back(multiRCG);
+
+	return StaticMultiMeshRender(multiRCG);
 }
 
 RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager() {

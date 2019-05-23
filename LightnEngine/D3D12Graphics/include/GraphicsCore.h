@@ -12,6 +12,7 @@
 #include "RenderableEntity.h"
 #include "DebugGeometry.h"
 
+#include "StaticMultiMesh.h"
 #include <LinerAllocator.h>
 
 #ifdef _DEBUG
@@ -35,6 +36,8 @@ public:
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
 	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
+	StaticMultiMeshRender createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas);
+
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 	RefPtr<DebugGeometryRender> getDebugGeometryRender();
 
@@ -70,5 +73,6 @@ private:
 
 	uint32 _gpuCommandCount;
 	LinerAllocator _gpuCommandArray;
+	VectorArray<StaticMultiMeshRCG*> _multiRcgs;
 };
 
