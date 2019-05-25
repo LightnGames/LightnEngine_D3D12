@@ -128,6 +128,8 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 	if (!pixelCbSizes.empty()) {
 		material._pixelConstantBuffer.create(device, pixelCbSizes);
 	}
+
+	material.setSizeInstance(device);
 }
 
 //テクスチャをまとめて生成する。まとめて送るのでCPUオーバーヘッドが少ない
@@ -150,7 +152,7 @@ void GpuResourceManager::createTextures(RefPtr<ID3D12Device> device, CommandCont
 			std::make_tuple());
 
 		Texture2D& tex = (*itr.first).second;
-		tex.createDeferred2(device, commandList, &uploadHeaps[i], fullPath);
+		tex.createDeferredFromName(device, commandList, &uploadHeaps[i], fullPath);
 	}
 
 	//アップロードバッファをGPUオンリーバッファにコピー

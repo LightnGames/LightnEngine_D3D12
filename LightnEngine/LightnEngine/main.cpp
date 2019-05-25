@@ -62,8 +62,8 @@ public:
 
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ meshName,skyName });
-		_mesh = gfx.createStaticSingleMeshRender(meshName, { "TestM" });
-		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+		_mesh.loadInstance(meshName, { "TestM" });
+		_sky.loadInstance(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {
@@ -103,20 +103,20 @@ public:
 
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
 
-		_mesh.updateWorldMatrix(mtxWorld.transpose());
+		_mesh.updateWorldMatrix(mtxWorld);
 		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
 		_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
 		_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	StaticSingleMeshRender _sky;
-	StaticSingleMeshRender _mesh;
+	SingleMeshRenderInstance _sky;
+	SingleMeshRenderInstance _mesh;
 };
 
 
@@ -164,8 +164,8 @@ public:
 
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ shaderBallName,skyName });
-		_mesh = gfx.createStaticSingleMeshRender(shaderBallName, { "TestM" });
-		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+		_mesh.loadInstance(shaderBallName, { "TestM" });
+		_sky.loadInstance(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {
@@ -208,20 +208,20 @@ public:
 
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
 
-		_mesh.updateWorldMatrix(mtxWorld.transpose());
+		_mesh.updateWorldMatrix(mtxWorld);
 		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
 		_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
 		_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	StaticSingleMeshRender _sky;
-	StaticSingleMeshRender _mesh;
+	SingleMeshRenderInstance _sky;
+	SingleMeshRenderInstance _mesh;
 };
 
 
@@ -254,9 +254,10 @@ public:
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ meshName,skyName });
 
-		_meshes.resize(xNum * yNum);
-		for (int x = 0; x < xNum; ++x) {
-			for (int y = 0; y < yNum; ++y) {
+		uint32 meshesLength = xNum * yNum;
+		_meshes.resize(meshesLength);
+		for (uint32 x = 0; x < xNum; ++x) {
+			for (uint32 y = 0; y < yNum; ++y) {
 				String matName("Test");
 				matName.append((std::to_string(x) + "" + std::to_string(y)).c_str());
 
@@ -270,11 +271,12 @@ public:
 				materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 				gfx.createSharedMaterial(materialSettings);
 
-				_meshes[x * xNum + y] = gfx.createStaticSingleMeshRender(meshName, { matName });
+				uint32 arrayIndex = x * xNum + y;
+				_meshes[arrayIndex].loadInstance(meshName, { matName });
 			}
 		}
 
-		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+		_sky.loadInstance(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {
@@ -324,7 +326,7 @@ public:
 				uint32 index = x * xNum + y;
 				float metallic = y / (float)(yNum-1);
 				float roughness = x / (float)(xNum-1);
-				_meshes[index].updateWorldMatrix(mtxWorld.multiply(Matrix4::translateXYZ(offset)).transpose());
+				_meshes[index].updateWorldMatrix(mtxWorld.multiply(Matrix4::translateXYZ(offset)));
 				_meshes[index].getMaterial(0)->setParameter<Vector3>("direction", lightDir);
 				_meshes[index].getMaterial(0)->setParameter<Vector3>("color", color);
 				_meshes[index].getMaterial(0)->setParameter<float>("intensity", intensity);
@@ -334,17 +336,17 @@ public:
 		}
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	StaticSingleMeshRender _sky;
+	SingleMeshRenderInstance _sky;
 	
 	const uint32 xNum = 7;
 	const uint32 yNum = 7;
-	VectorArray<StaticSingleMeshRender> _meshes;
+	VectorArray<SingleMeshRenderInstance> _meshes;
 };
 
 
@@ -409,8 +411,8 @@ public:
 
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ meshName,skyName });
-		_mesh = gfx.createStaticSingleMeshRender(meshName, { "TestM","TestM","TestM2" });
-		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+		_mesh.loadInstance(meshName, { "TestM","TestM","TestM2" });
+		_sky.loadInstance(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {
@@ -453,7 +455,7 @@ public:
 
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
 
-		_mesh.updateWorldMatrix(mtxWorld.transpose());
+		_mesh.updateWorldMatrix(mtxWorld);
 		for (auto&& material : _mesh.getMaterials()) {
 			material->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
 			material->setParameter<Vector3>("color", color);
@@ -461,14 +463,14 @@ public:
 		}
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	StaticSingleMeshRender _sky;
-	StaticSingleMeshRender _mesh;
+	SingleMeshRenderInstance _sky;
+	SingleMeshRenderInstance _mesh;
 };
 
 
@@ -499,7 +501,7 @@ public:
 
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ skyName });
-		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+		_sky.loadInstance(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {
@@ -545,13 +547,13 @@ public:
 		debugGeometryRender->debugDrawCapsule(Vector3(-2.5f, 0, 0) + offset, Quaternion::identity, capsuleRadius, capsuleHeight, Color::blue);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld.transpose());
+		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	StaticSingleMeshRender _sky;
+	SingleMeshRenderInstance _sky;
 };
 
 
@@ -646,22 +648,20 @@ public:
 
 		//メッシュデータ読み込み
 		gfx.createMeshSets({ skyName });
-		_sky = gfx.createStaticSingleMeshRender(skyName, { "TestS" });
+		_sky.loadInstance(skyName, { "TestS" });
 
-		graphicsCore->sky();
+		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
+		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 
 	void onUpdate() override {
 		Scene::onUpdate();
-
-		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld.transpose());
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
 	}
 
-	StaticSingleMeshRender _sky;
+	SingleMeshRenderInstance _sky;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {

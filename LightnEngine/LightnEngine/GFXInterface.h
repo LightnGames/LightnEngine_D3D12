@@ -28,7 +28,7 @@ public:
 	void loadSharedMaterial(const String& materialName, RefAddressOf<SharedMaterial> dstMaterial);
 	void loadTexture(const String& textureName, RefAddressOf<Texture2D> dstTexture);
 
-	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
+	SingleMeshRenderInstance createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 
 	uint32 getWidth() const;
 	uint32 getHeight() const;

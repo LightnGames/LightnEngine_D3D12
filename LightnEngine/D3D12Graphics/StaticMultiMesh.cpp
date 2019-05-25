@@ -102,7 +102,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	//コマンドシグネチャ生成
 	{
-		_gpuDrivenInstanceCulledBuffer = new GpuBuffer[_meshCount * FrameCount];
+		_gpuDrivenInstanceCulledBuffer = new GpuBuffer[_meshCount];
 		_indirectArgumentDstCounterOffset = AlignForUavCounter(_indirectArgumentCount * sizeof(IndirectCommand));
 
 		// Each command consists of a CBV update and a DrawInstanced call.
@@ -222,7 +222,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	}
 
 	ComPtr<ID3D12Resource> inCommandUploadBuffers;
-	ComPtr<ID3D12Resource> indirectCommandUploadBuffers[FrameCount];
+	ComPtr<ID3D12Resource> indirectCommandUploadBuffers;
 
 	auto commandListSet = commandContext->requestCommandListSet();
 	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
@@ -300,78 +300,78 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	}
 
 	//GPUカリング後のバッファをバインドするためのSRVとUAVを作成
-	for (uint32 frame = 0; frame < FrameCount; ++frame) {
-		VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_meshCount);
+	VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_meshCount);
 
-		for (uint32 i = 0; i < _meshCount; ++i) {
-			uint32 index = frame * _meshCount + i;
-			_gpuDrivenInstanceCulledBuffer[index].createDirectGpuOnlyEmpty(device, _uavCounterOffsets[i] + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-			ppCulledBuffers[i] = _gpuDrivenInstanceCulledBuffer[index].get();
-		}
-
-		descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV[frame], _meshCount, gpuDrivenInstanceCulledBufferUavs);
-		descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV[frame], _meshCount, gpuDrivenInstanceCulledBufferSrvs);
+	for (uint32 i = 0; i < _meshCount; ++i) {
+		uint32 index = i;
+		_gpuDrivenInstanceCulledBuffer[index].createDirectGpuOnlyEmpty(device, _uavCounterOffsets[i] + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		ppCulledBuffers[i] = _gpuDrivenInstanceCulledBuffer[index].get();
 	}
+
+	descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV, _meshCount, gpuDrivenInstanceCulledBufferUavs);
+	descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV, _meshCount, gpuDrivenInstanceCulledBufferSrvs);
 
 	//ExecuteIndirectに渡すIndirectBufferを生成
-	for (uint32 frame = 0; frame < FrameCount; ++frame) {
-		VectorArray<InIndirectCommand> commands(_indirectArgumentCount);
+	VectorArray<InIndirectCommand> commands(_indirectArgumentCount);
 
-		uint32 counter = 0;
-		for (uint32 i = 0; i < _meshCount; ++i) {
-			const uint32 culledBufferIndex = frame * _meshCount + static_cast<uint32>(i);
-			const PerMeshData& meshInfo = meshes[i];
-			D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
-			perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffer[culledBufferIndex].getGpuVirtualAddress();
-			perInstanceVertexBufferView.StrideInBytes = sizeof(InstacingVertexData);
-			perInstanceVertexBufferView.SizeInBytes = _uavCounterOffsets[i] + sizeof(UINT);
+	uint32 counter = 0;
+	for (uint32 i = 0; i < _meshCount; ++i) {
+		const uint32 culledBufferIndex = static_cast<uint32>(i);
+		const PerMeshData& meshInfo = meshes[i];
+		D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
+		perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffer[culledBufferIndex].getGpuVirtualAddress();
+		perInstanceVertexBufferView.StrideInBytes = sizeof(InstacingVertexData);
+		perInstanceVertexBufferView.SizeInBytes = _uavCounterOffsets[i] + sizeof(UINT);
 
-			//頂点バッファとインデックスバッファのリソースをロード
-			RefPtr<VertexAndIndexBuffer> meshVertexAndIndex;
-			gpuResourceManager.loadVertexAndIndexBuffer(initInfo.meshNames[i], &meshVertexAndIndex);
+		//頂点バッファとインデックスバッファのリソースをロード
+		RefPtr<VertexAndIndexBuffer> meshVertexAndIndex;
+		gpuResourceManager.loadVertexAndIndexBuffer(initInfo.meshNames[i], &meshVertexAndIndex);
 
-			//メッシュ内のサブメッシュごとにIndirectArgument情報を構築
-			for (size_t j = 0; j < meshInfo.textureIndices.size(); ++j) {
-				const TextureIndex& textureIndices = meshInfo.textureIndices[j];
+		//メッシュ内のサブメッシュごとにIndirectArgument情報を構築
+		for (size_t j = 0; j < meshInfo.textureIndices.size(); ++j) {
+			const TextureIndex& textureIndices = meshInfo.textureIndices[j];
 
-				IndirectCommand& command = commands[counter].indirectCommand;
-				commands[counter].meshIndex[0] = i;
-				command.vertexBufferView = meshVertexAndIndex->vertexBuffer._vertexBufferView;
-				command.indexBufferView = meshVertexAndIndex->indexBuffer._indexBufferView;
-				command.perInstanceVertexBufferView = perInstanceVertexBufferView;
-				command.textureIndices[0] = textureIndices.t1;
-				command.textureIndices[1] = textureIndices.t2;
-				command.textureIndices[2] = textureIndices.t3;
-				command.textureIndices[3] = textureIndices.t4;
-				command.drawArguments.IndexCountPerInstance = meshVertexAndIndex->materialDrawRanges[j].indexCount;
-				command.drawArguments.StartIndexLocation = meshVertexAndIndex->materialDrawRanges[j].indexOffset;
-				command.drawArguments.InstanceCount = 0;
-				command.drawArguments.BaseVertexLocation = 0;
-				command.drawArguments.StartInstanceLocation = 0;
+			IndirectCommand& command = commands[counter].indirectCommand;
+			commands[counter].meshIndex[0] = i;
+			command.vertexBufferView = meshVertexAndIndex->vertexBuffer._vertexBufferView;
+			command.indexBufferView = meshVertexAndIndex->indexBuffer._indexBufferView;
+			command.perInstanceVertexBufferView = perInstanceVertexBufferView;
+			command.textureIndices[0] = textureIndices.t1;
+			command.textureIndices[1] = textureIndices.t2;
+			command.textureIndices[2] = textureIndices.t3;
+			command.textureIndices[3] = textureIndices.t4;
+			command.drawArguments.IndexCountPerInstance = meshVertexAndIndex->materialDrawRanges[j].indexCount;
+			command.drawArguments.StartIndexLocation = meshVertexAndIndex->materialDrawRanges[j].indexOffset;
+			command.drawArguments.InstanceCount = 0;
+			command.drawArguments.BaseVertexLocation = 0;
+			command.drawArguments.StartInstanceLocation = 0;
 
-				counter++;
-			}
+			counter++;
 		}
-
-		_indirectArgumentSourceBuffer[frame].createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers[frame], commands);
-		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer[frame].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-
-		//GPUカリング後のIndirectBuffer
-		_indirectArgumentDstBuffer[frame].createDirectGpuOnlyEmpty(device, _indirectArgumentDstCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-		//IndirectArgumentバッファのUAVを作成
-		D3D12_BUFFER_UAV bufferUav;
-		bufferUav.FirstElement = 0;
-		bufferUav.NumElements = _indirectArgumentCount;
-		bufferUav.StructureByteStride = sizeof(IndirectCommand);
-		bufferUav.CounterOffsetInBytes = _indirectArgumentDstCounterOffset;
-
-		descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer[frame].getAdressOf(), &_setupCommandUavView[frame], 1, { bufferUav });
 	}
+
+	_indirectArgumentSourceBuffer.createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers, commands);
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer.get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+
+	//GPUカリング後のIndirectBuffer
+	_indirectArgumentDstBuffer.createDirectGpuOnlyEmpty(device, _indirectArgumentDstCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	//IndirectArgumentバッファのUAVを作成
+	D3D12_BUFFER_UAV bufferUav;
+	bufferUav.FirstElement = 0;
+	bufferUav.NumElements = _indirectArgumentCount;
+	bufferUav.StructureByteStride = sizeof(IndirectCommand);
+	bufferUav.CounterOffsetInBytes = _indirectArgumentDstCounterOffset;
+
+	descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer.getAdressOf(), &_setupCommandUavView, 1, { bufferUav });
 
 	//CulledBufferのカウンタまでのバイトオフセットを格納するバッファ
 	ComPtr<ID3D12Resource> offsetsUpload;
 	_indirectArgumentOffsetsBuffer.createDeferredGpuOnly<uint32>(device, commandList, &offsetsUpload, _uavCounterOffsets);
+
+	//UAVカウンタをリセットするための(UINT)0のバッファを生成
+	ComPtr<ID3D12Resource> uavCounterUpload;
+	_uavCounterReset.createDeferredGpuOnly<UINT>(device, commandList, &uavCounterUpload, { 0 });
 
 	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
 	commandContext->executeCommandList(commandList);
@@ -379,9 +379,6 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 
 	//コピーが終わるまでアップロードヒープを破棄しない
 	commandContext->waitForIdle();
-
-	//UAVカウンタをリセットするための(UINT)0のバッファを生成
-	_uavCounterReset.createDirectCpuReadWrite<UINT>(device, { 0 });
 }
 
 void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex) {
@@ -400,13 +397,12 @@ void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32
 		computeCommandList->SetComputeRootSignature(_cullingComputeRootSignature._rootSignature.Get());
 
 		computeCommandList->SetComputeRootDescriptorTable(0, _gpuDrivenInstanceMatrixView.gpuHandle);
-		computeCommandList->SetComputeRootDescriptorTable(1, _gpuDriventInstanceCulledUAV[frameIndex].gpuHandle);
+		computeCommandList->SetComputeRootDescriptorTable(1, _gpuDriventInstanceCulledUAV.gpuHandle);
 		computeCommandList->SetComputeRootConstantBufferView(2, _gpuCullingCameraConstantBuffers.constantBuffers[frameIndex][0]->_resource->GetGPUVirtualAddress());
 
 		//AppendStructuredBufferのカウンタを0にリセットする
 		for (uint32 i = 0; i < _meshCount; ++i) {
-			uint32 index = frameIndex * _meshCount + i;
-			computeCommandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffer[index].get(), _uavCounterOffsets[i], _uavCounterReset.get(), 0, sizeof(UINT));
+			computeCommandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffer[i].get(), _uavCounterOffsets[i], _uavCounterReset.get(), 0, sizeof(UINT));
 		}
 
 		culledBufferBarrier(computeCommandList, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, frameIndex);
@@ -421,15 +417,15 @@ void StaticMultiMeshRCG::onCompute(RefPtr<CommandContext> commandContext, uint32
 
 		culledBufferBarrier(computeCommandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, frameIndex);
 
-		computeCommandList->SetComputeRootShaderResourceView(0, _indirectArgumentSourceBuffer[frameIndex].getGpuVirtualAddress());
+		computeCommandList->SetComputeRootShaderResourceView(0, _indirectArgumentSourceBuffer.getGpuVirtualAddress());
 		computeCommandList->SetComputeRootShaderResourceView(1, _indirectArgumentOffsetsBuffer.getGpuVirtualAddress());
-		computeCommandList->SetComputeRootDescriptorTable(2, _gpuDriventInstanceCulledSRV[frameIndex].gpuHandle);
-		computeCommandList->SetComputeRootDescriptorTable(3, _setupCommandUavView[frameIndex].gpuHandle);
+		computeCommandList->SetComputeRootDescriptorTable(2, _gpuDriventInstanceCulledSRV.gpuHandle);
+		computeCommandList->SetComputeRootDescriptorTable(3, _setupCommandUavView.gpuHandle);
 
 		//AppendStructuredBufferのカウンタを0にリセットする
-		computeCommandList->CopyBufferRegion(_indirectArgumentDstBuffer[frameIndex].get(), _indirectArgumentDstCounterOffset, _uavCounterReset.get(), 0, sizeof(UINT));
+		computeCommandList->CopyBufferRegion(_indirectArgumentDstBuffer.get(), _indirectArgumentDstCounterOffset, _uavCounterReset.get(), 0, sizeof(UINT));
 
-		computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+		computeCommandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer.get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 		computeCommandList->Dispatch(_indirectArgumentCount, 1, 1);
 	}
 
@@ -453,20 +449,20 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 	commandList->SetGraphicsRootDescriptorTable(1, srv.gpuHandle);
 
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, frameIndex);
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer.get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
 	//EXECUTION WARNING #1044: GPU_BASED_VALIDATION_RESOURCE_STATE_IMPRECISE
 	//IndirectAtgumentバッファに含まれるバーテックスバッファを一度UAVとして扱うのでGPUデバッグレイヤー上でリソースの追跡ができないと警告
 	commandList->ExecuteIndirect(
 		_commandSignature._commandSignature.Get(),
 		_indirectArgumentCount,
-		_indirectArgumentDstBuffer[frameIndex].get(),
+		_indirectArgumentDstBuffer.get(),
 		0,
-		_indirectArgumentDstBuffer[frameIndex].get(),
+		_indirectArgumentDstBuffer.get(),
 		_indirectArgumentDstCounterOffset);
 
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST, frameIndex);
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer[frameIndex].get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
+	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer.get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
 
 #ifdef ENABLE_AABB_DEBUG_DRAW
 	DebugGeometryRender& debug = DebugGeometryRender::instance();
@@ -477,10 +473,8 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 }
 
 void StaticMultiMeshRCG::destroy() {
-	for (int i = 0; i < FrameCount; ++i) {
-		_indirectArgumentSourceBuffer[i].destroy();
-		_indirectArgumentDstBuffer[i].destroy();
-	}
+	_indirectArgumentSourceBuffer.destroy();
+	_indirectArgumentDstBuffer.destroy();
 
 	delete[] _gpuDrivenInstanceCulledBuffer;
 	_uavCounterReset.destroy();
@@ -518,12 +512,11 @@ void StaticMultiMeshRCG::updateCullingCameraInfo(const Camera & camera, uint32 f
 void StaticMultiMeshRCG::culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex) {
 	VectorArray<D3D12_RESOURCE_BARRIER> barriers(_meshCount);
 	for (uint32 i = 0; i < _meshCount; ++i) {
-		uint32 index = frameIndex * _meshCount + i;
 		barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		barriers[i].Transition.StateBefore = StateBefore;
 		barriers[i].Transition.StateAfter = StateAfter;
-		barriers[i].Transition.pResource = _gpuDrivenInstanceCulledBuffer[index].get();
+		barriers[i].Transition.pResource = _gpuDrivenInstanceCulledBuffer[i].get();
 	}
 
 	commandList->ResourceBarrier(_meshCount, barriers.data());

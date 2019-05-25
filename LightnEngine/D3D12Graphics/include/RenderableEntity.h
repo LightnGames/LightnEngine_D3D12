@@ -1,14 +1,14 @@
 #pragma once
 #include <Utility.h>
 #include <LMath.h>
-class StaticSingleMeshRCG;
 class StaticMultiMeshRCG;
 class SharedMaterial;
 
-class StaticSingleMeshRender {
+class SingleMeshRenderInstance {
 public:
-	StaticSingleMeshRender();
-	StaticSingleMeshRender(const VectorArray<RefPtr<SharedMaterial>>& materials, RefPtr<StaticSingleMeshRCG> rcg);
+	SingleMeshRenderInstance();
+
+	void loadInstance(const String& name, const VectorArray<String>& materialNames);
 	
 	//マテリアルをインデックスで取得
 	RefPtr<SharedMaterial> getMaterial(uint32 index) const;
@@ -20,7 +20,7 @@ public:
 	void updateWorldMatrix(const Matrix4& worldMatrix);
 
 	VectorArray<RefPtr<SharedMaterial>> _materials;
-	RefPtr<StaticSingleMeshRCG> _rcg;
+	Matrix4 _mtxWorld;
 };
 
 class StaticMultiMeshRender {

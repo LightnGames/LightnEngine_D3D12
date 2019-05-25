@@ -27,6 +27,11 @@ public:
 		return _resource.GetAddressOf();
 	}
 
+	//GPUの仮想アドレスを取得
+	D3D12_GPU_VIRTUAL_ADDRESS getGpuVirtualAddress() const {
+		return _resource->GetGPUVirtualAddress();
+	}
+
 	ComPtr<ID3D12Resource> _resource;
 };
 
@@ -110,15 +115,23 @@ public:
 			nullptr,
 			IID_PPV_ARGS(&_resource)));
 	}
+};
 
-	//CPU上で読み書き可能なバッファを生成する。CPUもGPUも読める中間メモリに配置されるのでGPUオンリーバッファに比べると読み書きが遅い
-	template<class T>
-	void createDirectCpuReadWrite(RefPtr<ID3D12Device> device, const VectorArray<T>& initData) {
+//CPU上で読み書き可能なバッファを生成する。CPUもGPUも読める中間メモリに配置されるのでGPUオンリーバッファに比べると読み書きが遅い
+class GpuBufferDynamic :public GpuResource {
+public:
+	void createDirect(RefPtr<ID3D12Device> device, const void* sourceDataPtr, uint32 length) {
+		createDirectEmpty(device, length);
+		writeData(sourceDataPtr, length);
+	}
+
+	//空のバッファを生成
+	void createDirectEmpty(RefPtr<ID3D12Device> device, uint32 size) {
 		D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 
 		D3D12_RESOURCE_DESC bufferDesc = {};
 		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		bufferDesc.Width = initData.size() * sizeof(T);
+		bufferDesc.Width = size;
 		bufferDesc.Height = 1;
 		bufferDesc.DepthOrArraySize = 1;
 		bufferDesc.MipLevels = 1;
@@ -133,15 +146,15 @@ public:
 			nullptr,
 			IID_PPV_ARGS(&_resource)));
 
-		T* mapPtr = nullptr;
-		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&mapPtr)));
-		memcpy(mapPtr, initData.data(), bufferDesc.Width);
+		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&_dataPtr)));
 	}
 
-	//GPUの仮想アドレスを取得
-	D3D12_GPU_VIRTUAL_ADDRESS getGpuVirtualAddress() const {
-		return _resource->GetGPUVirtualAddress();
+	//マップされた領域にに書き込み
+	void writeData(const void* bufferPtr, uint32 size, uint32 startOffset = 0) const {
+		memcpy(_dataPtr, reinterpret_cast<const byte*>(bufferPtr) + startOffset, size);
 	}
+
+	void* _dataPtr;
 };
 
 class Texture2D :public GpuResource {
@@ -181,14 +194,14 @@ public:
 	}
 
 	//直ちにテクスチャを生成し、操作が完了するまでスレッドを停止する
-	void createDirect(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const TextureInfo& info) {
+	void createDirectFromDataPtr(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const TextureInfo& info) {
 		//テクスチャコピーコマンドを発行する用のアロケーターとリスト
 		auto commandListSet = commandContext->requestCommandListSet();
 		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
 		ComPtr<ID3D12Resource> textureUploadHeap;
 
-		createDeferred(device, commandList, textureUploadHeap.ReleaseAndGetAddressOf(), info);
+		createDeferredFromDataPtr(device, commandList, textureUploadHeap.ReleaseAndGetAddressOf(), info);
 
 		//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
 		commandContext->executeCommandList(commandList);
@@ -198,8 +211,8 @@ public:
 		commandContext->waitForIdle();
 	}
 
-	//コマンドリストにテクスチャ生成コマンドを発行(発行のみで実行はしない)
-	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const TextureInfo& info) {
+	//すでにロードされたテクスチャデータから生成
+	void createDeferredFromDataPtr(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const TextureInfo& info) {
 		const uint32 texturePixelSize = 4;
 
 		//GPU読み出し専用テクスチャ本体を生成
@@ -239,14 +252,15 @@ public:
 		D3D12_SUBRESOURCE_DATA textureData = {};
 		textureData.pData = info.dataPtr;
 		textureData.RowPitch = info.width * texturePixelSize;
-		textureData.SlicePitch = textureData.RowPitch*info.height;
+		textureData.SlicePitch = textureData.RowPitch * info.height;
 
 		//GPU読み出し専用バッファにコピーコマンドを発行
 		updateSubresources(commandList, _resource.Get(), *uploadHeap, 0, 0, 1, &textureData);
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 	}
 
-	void createDeferred2(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const String& textureName) {
+	//テクスチャ名からロード
+	void createDeferredFromName(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const String& textureName) {
 		UniquePtr<uint8_t[]> ddsData;
 		VectorArray<D3D12_SUBRESOURCE_DATA> subresouceData;
 		throwIfFailed(DirectX::LoadDDSTextureFromFile(device, convertWString(textureName).c_str(), _resource.ReleaseAndGetAddressOf(), ddsData, subresouceData));
@@ -284,7 +298,7 @@ struct RefIndexBufferView {
 	D3D12_INDEX_BUFFER_VIEW view;
 };
 
-class VertexBuffer :public GpuResource{
+class VertexBuffer :public GpuBuffer {
 public:
 	//直ちに頂点バッファを生成し、操作が完了するまでスレッドを停止する
 	template <typename T>
@@ -305,51 +319,14 @@ public:
 
 	//コマンドリストに頂点バッファ生成コマンドを発行(発行のみで実行はしない)
 	template <typename T>
-	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const VectorArray<T>& vertices) {
-		const UINT64 vertexBufferSize = static_cast<UINT64>(sizeof(T)*vertices.size());
+	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, RefAddressOf<ID3D12Resource> uploadHeap, const VectorArray<T>& vertices) {
+		GpuBuffer::createDeferredGpuOnly<T>(device, commandList, uploadHeap, vertices);
 
-		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-		D3D12_HEAP_PROPERTIES vertexHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
-
-		//アップロード用バッファを生成
-		D3D12_RESOURCE_DESC vertexBufferDesc = {};
-		vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferDesc.Width = vertexBufferSize;
-		vertexBufferDesc.Height = 1;
-		vertexBufferDesc.DepthOrArraySize = 1;
-		vertexBufferDesc.MipLevels = 1;
-		vertexBufferDesc.SampleDesc.Count = 1;
-		vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-		throwIfFailed(device->CreateCommittedResource(
-			&vertexUploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(uploadHeap)
-		));
-
-		throwIfFailed(device->CreateCommittedResource(
-			&vertexHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&_resource)
-		));
-
-		D3D12_SUBRESOURCE_DATA vertexData = {};
-		vertexData.pData = vertices.data();
-		vertexData.RowPitch = vertexBufferSize;
-		vertexData.SlicePitch = vertexData.RowPitch;
-
-		updateSubresources<1>(commandList, _resource.Get(), *uploadHeap, 0, 0, 1, &vertexData);
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 		_vertexBufferView.BufferLocation = _resource->GetGPUVirtualAddress();
 		_vertexBufferView.StrideInBytes = sizeof(T);
-		_vertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
+		_vertexBufferView.SizeInBytes = static_cast<UINT>(sizeof(T) * vertices.size());
 	}
 
 	RefVertexBufferView getRefVertexBufferView() const {
@@ -359,53 +336,30 @@ public:
 	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
 };
 
-class VertexBufferDynamic :public GpuResource {
+class VertexBufferDynamic :public GpuBufferDynamic {
 public:
-	void createDirectDynamic(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, uint32 length, uint32 strideInBytes) {
-		auto commandListSet = commandContext->requestCommandListSet();
-		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
+	template <class T>
+	void createDirectVertex(RefPtr<ID3D12Device> device, const VectorArray<T>& vertices) {
+		const uint32 vertexBufferSize = static_cast<uint32>(vertices.size() * sizeof(T));
+		GpuBufferDynamic::createDirect(device, vertices.data(), vertexBufferSize);
 
-		const UINT64 vertexBufferSize = static_cast<UINT64>(length * strideInBytes);
-		D3D12_HEAP_PROPERTIES vertexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-		D3D12_RESOURCE_DESC vertexBufferDesc = {};
-		vertexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferDesc.Width = vertexBufferSize;
-		vertexBufferDesc.Height = 1;
-		vertexBufferDesc.DepthOrArraySize = 1;
-		vertexBufferDesc.MipLevels = 1;
-		vertexBufferDesc.SampleDesc.Count = 1;
-		vertexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-		throwIfFailed(device->CreateCommittedResource(
-			&vertexUploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&_resource)
-		));
-
-		_vertexBufferView.BufferLocation = _resource->GetGPUVirtualAddress();
-		_vertexBufferView.StrideInBytes = strideInBytes;
-		_vertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
-
-		_resource->Map(0, nullptr, reinterpret_cast<void**>(&_dataPtr));
-
-		//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
-		commandContext->executeCommandList(commandList);
-		commandContext->discardCommandListSet(commandListSet);
-
-		//コピーが終わるまでアップロードヒープを破棄しない
-		commandContext->waitForIdle();
+		_vertexBufferView.BufferLocation = getGpuVirtualAddress();
+		_vertexBufferView.StrideInBytes = sizeof(T);
+		_vertexBufferView.SizeInBytes = vertexBufferSize;
 	}
 
+	void createDirectEmptyVertex(RefPtr<ID3D12Device> device, uint32 strideInBytes, uint32 length) {
+		GpuBufferDynamic::createDirectEmpty(device, length * strideInBytes);
 
+		_vertexBufferView.BufferLocation = getGpuVirtualAddress();
+		_vertexBufferView.StrideInBytes = strideInBytes;
+		_vertexBufferView.SizeInBytes = length * strideInBytes;
+	}
 
-	void* _dataPtr;
 	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
 };
 
-class IndexBuffer :public GpuResource {
+class IndexBuffer :public GpuBuffer {
 public:
 	void createDirect(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const VectorArray<UINT32>& indices) {
 		ComPtr<ID3D12Resource> indexUploadHeap;
@@ -425,49 +379,13 @@ public:
 
 	//コマンドリストにインデックスバッファ生成コマンドを発行(発行のみで実行はしない)
 	void createDeferred(RefPtr<ID3D12Device> device, RefPtr<ID3D12GraphicsCommandList> commandList, ID3D12Resource** uploadHeap, const VectorArray<UINT32>& indices) {
-		const UINT64 indexBufferSize = static_cast<UINT64>(sizeof(UINT32)*indices.size());
+		GpuBuffer::createDeferredGpuOnly<UINT32>(device, commandList, uploadHeap, indices);
 
-		D3D12_HEAP_PROPERTIES indexHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
-		D3D12_HEAP_PROPERTIES indexUploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-
-		D3D12_RESOURCE_DESC indexBufferDesc = {};
-		indexBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		indexBufferDesc.Width = indexBufferSize;
-		indexBufferDesc.Height = 1;
-		indexBufferDesc.DepthOrArraySize = 1;
-		indexBufferDesc.MipLevels = 1;
-		indexBufferDesc.SampleDesc.Count = 1;
-		indexBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-		throwIfFailed(device->CreateCommittedResource(
-			&indexUploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(uploadHeap)
-		));
-
-		throwIfFailed(device->CreateCommittedResource(
-			&indexHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&_resource)
-		));
-
-		D3D12_SUBRESOURCE_DATA indexData = {};
-		indexData.pData = indices.data();
-		indexData.RowPitch = indexBufferSize;
-		indexData.SlicePitch = indexData.RowPitch;
-
-		updateSubresources<1>(commandList, _resource.Get(), *uploadHeap, 0, 0, 1, &indexData);
 		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 		_indexBufferView.BufferLocation = _resource->GetGPUVirtualAddress();
 		_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
-		_indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
+		_indexBufferView.SizeInBytes = static_cast<UINT>(sizeof(UINT32) * indices.size());
 		_indexCount = static_cast<uint32>(indices.size());
 	}
 
@@ -479,37 +397,15 @@ public:
 	D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 };
 
-class ConstantBuffer :public GpuResource {
+class ConstantBuffer :public GpuBufferDynamic {
 public:
 	void create(RefPtr<ID3D12Device> device, uint32 size) {
-		D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_UPLOAD };
-
 		//256バイトでアライン
 		this->size = size;
-		const UINT64 constantBufferSize = (size + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
+		const UINT32 constantBufferSize = (size + (D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1)) & ~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1);
 
-		D3D12_RESOURCE_DESC resourceDesc = {};
-		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		resourceDesc.Width = constantBufferSize;
-		resourceDesc.Height = 1;
-		resourceDesc.DepthOrArraySize = 1;
-		resourceDesc.MipLevels = 1;
-		resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		resourceDesc.SampleDesc.Count = 1;
-
-		device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&_resource));
-
-		NAME_D3D12_OBJECT(_resource);
-		throwIfFailed(_resource->Map(0, nullptr, reinterpret_cast<void**>(&dataPtr)));
-	}
-
-
-	//マップされた領域にに書き込み
-	void writeData(const void* bufferPtr, uint32 size, uint32 startOffset = 0) const{
-		memcpy(dataPtr, reinterpret_cast<const byte*>(bufferPtr) + startOffset, size);
+		GpuBufferDynamic::createDirectEmpty(device, constantBufferSize);
 	}
 
 	uint32 size;
-	void* dataPtr;
 };

@@ -26,7 +26,7 @@ void DebugLineRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	manager.loadSharedMaterial("GizmoT", &_material);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
-		_perInstanceData[i].createDirectDynamic(device, commandContext, MAX_GIZMO, sizeof(DebugLineVertex));
+		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugLineVertex), MAX_GIZMO);
 	}
 }
 
@@ -67,7 +67,7 @@ void DebugCubeRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	manager.loadSharedMaterial("GizmoB", &_material);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
-		_perInstanceData[i].createDirectDynamic(device, commandContext, MAX_GIZMO, sizeof(DebugGeometryVertex));
+		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugGeometryVertex), MAX_GIZMO);
 	}
 
 	VectorArray<Vector3> vertices = {
@@ -155,7 +155,7 @@ void DebugSphereRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContex
 	manager.loadSharedMaterial("GizmoS", &_material);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
-		_perInstanceData[i].createDirectDynamic(device, commandContext, MAX_GIZMO, sizeof(DebugGeometryVertex));
+		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugGeometryVertex), MAX_GIZMO);
 	}
 
 	constexpr uint32 circleVertexCount = 16;
@@ -244,7 +244,7 @@ void DebugCapsuleRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	manager.loadSharedMaterial("GizmoC", &_material);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
-		_perInstanceData[i].createDirectDynamic(device, commandContext, MAX_GIZMO, sizeof(DebugCapsuleRender));
+		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugCapsuleRender), MAX_GIZMO);
 	}
 
 	constexpr float upperSpahere = 1.0f;

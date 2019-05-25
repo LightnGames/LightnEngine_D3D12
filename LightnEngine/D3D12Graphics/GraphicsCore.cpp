@@ -230,36 +230,22 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	//メッシュを描画
+	//描画設定
 	RenderSettings renderSettings(commandList, _frameIndex);
 
-	//マテリアルの定数バッファをGPUへアップロード
+	//マテリアルごとにメッシュを描画
 	RefPtr<Camera> mainCamera = _gpuResourceManager.getMainCamera();
 	auto& materials = _gpuResourceManager.getMaterials();
 	for (auto& material : materials) {
 		SharedMaterial& sharedMaterial = material.second;
-		sharedMaterial.setParameter<Matrix4>("mtxWorld", Matrix4::scaleXYZ(Vector3::one * 100).transpose());
 		sharedMaterial.setParameter<Matrix4>("mtxView", mainCamera->getViewMatrixTransposed());
 		sharedMaterial.setParameter<Matrix4>("mtxProj", mainCamera->getProjectionMatrixTransposed());
 		sharedMaterial.setParameter<Vector3>("cameraPos", mainCamera->getPosition());
 		sharedMaterial._vertexConstantBuffer.flashBufferData(_frameIndex);
 		sharedMaterial._pixelConstantBuffer.flashBufferData(_frameIndex);
+		sharedMaterial.flushInstanceData(_frameIndex);
 
 		sharedMaterial.setupRenderCommand(renderSettings);
-	}
-
-	union GpuCommandGroup {
-		RefPtr<StaticSingleMeshRCG> rcg;
-		byte* bytePtr;
-	};
-
-	GpuCommandGroup group;
-	//リニアアロケーターに連続して描画コマンドが存在するので
-	//ポインタを任意でオフセットしながらレンダーコマンドグループのデータを参照してループする
-	group.rcg = reinterpret_cast<StaticSingleMeshRCG*>(_gpuCommandArray.mainMemory);
-	for (uint32 i = 0; i < _gpuCommandCount; ++i) {
-		//group.rcg->setupRenderCommand(renderSettings);
-		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
 	CameraConstantRaw cr;
@@ -334,40 +320,6 @@ void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& sett
 	_gpuResourceManager.createSharedMaterial(_device.Get(), settings);
 }
 
-StaticSingleMeshRender GraphicsCore::createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames) {
-	//メッシュインスタンス生成
-	RefPtr<VertexAndIndexBuffer> buffers;
-	_gpuResourceManager.loadVertexAndIndexBuffer(name, &buffers);
-
-	const size_t materialCount = buffers->materialDrawRanges.size();
-	VectorArray<MaterialSlot> slots;
-	VectorArray<RefPtr<SharedMaterial>> materials;
-	materials.reserve(materialCount);
-	slots.reserve(materialCount);
-
-	//マテリアルスロットにマテリアルをセット
-	for (size_t i = 0; i < materialNames.size(); ++i) {
-		RefPtr<SharedMaterial> material;
-		_gpuResourceManager.loadSharedMaterial(materialNames[i], &material);
-
-		slots.emplace_back(buffers->materialDrawRanges[i], material->getRefSharedMaterial());
-		materials.emplace_back(material);
-	}
-
-	_gpuCommandCount++;
-
-	const size_t memorySize = StaticSingleMeshRCG::getRequireMemorySize(slots.size());
-	byte* r = _gpuCommandArray.divideMemory(memorySize);
-
-	//アロケートしたメモリの先頭からRCGインスタンスを生成
-	RefPtr<StaticSingleMeshRCG> render = new (r) StaticSingleMeshRCG(
-		buffers->vertexBuffer.getRefVertexBufferView(),
-		buffers->indexBuffer.getRefIndexBufferView(),
-		slots);
-
-	return StaticSingleMeshRender(materials, render);
-}
-
 StaticMultiMeshRender GraphicsCore::createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas){
 	StaticMultiMeshRCG* multiRCG = new StaticMultiMeshRCG();
 	multiRCG->create(_device.Get(), &_graphicsCommandContext, meshDatas);
@@ -383,25 +335,6 @@ RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager() {
 
 RefPtr<DebugGeometryRender> GraphicsCore::getDebugGeometryRender() {
 	return &_debugGeometryRender;
-}
-
-void GraphicsCore::sky(){
-	RefPtr<SharedMaterial> m;
-	_gpuResourceManager.loadSharedMaterial("TestS", &m);
-
-	RefPtr<VertexAndIndexBuffer> v;
-	_gpuResourceManager.loadVertexAndIndexBuffer("skySphere.mesh", &v);
-
-	VectorArray<RefPtr<Matrix4>> matrics;
-	VectorArray<RefPtr<RefVertexAndIndexBuffer>> meshes;
-
-	static Matrix4 ma = Matrix4::scaleXYZ(Vector3::one * 100).transpose();
-	matrics.push_back(&ma);
-
-	static RefVertexAndIndexBuffer rv(v->vertexBuffer.getRefVertexBufferView(), v->indexBuffer.getRefIndexBufferView(), v->materialDrawRanges[0]);
-	meshes.push_back(&rv);
-
-	m->addMesh(_device.Get(), matrics, meshes);
 }
 
 void GraphicsCore::moveToNextFrame() {

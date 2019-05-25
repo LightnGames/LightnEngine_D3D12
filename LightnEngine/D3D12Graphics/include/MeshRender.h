@@ -8,23 +8,6 @@
 #include "Camera.h"
 #include "AABB.h"
 
-//マテリアルの描画範囲定義
-struct MaterialDrawRange {
-	MaterialDrawRange() :indexCount(0), indexOffset(0) {}
-	MaterialDrawRange(uint32 indexCount, uint32 indexOffset) :indexCount(indexCount), indexOffset(indexOffset) {}
-
-	uint32 indexCount;
-	uint32 indexOffset;
-};
-
-//マテリアルごとのインデックス範囲データ
-struct MaterialSlot {
-	MaterialSlot(const MaterialDrawRange& range, const RefSharedMaterial& material) :range(range), material(material) {}
-
-	const RefSharedMaterial material;
-	const MaterialDrawRange range;
-};
-
 //RCG...RenderCommandGroup
 //可変長のマテリアルをそれぞれ持ったインスタンスをメモリ上に連続して配置するために
 //レンダーコマンドグループ＋マテリアルコマンドサイズｘマテリアル数(sizeof(StaticSingleMeshRCG) + sizeof(MaterialSlot) * materialCount)
@@ -65,26 +48,4 @@ private:
 	const size_t _materialSlotSize;
 
 	//このインスタンスの後ろ(sizeof(StaticSingleMeshRCG))にマテリアルのデータを配置！！！
-};
-
-struct RefVertexAndIndexBuffer {
-	RefVertexAndIndexBuffer(const RefVertexBufferView& vertexView,
-		const RefIndexBufferView& indexView,
-		const MaterialDrawRange& drawRange) :
-		vertexView(vertexView), indexView(indexView), drawRange(drawRange) {
-	}
-
-	const RefVertexBufferView vertexView;
-	const RefIndexBufferView indexView;
-	const MaterialDrawRange drawRange;
-};
-
-//頂点バッファとインデックスバッファのリソース管理
-struct VertexAndIndexBuffer {
-	VertexAndIndexBuffer(const VectorArray<MaterialDrawRange>& materialDrawRanges) :materialDrawRanges(materialDrawRanges) {}
-
-	VertexBuffer vertexBuffer;
-	IndexBuffer indexBuffer;
-	AABB boundingBox;
-	VectorArray<MaterialDrawRange> materialDrawRanges;
 };

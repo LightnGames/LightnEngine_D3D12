@@ -112,14 +112,14 @@ private:
 
 	GpuBuffer* _gpuDrivenInstanceCulledBuffer;//GPUカリング後の描画対象のインスタンスのワールド行列
 	GpuBuffer _gpuDrivenInstanceMatrixBuffer;//カリング前のシーンに配置されているインスタンスのワールド行列
-	GpuBuffer _indirectArgumentDstBuffer[FrameCount];//GPUカリング後のExecuteIndirectに渡される描画引数
-	GpuBuffer _indirectArgumentSourceBuffer[FrameCount];//カリング前のシーンに配置されているインスタンスの描画引数
+	GpuBuffer _indirectArgumentDstBuffer;//GPUカリング後のExecuteIndirectに渡される描画引数
+	GpuBuffer _indirectArgumentSourceBuffer;//カリング前のシーンに配置されているインスタンスの描画引数
 	GpuBuffer _indirectArgumentOffsetsBuffer;
 	GpuBuffer _uavCounterReset;//UAVのAppendStructuredBufferのカウント引数を０に戻すためのUINT１つのバッファ
 
-	BufferView _setupCommandUavView[FrameCount];
-	BufferView _gpuDriventInstanceCulledSRV[FrameCount];//GPUカリング後の情報を読み込むバッファのSRV
-	BufferView _gpuDriventInstanceCulledUAV[FrameCount];//GPUカリング後の情報を書き込むバッファのUAV
+	BufferView _setupCommandUavView;
+	BufferView _gpuDriventInstanceCulledSRV;//GPUカリング後の情報を読み込むバッファのSRV
+	BufferView _gpuDriventInstanceCulledUAV;//GPUカリング後の情報を書き込むバッファのUAV
 	BufferView _gpuDrivenInstanceMatrixView;
 
 #ifdef ENABLE_AABB_DEBUG_DRAW

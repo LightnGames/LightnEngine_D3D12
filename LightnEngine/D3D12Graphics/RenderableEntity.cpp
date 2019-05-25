@@ -2,24 +2,40 @@
 #include "MeshRender.h"
 #include "SharedMaterial.h"
 #include "GpuResource.h"
+#include "GpuResourceManager.h"
 
-StaticSingleMeshRender::StaticSingleMeshRender() :_materials{}, _rcg(nullptr) {
+SingleMeshRenderInstance::SingleMeshRenderInstance() :_materials{}, _mtxWorld(Matrix4::identity) {
 }
 
-StaticSingleMeshRender::StaticSingleMeshRender(const VectorArray<RefPtr<SharedMaterial>>& materials, RefPtr<StaticSingleMeshRCG> rcg) :
-	_materials(materials), _rcg(rcg) {
+void SingleMeshRenderInstance::loadInstance(const String& name, const VectorArray<String>& materialNames){
+	GpuResourceManager& manager = GpuResourceManager::instance();
+	
+	//メッシュインスタンスロード
+	RefPtr<VertexAndIndexBuffer> vertexAndIndex;
+	manager.loadVertexAndIndexBuffer(name, &vertexAndIndex);
+
+	//マテリアルスロットにマテリアルをセット
+	const size_t materialCount = vertexAndIndex->materialDrawRanges.size();
+	_materials.resize(materialCount);
+
+	for (size_t i = 0; i < materialNames.size(); ++i) {
+		manager.loadSharedMaterial(materialNames[i], &_materials[i]);
+
+		InstanceInfoPerMaterial drawInfo(&_mtxWorld, vertexAndIndex->getRefVertexAndIndexBuffer(i));
+		_materials[i]->addMeshInstance(drawInfo);
+	}
 }
 
-RefPtr<SharedMaterial> StaticSingleMeshRender::getMaterial(uint32 index) const{
+RefPtr<SharedMaterial> SingleMeshRenderInstance::getMaterial(uint32 index) const{
 	return _materials[index];
 }
 
-VectorArray<RefPtr<SharedMaterial>>& StaticSingleMeshRender::getMaterials(){
+VectorArray<RefPtr<SharedMaterial>>& SingleMeshRenderInstance::getMaterials(){
 	return _materials;
 }
 
-void StaticSingleMeshRender::updateWorldMatrix(const Matrix4& worldMatrix){
-	_rcg->updateWorldMatrix(worldMatrix);
+void SingleMeshRenderInstance::updateWorldMatrix(const Matrix4& worldMatrix){
+	_mtxWorld = worldMatrix;
 }
 
 StaticMultiMeshRender::StaticMultiMeshRender(RefPtr<StaticMultiMeshRCG> rcg):_rcg(rcg){

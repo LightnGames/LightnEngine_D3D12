@@ -132,27 +132,32 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 
 	uint32 cnt = 0;
 	for (auto&& mesh : _meshes) {
-		D3D12_VERTEX_BUFFER_VIEW views[2] = { mesh->vertexView.view, _instanceVertexView };
+		const RefVertexAndIndexBuffer& drawInfo = mesh.drawInfo;
+		D3D12_VERTEX_BUFFER_VIEW views[2] = { drawInfo.vertexView.view, _instanceVertexBuffer[frameIndex]._vertexBufferView };
 		commandList->IASetVertexBuffers(0, 2, views);
-		commandList->IASetIndexBuffer(&mesh->indexView.view);
-		commandList->DrawIndexedInstanced(mesh->drawRange.indexCount, 1, mesh->drawRange.indexOffset, 0, cnt);
+		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
+		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, cnt);
 		
 		cnt++;
 	}
 }
 
-void SharedMaterial::addMesh(RefPtr<ID3D12Device> device, VectorArray<RefPtr<Matrix4>> matrices, VectorArray<RefPtr<RefVertexAndIndexBuffer>>& meshes) {
-	_matrices = matrices;
-	_meshes = meshes;
+void SharedMaterial::addMeshInstance(const InstanceInfoPerMaterial& instanceInfo){
+	_meshes.emplace_back(instanceInfo);
+}
 
+void SharedMaterial::flushInstanceData(uint32 frameIndex){
 	VectorArray<Matrix4> m;
-	m.reserve(_matrices.size());
-	for (const auto& matrix : _matrices) {
-		m.emplace_back(*matrix);
+	m.reserve(_meshes.size());
+	for (const auto& mesh : _meshes) {
+		m.emplace_back(mesh.mtxWorld->transpose());
 	}
 
-	_instanceVertexBuffer.createDirectCpuReadWrite<Matrix4>(device, m);
-	_instanceVertexView.BufferLocation = _instanceVertexBuffer.getGpuVirtualAddress();
-	_instanceVertexView.SizeInBytes = sizeof(Matrix4) * _matrices.size();
-	_instanceVertexView.StrideInBytes = sizeof(Matrix4);
+	_instanceVertexBuffer[frameIndex].writeData(m.data(), static_cast<uint32>(m.size() * sizeof(Matrix4)));
+}
+
+void SharedMaterial::setSizeInstance(RefPtr<ID3D12Device> device) {
+	for (uint32 i = 0; i < FrameCount; ++i) {
+		_instanceVertexBuffer[i].createDirectEmptyVertex(device, sizeof(Matrix4), MAX_INSTANCE_PER_MATERIAL);
+	}
 }

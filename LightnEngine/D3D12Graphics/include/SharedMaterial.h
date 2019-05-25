@@ -6,10 +6,12 @@
 #include "GraphicsConstantSettings.h"
 #include "GpuResource.h"
 #include "BufferView.h"
+#include "AABB.h"
+
+#define MAX_INSTANCE_PER_MATERIAL 256
 
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
-struct RefVertexAndIndexBuffer;
 class ConstantBuffer;
 class VertexShader;
 class PixelShader;
@@ -67,14 +69,6 @@ struct ConstantBufferFrame {
 	BufferView constantBufferViews[FrameCount];
 };
 
-struct RenderSettings {
-	RenderSettings(RefPtr<ID3D12GraphicsCommandList> commandList, uint32 frameIndex) :
-		commandList(commandList), frameIndex(frameIndex) {}
-
-	RefPtr<ID3D12GraphicsCommandList> commandList;
-	const uint32 frameIndex;
-};
-
 //描画コマンド構築のみに必要な最小限のデータをパックした構造体
 struct RefSharedMaterial {
 	RefSharedMaterial(
@@ -100,6 +94,65 @@ struct RefSharedMaterial {
 	const RefBufferView srvVertex;
 	const RefConstantBufferViews pixelConstantViews;
 	const D3D_PRIMITIVE_TOPOLOGY topology;
+};
+
+//マテリアルの描画範囲定義
+struct MaterialDrawRange {
+	MaterialDrawRange() :indexCount(0), indexOffset(0) {}
+	MaterialDrawRange(uint32 indexCount, uint32 indexOffset) :indexCount(indexCount), indexOffset(indexOffset) {}
+
+	uint32 indexCount;
+	uint32 indexOffset;
+};
+
+struct RefVertexAndIndexBuffer {
+	RefVertexAndIndexBuffer(const RefVertexBufferView& vertexView,
+		const RefIndexBufferView& indexView,
+		const MaterialDrawRange& drawRange) :
+		vertexView(vertexView), indexView(indexView), drawRange(drawRange) {
+	}
+
+	RefVertexBufferView vertexView;
+	RefIndexBufferView indexView;
+	MaterialDrawRange drawRange;
+};
+
+//頂点バッファとインデックスバッファのリソース管理
+struct VertexAndIndexBuffer {
+	VertexAndIndexBuffer(const VectorArray<MaterialDrawRange>& materialDrawRanges) :materialDrawRanges(materialDrawRanges) {}
+
+	RefVertexAndIndexBuffer getRefVertexAndIndexBuffer(uint32 materialIndex) const {
+		return RefVertexAndIndexBuffer(vertexBuffer.getRefVertexBufferView(), indexBuffer.getRefIndexBufferView(), materialDrawRanges[materialIndex]);
+	}
+
+	VertexBuffer vertexBuffer;
+	IndexBuffer indexBuffer;
+	AABB boundingBox;
+	VectorArray<MaterialDrawRange> materialDrawRanges;
+};
+
+//マテリアルごとのインデックス範囲データ
+struct MaterialSlot {
+	MaterialSlot(const MaterialDrawRange& range, const RefSharedMaterial& material) :range(range), material(material) {}
+
+	const RefSharedMaterial material;
+	const MaterialDrawRange range;
+};
+
+struct RenderSettings {
+	RenderSettings(RefPtr<ID3D12GraphicsCommandList> commandList, uint32 frameIndex) :
+		commandList(commandList), frameIndex(frameIndex) {}
+
+	RefPtr<ID3D12GraphicsCommandList> commandList;
+	const uint32 frameIndex;
+};
+
+struct InstanceInfoPerMaterial {
+	InstanceInfoPerMaterial(RefPtr<Matrix4> mtxWorld, RefVertexAndIndexBuffer drawInfo) :
+		mtxWorld(mtxWorld), drawInfo(drawInfo) {}
+
+	RefPtr<Matrix4> mtxWorld;
+	RefVertexAndIndexBuffer drawInfo;
 };
 
 class SharedMaterial {
@@ -187,7 +240,9 @@ public:
 			_topology);
 	}
 
-	void addMesh(RefPtr<ID3D12Device> device, VectorArray<RefPtr<Matrix4>> matrices, VectorArray<RefPtr<RefVertexAndIndexBuffer>>& meshes);
+	void addMeshInstance(const InstanceInfoPerMaterial& instanceInfo);
+	void flushInstanceData(uint32 frameIndex);
+	void setSizeInstance(RefPtr<ID3D12Device> device);
 
 	const D3D_PRIMITIVE_TOPOLOGY _topology;
 
@@ -203,8 +258,6 @@ public:
 	ConstantBufferFrame _vertexConstantBuffer;
 	ConstantBufferFrame _pixelConstantBuffer;
 
-	GpuBuffer _instanceVertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW _instanceVertexView;
-	VectorArray<RefPtr<Matrix4>> _matrices;
-	VectorArray<RefPtr<RefVertexAndIndexBuffer>> _meshes;
+	VertexBufferDynamic _instanceVertexBuffer[FrameCount];
+	VectorArray<InstanceInfoPerMaterial> _meshes;
 };

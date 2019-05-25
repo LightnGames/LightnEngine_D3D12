@@ -35,13 +35,10 @@ public:
 	void createMeshSets(const VectorArray<String>& fileNames);
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
-	StaticSingleMeshRender createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);
 	StaticMultiMeshRender createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas);
 
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 	RefPtr<DebugGeometryRender> getDebugGeometryRender();
-
-	void sky();
 
 public:
 	UINT _width;
