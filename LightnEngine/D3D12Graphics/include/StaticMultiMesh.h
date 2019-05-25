@@ -83,7 +83,7 @@ public:
 	//”jŠü
 	void destroy();
 
-	ConstantBufferMaterial cb;
+	ConstantBufferFrame cb;
 
 	RootSignature rootSignature;
 	PipelineState pipelineState;
@@ -101,7 +101,7 @@ private:
 	UINT _indirectArgumentDstCounterOffset;
 	UINT _gpuCullingDispatchCount;
 
-	ConstantBufferMaterial _gpuCullingCameraConstantBuffers;
+	ConstantBufferFrame _gpuCullingCameraConstantBuffers;
 	VectorArray<uint32> _uavCounterOffsets;
 
 	CommandSignature _commandSignature;

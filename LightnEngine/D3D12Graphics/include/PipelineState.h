@@ -452,11 +452,14 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootSignature;
 };
 
-class PipelineState :private NonCopyable {
-public:
-	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature,
-		const VertexShader& vertexShader, const PixelShader& pixelShader, D3D12_PRIMITIVE_TOPOLOGY_TYPE topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE) {
-		D3D12_RASTERIZER_DESC rasterizerDesc = {};
+struct DefaultPipelineStateDescSet {
+	DefaultPipelineStateDescSet() :
+		dsDesc({}),
+		dsopDesc({}),
+		rasterizerDesc({}),
+		blendDesc({}),
+		defaultRenderTargetBlendDesc({}),
+		topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE) {
 		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 		rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 		rasterizerDesc.FrontCounterClockwise = FALSE;
@@ -469,11 +472,9 @@ public:
 		rasterizerDesc.ForcedSampleCount = 0;
 		rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
-		D3D12_BLEND_DESC blendDesc = {};
 		blendDesc.AlphaToCoverageEnable = FALSE;
 		blendDesc.IndependentBlendEnable = FALSE;
 
-		D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {};
 		defaultRenderTargetBlendDesc.BlendEnable = FALSE;
 		defaultRenderTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
 		defaultRenderTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
@@ -489,7 +490,6 @@ public:
 			blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
 		}
 
-		D3D12_DEPTH_STENCIL_DESC dsDesc = {};
 		dsDesc.DepthEnable = TRUE;
 		dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 		dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
@@ -497,7 +497,6 @@ public:
 		dsDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
 		dsDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
 
-		D3D12_DEPTH_STENCILOP_DESC dsopDesc = {};
 		dsopDesc.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
 		dsopDesc.StencilFailOp = D3D12_STENCIL_OP_KEEP;
 		dsopDesc.StencilPassOp = D3D12_STENCIL_OP_KEEP;
@@ -505,17 +504,55 @@ public:
 
 		dsDesc.FrontFace = dsopDesc;
 		dsDesc.BackFace = dsopDesc;
+	}
+
+	D3D12_RASTERIZER_DESC rasterizerDesc;
+	D3D12_BLEND_DESC blendDesc;
+	D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc;
+	D3D12_DEPTH_STENCIL_DESC dsDesc;
+	D3D12_DEPTH_STENCILOP_DESC dsopDesc;
+	D3D12_PRIMITIVE_TOPOLOGY_TYPE topology;
+};
+
+class PipelineState :private NonCopyable {
+public:
+	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature,
+		const VertexShader& vertexShader, const PixelShader& pixelShader,
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE) {
+		DefaultPipelineStateDescSet psoDescSet;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { vertexShader.inputLayouts.data(), static_cast<UINT>(vertexShader.inputLayouts.size()) };
 		psoDesc.pRootSignature = rootSignature->_rootSignature.Get();
 		psoDesc.VS = vertexShader.getByteCode();
 		psoDesc.PS = pixelShader.getByteCode();
-		psoDesc.RasterizerState = rasterizerDesc;
-		psoDesc.BlendState = blendDesc;
-		psoDesc.DepthStencilState = dsDesc;
+		psoDesc.RasterizerState = psoDescSet.rasterizerDesc;
+		psoDesc.BlendState = psoDescSet.blendDesc;
+		psoDesc.DepthStencilState = psoDescSet.dsDesc;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = topology;
+		psoDesc.NumRenderTargets = 1;
+		psoDesc.RTVFormats[0] = RenderTargetFormat;
+		psoDesc.DSVFormat = DepthStencilFormat;
+		psoDesc.SampleDesc.Count = 1;
+		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
+		NAME_D3D12_OBJECT(_pipelineState);
+	}
+
+	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature,
+		const VertexShader& vertexShader, const PixelShader& pixelShader,
+		const DefaultPipelineStateDescSet& psoDescSet) {
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+		psoDesc.InputLayout = { vertexShader.inputLayouts.data(), static_cast<UINT>(vertexShader.inputLayouts.size()) };
+		psoDesc.pRootSignature = rootSignature->_rootSignature.Get();
+		psoDesc.VS = vertexShader.getByteCode();
+		psoDesc.PS = pixelShader.getByteCode();
+		psoDesc.RasterizerState = psoDescSet.rasterizerDesc;
+		psoDesc.BlendState = psoDescSet.blendDesc;
+		psoDesc.DepthStencilState = psoDescSet.dsDesc;
+		psoDesc.SampleMask = UINT_MAX;
+		psoDesc.PrimitiveTopologyType = psoDescSet.topology;
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = RenderTargetFormat;
 		psoDesc.DSVFormat = DepthStencilFormat;

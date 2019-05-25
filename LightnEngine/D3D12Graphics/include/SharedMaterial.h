@@ -2,18 +2,19 @@
 
 #include <Utility.h>
 #include <d3d12.h>
+#include <LMath.h>
 #include "GraphicsConstantSettings.h"
+#include "GpuResource.h"
 #include "BufferView.h"
 
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
+struct RefVertexAndIndexBuffer;
 class ConstantBuffer;
 class VertexShader;
 class PixelShader;
 
 #include "PipelineState.h"
-
-using Root32bitConstantInfo = std::pair<const void*, uint32>;//データポインタ、サイズ
 
 //以下グラフィックスインターフェース定義。グラフィックスAPIインターフェースヘッダーに移動する
 struct SharedMaterialCreateSettings {
@@ -35,9 +36,9 @@ struct RefConstantBufferViews {
 	}
 };
 
-struct ConstantBufferMaterial {
-	ConstantBufferMaterial();
-	~ConstantBufferMaterial();
+struct ConstantBufferFrame {
+	ConstantBufferFrame();
+	~ConstantBufferFrame();
 
 	void shutdown();
 
@@ -66,22 +67,11 @@ struct ConstantBufferMaterial {
 	BufferView constantBufferViews[FrameCount];
 };
 
-struct Root32bitConstantMaterial {
-	~Root32bitConstantMaterial();
-
-	void create(const VectorArray<uint32>& bufferSizes);
-	bool isEnableConstant() const;
-
-	VectorArray<byte*> dataPtrs;
-};
-
 struct RenderSettings {
 	RenderSettings(RefPtr<ID3D12GraphicsCommandList> commandList, uint32 frameIndex) :
 		commandList(commandList), frameIndex(frameIndex) {}
 
 	RefPtr<ID3D12GraphicsCommandList> commandList;
-	VectorArray<Root32bitConstantInfo> vertexRoot32bitConstants;
-	VectorArray<Root32bitConstantInfo> pixelRoot32bitConstants;
 	const uint32 frameIndex;
 };
 
@@ -94,10 +84,6 @@ struct RefSharedMaterial {
 		const RefBufferView& srvVertex,
 		const RefConstantBufferViews& vertexConstantViews,
 		const RefConstantBufferViews& pixelConstantViews,
-		const uint32 pixelRoot32bitConstantIndex,
-		const uint32 pixelRoot32bitConstantCount,
-		const uint32 vertexRoot32bitConstantIndex,
-		const uint32 vertexRoot32bitConstantCount,
 		D3D_PRIMITIVE_TOPOLOGY topology) :
 		pipelineState(pipelineState),
 		rootSignature(rootSignature),
@@ -105,22 +91,14 @@ struct RefSharedMaterial {
 		srvVertex(srvVertex),
 		vertexConstantViews(vertexConstantViews),
 		pixelConstantViews(pixelConstantViews),
-		pixelRoot32bitConstantIndex(pixelRoot32bitConstantIndex),
-		pixelRoot32bitConstantCount(pixelRoot32bitConstantCount),
-		vertexRoot32bitConstantIndex(vertexRoot32bitConstantIndex),
-		vertexRoot32bitConstantCount(vertexRoot32bitConstantCount),
 		topology(topology){}
 
 	const RefPipelineState pipelineState;
 	const RefRootsignature rootSignature;
 	const RefBufferView srvPixel;
 	const RefConstantBufferViews vertexConstantViews;
-	const uint32 pixelRoot32bitConstantIndex;
-	const uint32 pixelRoot32bitConstantCount;
 	const RefBufferView srvVertex;
 	const RefConstantBufferViews pixelConstantViews;
-	const uint32 vertexRoot32bitConstantIndex;
-	const uint32 vertexRoot32bitConstantCount;
 	const D3D_PRIMITIVE_TOPOLOGY topology;
 };
 
@@ -161,14 +139,6 @@ public:
 			}
 		}
 
-		//ルート32bit定数
-		//for (size_t i = 0; i < _vsReflection.root32bitConstants.size(); ++i) {
-		//	const auto variable = _vsReflection.root32bitConstants[i].getVariable(name);
-		//	if (variable != nullptr) {
-		//		return reinterpret_cast<T*>(reinterpret_cast<byte*>(_vertexRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
-		//	}
-		//}
-
 		//ピクセルシェーダー定義からパラメータを検索
 
 		//定数バッファ
@@ -179,14 +149,6 @@ public:
 			}
 		}
 
-		//ルート32bit定数
-		//for (size_t i = 0; i < _psReflection.root32bitConstants.size(); ++i) {
-		//	const auto variable = _psReflection.root32bitConstants[i].getVariable(name);
-		//	if (variable != nullptr) {
-		//		return reinterpret_cast<T*>(reinterpret_cast<byte*>(_pixelRoot32bitConstant.dataPtrs[i]) + variable->startOffset);
-		//	}
-		//}
-
 		return nullptr;
 	}
 
@@ -196,12 +158,8 @@ public:
 		uint32 descriptorTableIndex = 0;
 		uint32 srvPixelIndex = 0;
 		uint32 pixelConstantIndex = 0;
-		uint32 pixelRoot32bitIndex = 0;
-		uint32 pixelRoot32bitCount = 0;
 		uint32 srvVertexIndex = 0;
 		uint32 vertexConstantIndex = 0;
-		uint32 vertexRoot32bitIndex = 0;
-		uint32 vertexRoot32bitCount = 0;
 
 		if (_srvPixel.isEnable()) {
 			srvPixelIndex = descriptorTableIndex++;
@@ -209,12 +167,6 @@ public:
 
 		if (_pixelConstantBuffer.isEnableBuffer()) {
 			pixelConstantIndex = descriptorTableIndex++;
-		}
-
-		pixelRoot32bitCount = static_cast<uint32>(_psReflection.root32bitConstants.size());
-		if (pixelRoot32bitCount > 0) {
-			pixelRoot32bitIndex = descriptorTableIndex;
-			descriptorTableIndex += pixelRoot32bitCount;
 		}
 
 		if (_srvVertex.isEnable()) {
@@ -225,12 +177,6 @@ public:
 			vertexConstantIndex = descriptorTableIndex++;
 		}
 
-		vertexRoot32bitCount = static_cast<uint32>(_vsReflection.root32bitConstants.size());
-		if (vertexRoot32bitCount > 0) {
-			vertexRoot32bitIndex = descriptorTableIndex;
-			descriptorTableIndex += vertexRoot32bitCount;
-		}
-
 		return RefSharedMaterial(
 			_pipelineState,
 			_rootSignature,
@@ -238,12 +184,11 @@ public:
 			_srvVertex.getRefBufferView(srvVertexIndex),
 			_vertexConstantBuffer.getRefBufferViews(vertexConstantIndex),
 			_pixelConstantBuffer.getRefBufferViews(pixelConstantIndex),
-			pixelRoot32bitIndex,
-			pixelRoot32bitCount,
-			vertexRoot32bitIndex,
-			vertexRoot32bitCount,
 			_topology);
 	}
+
+	void addMesh(RefPtr<ID3D12Device> device, VectorArray<RefPtr<Matrix4>> matrices, VectorArray<RefPtr<RefVertexAndIndexBuffer>>& meshes);
+
 	const D3D_PRIMITIVE_TOPOLOGY _topology;
 
 	const RefPipelineState _pipelineState;
@@ -255,8 +200,11 @@ public:
 	BufferView _srvPixel;
 	BufferView _srvVertex;
 
-	Root32bitConstantMaterial _vertexRoot32bitConstant;
-	Root32bitConstantMaterial _pixelRoot32bitConstant;
-	ConstantBufferMaterial _vertexConstantBuffer;
-	ConstantBufferMaterial _pixelConstantBuffer;
+	ConstantBufferFrame _vertexConstantBuffer;
+	ConstantBufferFrame _pixelConstantBuffer;
+
+	GpuBuffer _instanceVertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW _instanceVertexView;
+	VectorArray<RefPtr<Matrix4>> _matrices;
+	VectorArray<RefPtr<RefVertexAndIndexBuffer>> _meshes;
 };

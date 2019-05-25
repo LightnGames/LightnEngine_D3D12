@@ -41,6 +41,8 @@ public:
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 	RefPtr<DebugGeometryRender> getDebugGeometryRender();
 
+	void sky();
+
 public:
 	UINT _width;
 	UINT _height;

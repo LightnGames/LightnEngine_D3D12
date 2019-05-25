@@ -6,8 +6,11 @@ struct PSInput
 
 struct VSInput
 {
-    float3 position : POSITION;
-    float2 uv : TEXCOORD;
+	float3 position : POSITION;
+	float3 normal : NORMAL;
+	float3 tangent : TANGENT;
+	float2 uv : TEXCOORD;
+	float4x4 mtxWorld : MATRIX0;
 };
 
 TextureCube _texture : register(t0);
@@ -20,7 +23,7 @@ cbuffer CameraInfo : register(b0)
 	float3 cameraPos;
 }
 
-cbuffer ROOT_32BIT_CONSTANTS_MtxWorld : register(b1)
+cbuffer MtxWorld : register(b1)
 {
 	float4x4 mtxWorld;
 }

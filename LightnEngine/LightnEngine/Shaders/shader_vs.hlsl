@@ -23,7 +23,7 @@ cbuffer CameraInfo : register(b0)
 	float3 cameraPos;
 }
 
-cbuffer ROOT_32BIT_CONSTANTS_MtxWorld : register(b1)
+cbuffer MtxWorld : register(b1)
 {
 	float4x4 mtxWorld;
 }

@@ -123,22 +123,10 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 		material._vertexConstantBuffer.create(device, vertexCbSizes);
 	}
 
-	//頂点シェーダーのルート32bit定数サイズを取得して初期化
-	VectorArray<uint32> vertexRoot32bitSizes = vertexShader->getRoot32bitConstantSizes();
-	if (!vertexRoot32bitSizes.empty()) {
-		material._vertexRoot32bitConstant.create(vertexRoot32bitSizes);
-	}
-
 	//ピクセルシェーダーの定数バッファサイズを取得して定数バッファ本体を生成
 	VectorArray<uint32> pixelCbSizes = pixelShader->getConstantBufferSizes();
 	if (!pixelCbSizes.empty()) {
 		material._pixelConstantBuffer.create(device, pixelCbSizes);
-	}
-
-	//ピクセルシェーダーのルート32bit定数サイズを取得して初期化
-	VectorArray<uint32> pixelRoot32bitSizes = pixelShader->getRoot32bitConstantSizes();
-	if (!pixelRoot32bitSizes.empty()) {
-		material._pixelRoot32bitConstant.create(pixelRoot32bitSizes);
 	}
 }
 

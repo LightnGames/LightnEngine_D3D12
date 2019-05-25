@@ -47,10 +47,6 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const {
 			commandList->SetGraphicsRootDescriptorTable(view.descriptorIndex, view.gpuHandle);
 		}
 
-		//for (uint32 i = 0; i < mat.pixelRoot32bitConstantCount; ++i) {
-		//	commandList->SetGraphicsRoot32BitConstants(mat.pixelRoot32bitConstantIndex + i, settings.pixelRoot32bitConstants[i].second / 4, settings.pixelRoot32bitConstants[i].first, 0);
-		//}
-
 		//頂点シェーダーリソースをマップ
 		const RefBufferView& srvVertex = mat.srvVertex;
 		if (srvVertex.isEnable()) {
@@ -62,9 +58,6 @@ void StaticSingleMeshRCG::setupRenderCommand(RenderSettings& settings) const {
 			const RefBufferView& view = mat.vertexConstantViews.views[frameIndex];
 			commandList->SetGraphicsRootDescriptorTable(view.descriptorIndex, view.gpuHandle);
 		}
-
-		//シングルスタティックメッシュ用のワールド行列をマップ
-		commandList->SetGraphicsRoot32BitConstants(mat.vertexRoot32bitConstantIndex, static_cast<uint32>(sizeof(_worldMatrix) / 4), &_worldMatrix, 0);
 
 		//ドローコール
 		commandList->IASetPrimitiveTopology(mat.topology);

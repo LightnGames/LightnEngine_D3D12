@@ -67,6 +67,18 @@ private:
 	//このインスタンスの後ろ(sizeof(StaticSingleMeshRCG))にマテリアルのデータを配置！！！
 };
 
+struct RefVertexAndIndexBuffer {
+	RefVertexAndIndexBuffer(const RefVertexBufferView& vertexView,
+		const RefIndexBufferView& indexView,
+		const MaterialDrawRange& drawRange) :
+		vertexView(vertexView), indexView(indexView), drawRange(drawRange) {
+	}
+
+	const RefVertexBufferView vertexView;
+	const RefIndexBufferView indexView;
+	const MaterialDrawRange drawRange;
+};
+
 //頂点バッファとインデックスバッファのリソース管理
 struct VertexAndIndexBuffer {
 	VertexAndIndexBuffer(const VectorArray<MaterialDrawRange>& materialDrawRanges) :materialDrawRanges(materialDrawRanges) {}

@@ -9,6 +9,8 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
+RootSignature depthPrePassSignature;
+PipelineState depthPrePassState;
 GraphicsCore::GraphicsCore() :
 	_width(1280),
 	_height(720),
@@ -122,6 +124,14 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
+
+	return;
+	DefaultPipelineStateDescSet psoDescSet = {};
+
+	VertexShader vs;
+	PixelShader ps;
+	depthPrePassSignature.create(_device.Get(), vs, ps);
+	depthPrePassState.create(_device.Get(), &depthPrePassSignature, vs, ps, psoDescSet);
 }
 
 void GraphicsCore::onUpdate() {
@@ -220,20 +230,23 @@ void GraphicsCore::onRender() {
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+	//メッシュを描画
+	RenderSettings renderSettings(commandList, _frameIndex);
+
 	//マテリアルの定数バッファをGPUへアップロード
 	RefPtr<Camera> mainCamera = _gpuResourceManager.getMainCamera();
 	auto& materials = _gpuResourceManager.getMaterials();
 	for (auto& material : materials) {
 		SharedMaterial& sharedMaterial = material.second;
+		sharedMaterial.setParameter<Matrix4>("mtxWorld", Matrix4::scaleXYZ(Vector3::one * 100).transpose());
 		sharedMaterial.setParameter<Matrix4>("mtxView", mainCamera->getViewMatrixTransposed());
 		sharedMaterial.setParameter<Matrix4>("mtxProj", mainCamera->getProjectionMatrixTransposed());
 		sharedMaterial.setParameter<Vector3>("cameraPos", mainCamera->getPosition());
 		sharedMaterial._vertexConstantBuffer.flashBufferData(_frameIndex);
 		sharedMaterial._pixelConstantBuffer.flashBufferData(_frameIndex);
-	}
 
-	//メッシュを描画
-	RenderSettings renderSettings(commandList, _frameIndex);
+		sharedMaterial.setupRenderCommand(renderSettings);
+	}
 
 	union GpuCommandGroup {
 		RefPtr<StaticSingleMeshRCG> rcg;
@@ -245,7 +258,7 @@ void GraphicsCore::onRender() {
 	//ポインタを任意でオフセットしながらレンダーコマンドグループのデータを参照してループする
 	group.rcg = reinterpret_cast<StaticSingleMeshRCG*>(_gpuCommandArray.mainMemory);
 	for (uint32 i = 0; i < _gpuCommandCount; ++i) {
-		group.rcg->setupRenderCommand(renderSettings);
+		//group.rcg->setupRenderCommand(renderSettings);
 		group.bytePtr += group.rcg->getRequireMemorySize();
 	}
 
@@ -370,6 +383,25 @@ RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager() {
 
 RefPtr<DebugGeometryRender> GraphicsCore::getDebugGeometryRender() {
 	return &_debugGeometryRender;
+}
+
+void GraphicsCore::sky(){
+	RefPtr<SharedMaterial> m;
+	_gpuResourceManager.loadSharedMaterial("TestS", &m);
+
+	RefPtr<VertexAndIndexBuffer> v;
+	_gpuResourceManager.loadVertexAndIndexBuffer("skySphere.mesh", &v);
+
+	VectorArray<RefPtr<Matrix4>> matrics;
+	VectorArray<RefPtr<RefVertexAndIndexBuffer>> meshes;
+
+	static Matrix4 ma = Matrix4::scaleXYZ(Vector3::one * 100).transpose();
+	matrics.push_back(&ma);
+
+	static RefVertexAndIndexBuffer rv(v->vertexBuffer.getRefVertexBufferView(), v->indexBuffer.getRefIndexBufferView(), v->materialDrawRanges[0]);
+	meshes.push_back(&rv);
+
+	m->addMesh(_device.Get(), matrics, meshes);
 }
 
 void GraphicsCore::moveToNextFrame() {
