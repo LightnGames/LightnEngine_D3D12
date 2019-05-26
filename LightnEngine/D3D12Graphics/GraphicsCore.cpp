@@ -130,8 +130,8 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	VertexShader vs;
 	PixelShader ps;
-	depthPrePassSignature.create(_device.Get(), vs, ps);
-	depthPrePassState.create(_device.Get(), &depthPrePassSignature, vs, ps, psoDescSet);
+	depthPrePassSignature.create(_device.Get(), &vs, &ps);
+	depthPrePassState.create(_device.Get(), &depthPrePassSignature, &vs, &ps, psoDescSet);
 }
 
 void GraphicsCore::onUpdate() {

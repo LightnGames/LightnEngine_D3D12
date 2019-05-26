@@ -169,6 +169,9 @@ public:
 	//このマテリアルを描画するための描画コマンドを積み込む
 	void setupRenderCommand(RenderSettings& settings) const;
 
+	//マテリアルに属している頂点情報を描画
+	void drawGeometries(RenderSettings& settings) const;
+
 	//パラメータ名と値から直接更新
 	template <class T>
 	void setParameter(const String& name, const T& parameter) {

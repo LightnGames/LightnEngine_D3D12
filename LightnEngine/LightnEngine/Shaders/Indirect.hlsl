@@ -6,7 +6,6 @@ struct PSInput
 	float3 binormal : BINORMAL;
 	float2 uv : TEXCOORD;
 	float3 viewDir : VIEWDIR;
-	float4 color : COLOR;
 };
 
 struct VSInput {
@@ -15,7 +14,6 @@ struct VSInput {
 	float3 tangent : TANGENT;
 	float2 uv : TEXCOORD;
 	float4x4 mtxWorld : MATRIX0;
-	float4 color : COLOR0;
 };
 
 cbuffer CameraInfo : register(b0)
@@ -38,8 +36,6 @@ PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 
 	result.uv = input.uv;
 	result.viewDir = normalize(cameraPos - worldPos.xyz);
-
-	result.color = input.color;
 
 	return result;
 }

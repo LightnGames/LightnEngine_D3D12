@@ -28,13 +28,11 @@ struct InIndirectCommand {
 struct PerInstanceMeshInfo {
 	Matrix4 mtxWorld;
 	AABB boundingBox;
-	Color color;
 	uint32 indirectArgumentIndex;
 };
 
 struct InstacingVertexData {
 	Matrix4 mtxWorld;
-	Color color;
 };
 
 struct TextureIndex {
@@ -79,6 +77,7 @@ public:
 
 	//GPUƒJƒŠƒ“ƒOŒã‚Ìî•ñ‚Å•`‰æ
 	void setupRenderCommand(RenderSettings& settings);
+	void drawGeometries(RenderSettings& settings);
 
 	//”jŠü
 	void destroy();

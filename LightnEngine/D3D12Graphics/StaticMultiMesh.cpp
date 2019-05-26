@@ -36,7 +36,6 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-		{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	};
 
 	VertexShader vs;
@@ -89,7 +88,7 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 	rootSignature.create(device, parameterDescs, &samplerDesc);
-	pipelineState.create(device, &rootSignature, vs, ps);
+	pipelineState.create(device, &rootSignature, &vs, &ps);
 
 	//•`‰æŒ³î•ñ‚©‚çGPUƒJƒŠƒ“ƒO‚ÆIndirect•`‰æ‚É•K—v‚Èî•ñ‚ð‚Ü‚Æ‚ß‚é
 	_meshCount = static_cast<uint32>(meshes.size());
@@ -256,7 +255,6 @@ void StaticMultiMeshRCG::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 			#endif
 
 			PerInstanceMeshInfo info;
-			info.color = Color::white;
 			info.indirectArgumentIndex = i;
 			info.mtxWorld = mtxWorld.transpose();
 			info.boundingBox = boundingBox;
@@ -440,13 +438,20 @@ void StaticMultiMeshRCG::setupRenderCommand(RenderSettings & settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
-	//_material->setupRenderCommand(settings);
 	commandList->SetGraphicsRootSignature(rootSignature._rootSignature.Get());
 	commandList->SetPipelineState(pipelineState._pipelineState.Get());
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	commandList->SetGraphicsRootDescriptorTable(0, cb.constantBufferViews[frameIndex].gpuHandle);
 	commandList->SetGraphicsRootDescriptorTable(1, srv.gpuHandle);
+
+	drawGeometries(settings);
+}
+
+void StaticMultiMeshRCG::drawGeometries(RenderSettings& settings){
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+	uint32 frameIndex = settings.frameIndex;
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, frameIndex);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer.get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));

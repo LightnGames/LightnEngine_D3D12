@@ -53,7 +53,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			std::make_tuple());
 
 		rootSignature = &(*itr.first).second;
-		rootSignature->create(device, *vertexShader, *pixelShader);
+		rootSignature->create(device, vertexShader, pixelShader);
 	}
 
 	//パイプラインステートキャッシュがあればそれを使う。なければ新規生成
@@ -67,7 +67,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			std::make_tuple());
 
 		pipelineState = &(*itr.first).second;
-		pipelineState->create(device, rootSignature, *vertexShader, *pixelShader, castTopologyToType(settings.topology));
+		pipelineState->create(device, rootSignature, vertexShader, pixelShader, castTopologyToType(settings.topology));
 	}
 
 	assert(_resourcePool->sharedMaterials.count(settings.name) == 0 && "その名前のマテリアルはすでに存在します！");

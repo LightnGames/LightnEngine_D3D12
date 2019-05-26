@@ -77,7 +77,7 @@ struct ShaderReflectionCB {
 
 struct ShaderReflectionResult {
 	//Root32bitConstantに含まれる値の数を取得(4byte変数がいくつあるか)
-	uint32 getRoot32bitConstantNum(uint32 index) const{
+	uint32 getRoot32bitConstantNum(uint32 index) const {
 		return root32bitConstants[index].getBufferSize() / 4;
 	}
 
@@ -334,7 +334,7 @@ public:
 	}
 };
 
-class CommandSignature :private NonCopyable{
+class CommandSignature :private NonCopyable {
 public:
 	void create(RefPtr<ID3D12Device> device, uint32 byteStride, const VectorArray<D3D12_INDIRECT_ARGUMENT_DESC>& descs, RefPtr<ID3D12RootSignature> rootSignature = nullptr) {
 		D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
@@ -353,7 +353,7 @@ public:
 	ComPtr<ID3D12CommandSignature> _commandSignature;
 };
 
-class RootSignature :private NonCopyable{
+class RootSignature :private NonCopyable {
 public:
 	RootSignature() {}
 
@@ -377,38 +377,38 @@ public:
 		NAME_D3D12_OBJECT(_rootSignature);
 	}
 
-	void create(RefPtr<ID3D12Device> device, const VertexShader& vertexShader, const PixelShader& pixelShader) {
+	void create(RefPtr<ID3D12Device> device, const RefPtr<VertexShader> vertexShader, const RefPtr<PixelShader> pixelShader) {
 		VectorArray<D3D12_ROOT_PARAMETER1> rootParameters;
 
 		//ピクセルシェーダー
-		{
-			const ShaderReflectionResult& result = pixelShader.shaderReflectionResult;
+		if (pixelShader) {
+			const ShaderReflectionResult& result = pixelShader->shaderReflectionResult;
 			if (!result.srvRangeDescs.empty()) {
-				rootParameters.emplace_back(pixelShader.getSrvRootParameter());//DescriptorTableIndex: 1
+				rootParameters.emplace_back(pixelShader->getSrvRootParameter());//DescriptorTableIndex: 1
 			}
 
 			if (!result.cbvRangeDescs.empty()) {
-				rootParameters.emplace_back(pixelShader.getCbvRootParameter());//DescriptorTableIndex: 2
+				rootParameters.emplace_back(pixelShader->getCbvRootParameter());//DescriptorTableIndex: 2
 			}
 
-			auto root32bitConstants = pixelShader.getRoot32bitRootParameter();
+			auto root32bitConstants = pixelShader->getRoot32bitRootParameter();
 			for (const auto& root32bitConstant : root32bitConstants) {
 				rootParameters.emplace_back(root32bitConstant);
 			}
 		}
 
 		//頂点シェーダー
-		{
-			const ShaderReflectionResult& result = vertexShader.shaderReflectionResult;
+		if (vertexShader) {
+			const ShaderReflectionResult& result = vertexShader->shaderReflectionResult;
 			if (!result.srvRangeDescs.empty()) {
-				rootParameters.emplace_back(vertexShader.getSrvRootParameter());//DescriptorTableIndex: 3
+				rootParameters.emplace_back(vertexShader->getSrvRootParameter());//DescriptorTableIndex: 3
 			}
 
 			if (!result.cbvRangeDescs.empty()) {
-				rootParameters.emplace_back(vertexShader.getCbvRootParameter());//DescriptorTableIndex: 4
+				rootParameters.emplace_back(vertexShader->getCbvRootParameter());//DescriptorTableIndex: 4
 			}
 
-			auto root32bitConstants = vertexShader.getRoot32bitRootParameter();
+			auto root32bitConstants = vertexShader->getRoot32bitRootParameter();
 			for (const auto& root32bitConstant : root32bitConstants) {
 				rootParameters.emplace_back(root32bitConstant);
 			}
@@ -517,37 +517,22 @@ struct DefaultPipelineStateDescSet {
 class PipelineState :private NonCopyable {
 public:
 	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature,
-		const VertexShader& vertexShader, const PixelShader& pixelShader,
+		const RefPtr<VertexShader> vertexShader, const RefPtr<PixelShader> pixelShader,
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE) {
 		DefaultPipelineStateDescSet psoDescSet;
+		psoDescSet.topology = topology;
 
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { vertexShader.inputLayouts.data(), static_cast<UINT>(vertexShader.inputLayouts.size()) };
-		psoDesc.pRootSignature = rootSignature->_rootSignature.Get();
-		psoDesc.VS = vertexShader.getByteCode();
-		psoDesc.PS = pixelShader.getByteCode();
-		psoDesc.RasterizerState = psoDescSet.rasterizerDesc;
-		psoDesc.BlendState = psoDescSet.blendDesc;
-		psoDesc.DepthStencilState = psoDescSet.dsDesc;
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = topology;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = RenderTargetFormat;
-		psoDesc.DSVFormat = DepthStencilFormat;
-		psoDesc.SampleDesc.Count = 1;
-		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
-		NAME_D3D12_OBJECT(_pipelineState);
+		create(device, rootSignature, vertexShader, pixelShader, psoDescSet);
 	}
 
 	void create(RefPtr<ID3D12Device> device, RefPtr<RootSignature> rootSignature,
-		const VertexShader& vertexShader, const PixelShader& pixelShader,
+		const RefPtr<VertexShader> vertexShader, const RefPtr<PixelShader> pixelShader,
 		const DefaultPipelineStateDescSet& psoDescSet) {
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { vertexShader.inputLayouts.data(), static_cast<UINT>(vertexShader.inputLayouts.size()) };
+		psoDesc.InputLayout = { vertexShader->inputLayouts.data(), static_cast<UINT>(vertexShader->inputLayouts.size()) };
 		psoDesc.pRootSignature = rootSignature->_rootSignature.Get();
-		psoDesc.VS = vertexShader.getByteCode();
-		psoDesc.PS = pixelShader.getByteCode();
+		psoDesc.VS = vertexShader->getByteCode();
 		psoDesc.RasterizerState = psoDescSet.rasterizerDesc;
 		psoDesc.BlendState = psoDescSet.blendDesc;
 		psoDesc.DepthStencilState = psoDescSet.dsDesc;
@@ -557,6 +542,11 @@ public:
 		psoDesc.RTVFormats[0] = RenderTargetFormat;
 		psoDesc.DSVFormat = DepthStencilFormat;
 		psoDesc.SampleDesc.Count = 1;
+
+		if (pixelShader != nullptr) {
+			psoDesc.PS = pixelShader->getByteCode();
+		}
+
 		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
 		NAME_D3D12_OBJECT(_pipelineState);
 	}
@@ -576,5 +566,5 @@ public:
 		_pipelineState = nullptr;
 	}
 
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState;
+	ComPtr<ID3D12PipelineState> _pipelineState;
 };

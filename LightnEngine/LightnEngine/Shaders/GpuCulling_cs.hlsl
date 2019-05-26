@@ -9,13 +9,11 @@ struct AABB {
 struct ObjectInfo {
 	float4x4 mtxWorld;
 	AABB boundingBox;
-	float4 color;
 	uint indirectArgumentIndex;
 };
 
 struct OutputInfo {
 	float4x4 mtxWorld;
-	float4 color;
 };
 
 cbuffer RootConstants : register(b0)
@@ -73,7 +71,6 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadGroupId : SV_GroupThreadID)
 	if (inCount == FrustumPlaneCount) {
 		OutputInfo info;
 		info.mtxWorld = objectInfo.mtxWorld;
-		info.color = objectInfo.color;
 
 		outputCommands[objectInfo.indirectArgumentIndex].Append(info);
 	}

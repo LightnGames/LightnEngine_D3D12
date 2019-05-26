@@ -128,17 +128,23 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 		descriptorTableIndex++;
 	}
 
+	drawGeometries(settings);
+}
+
+void SharedMaterial::drawGeometries(RenderSettings& settings) const{
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+	const uint32 frameIndex = settings.frameIndex;
+
 	commandList->IASetPrimitiveTopology(_topology);
 
-	uint32 cnt = 0;
-	for (auto&& mesh : _meshes) {
+	for (size_t i = 0; i < _meshes.size(); ++i) {
+		const InstanceInfoPerMaterial& mesh = _meshes[i];
 		const RefVertexAndIndexBuffer& drawInfo = mesh.drawInfo;
 		D3D12_VERTEX_BUFFER_VIEW views[2] = { drawInfo.vertexView.view, _instanceVertexBuffer[frameIndex]._vertexBufferView };
+
 		commandList->IASetVertexBuffers(0, 2, views);
 		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
-		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, cnt);
-		
-		cnt++;
+		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, i);
 	}
 }
 
