@@ -7,7 +7,7 @@
 #define D3D12
 struct SharedMaterialCreateSettings;
 class GraphicsCore;
-class SharedMaterial;
+class SingleMeshRenderPass;
 class Texture2D;
 
 #include <RenderableEntity.h>
@@ -25,7 +25,7 @@ public:
 	void createMeshSets(const VectorArray<String>& fileNames);
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
-	void loadSharedMaterial(const String& materialName, RefAddressOf<SharedMaterial> dstMaterial);
+	void loadSharedMaterial(const String& materialName, RefAddressOf<SingleMeshRenderPass> dstMaterial);
 	void loadTexture(const String& textureName, RefAddressOf<Texture2D> dstTexture);
 
 	SingleMeshRenderInstance createStaticSingleMeshRender(const String& name, const VectorArray<String>& materialNames);

@@ -14,7 +14,7 @@ struct SharedMaterialCreateSettings;
 class VertexShader;
 class PixelShader;
 class Texture2D;
-class SharedMaterial;
+class SingleMeshRenderPass;
 class CommandContext;
 class StaticSingleMeshRCG;
 
@@ -31,7 +31,7 @@ public:
 	RefPtr<VertexShader> createVertexShader(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& inputLayouts);
 	RefPtr<PixelShader> createPixelShader(const String& fileName);
 
-	void loadSharedMaterial(const String& materialName, RefAddressOf<SharedMaterial> dstMaterial) const;
+	void loadSharedMaterial(const String& materialName, RefAddressOf<SingleMeshRenderPass> dstMaterial) const;
 	void loadTexture(const String& textureName, RefAddressOf<Texture2D> dstTexture) const;
 	void loadVertexAndIndexBuffer(const String& meshName, RefAddressOf<VertexAndIndexBuffer> dstBuffers) const;
 	void loadVertexShader(const String& shaderName, RefAddressOf<VertexShader> dstShader) const;
@@ -39,7 +39,7 @@ public:
 
 	void shutdown();
 
-	UnorderedMap<String, SharedMaterial>& getMaterials() const;
+	UnorderedMap<String, SingleMeshRenderPass>& getMaterials() const;
 	RefPtr<Camera> getMainCamera();
 
 private:

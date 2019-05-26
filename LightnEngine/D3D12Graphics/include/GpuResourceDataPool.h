@@ -22,7 +22,7 @@ struct GpuResourceDataPool {
 	UnorderedMap<String, PixelShader> pixelShaders;
 	UnorderedMap<String, PipelineState> pipelineStates;
 	UnorderedMap<String, RootSignature> rootSignatures;
-	UnorderedMap<String, SharedMaterial> sharedMaterials;
+	UnorderedMap<String, SingleMeshRenderPass> sharedMaterials;
 	UnorderedMap<String, Texture2D> textures;
 	UnorderedMap<String, VertexAndIndexBuffer> vertexAndIndexBuffers;
 };

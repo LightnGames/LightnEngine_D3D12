@@ -25,11 +25,11 @@ void SingleMeshRenderInstance::loadInstance(const String& name, const VectorArra
 	}
 }
 
-RefPtr<SharedMaterial> SingleMeshRenderInstance::getMaterial(uint32 index) const{
+RefPtr<SingleMeshRenderPass> SingleMeshRenderInstance::getMaterial(uint32 index) const{
 	return _materials[index];
 }
 
-VectorArray<RefPtr<SharedMaterial>>& SingleMeshRenderInstance::getMaterials(){
+VectorArray<RefPtr<SingleMeshRenderPass>>& SingleMeshRenderInstance::getMaterials(){
 	return _materials;
 }
 
@@ -37,5 +37,5 @@ void SingleMeshRenderInstance::updateWorldMatrix(const Matrix4& worldMatrix){
 	_mtxWorld = worldMatrix;
 }
 
-StaticMultiMeshRender::StaticMultiMeshRender(RefPtr<StaticMultiMeshRCG> rcg):_rcg(rcg){
+StaticMultiMeshRender::StaticMultiMeshRender(RefPtr<StaticMultiMeshRenderPass> rcg):_rcg(rcg){
 }

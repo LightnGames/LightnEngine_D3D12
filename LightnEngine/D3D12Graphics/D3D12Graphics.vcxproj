@@ -39,6 +39,7 @@
     <ClInclude Include="include\ImguiWindow.h" />
     <ClInclude Include="include\PipelineState.h" />
     <ClInclude Include="include\RenderableEntity.h" />
+    <ClInclude Include="include\RenderPass.h" />
     <ClInclude Include="include\SharedMaterial.h" />
     <ClInclude Include="include\StaticMultiMesh.h" />
     <ClInclude Include="include\stdafx.h" />

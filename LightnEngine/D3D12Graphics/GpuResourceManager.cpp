@@ -82,7 +82,7 @@ void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const
 			rootSignature->getRefRootSignature(),
 			settings.topology));
 
-	SharedMaterial& material = (*itr.first).second;
+	SingleMeshRenderPass& material = (*itr.first).second;
 	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 
 	//頂点シェーダーテクスチャSRV生成
@@ -207,6 +207,7 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 	uint32 uploadHeapCounter = 0;
 	for (const auto& fileName : fileNames) {
 		{
+			assert(_resourcePool->vertexAndIndexBuffers.count(fileName) == 0 && "すでにこのメッシュはロード済み");
 			//fbxsdk::FbxManager* manager = fbxsdk::FbxManager::Create();
 			//FbxIOSettings* ios = FbxIOSettings::Create(manager, IOSROOT);
 			//manager->SetIOSettings(ios);
@@ -402,7 +403,7 @@ RefPtr<PixelShader> GpuResourceManager::createPixelShader(const String& fileName
 	return pixelShader;
 }
 
-void GpuResourceManager::loadSharedMaterial(const String & materialName, RefAddressOf<SharedMaterial> dstMaterial) const {
+void GpuResourceManager::loadSharedMaterial(const String & materialName, RefAddressOf<SingleMeshRenderPass> dstMaterial) const {
 	assert(_resourcePool->sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
 	*dstMaterial = &_resourcePool->sharedMaterials.at(materialName);
 }
@@ -431,7 +432,7 @@ void GpuResourceManager::shutdown() {
 	_resourcePool.reset();
 }
 
-UnorderedMap<String, SharedMaterial>& GpuResourceManager::getMaterials() const {
+UnorderedMap<String, SingleMeshRenderPass>& GpuResourceManager::getMaterials() const {
 	return _resourcePool->sharedMaterials;
 }
 

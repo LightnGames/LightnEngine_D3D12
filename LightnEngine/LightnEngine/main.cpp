@@ -487,7 +487,7 @@ public:
 		String specularBrdf("cubemapBrdf.dds");
 
 		//テクスチャ読み込み
-		gfx.createTextures({ diffuseEnv, specularEnv, specularBrdf });
+		//gfx.createTextures({ diffuseEnv, specularEnv, specularBrdf });
 
 		SharedMaterialCreateSettings skyMatSettings;
 		skyMatSettings.name = "TestS";
@@ -500,8 +500,8 @@ public:
 		gfx.createSharedMaterial(skyMatSettings);
 
 		//メッシュデータ読み込み
-		gfx.createMeshSets({ skyName });
-		_sky.loadInstance(skyName, { "TestS" });
+		//gfx.createMeshSets({ skyName });
+		//_sky.loadInstance(skyName, { "TestS" });
 	}
 
 	void onUpdate() override {
@@ -547,7 +547,7 @@ public:
 		debugGeometryRender->debugDrawCapsule(Vector3(-2.5f, 0, 0) + offset, Quaternion::identity, capsuleRadius, capsuleHeight, Color::blue);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld);
+		//_sky.updateWorldMatrix(skyMtxWorld);
 	}
 	void onDestroy() override {
 		Scene::onDestroy();
@@ -635,23 +635,6 @@ public:
 		graphicsCore->createMeshSets(initSettings.meshNames);
 		graphicsCore->createTextures(initSettings.textureNames);
 		graphicsCore->createStaticMultiMeshRender(initSettings);
-
-		SharedMaterialCreateSettings skyMatSettings;
-		skyMatSettings.name = "TestS";
-		skyMatSettings.vertexShaderName = "skyShaders.hlsl";
-		skyMatSettings.pixelShaderName = "skyShaders.hlsl";
-		skyMatSettings.vsTextures = {};
-		skyMatSettings.psTextures = { diffuseEnv };
-		skyMatSettings.inputLayouts = inputLayouts;
-		skyMatSettings.topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		gfx.createSharedMaterial(skyMatSettings);
-
-		//メッシュデータ読み込み
-		gfx.createMeshSets({ skyName });
-		_sky.loadInstance(skyName, { "TestS" });
-
-		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-		_sky.updateWorldMatrix(skyMtxWorld);
 	}
 
 	void onUpdate() override {
@@ -661,7 +644,7 @@ public:
 		Scene::onDestroy();
 	}
 
-	SingleMeshRenderInstance _sky;
+	//SingleMeshRenderInstance _sky;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {

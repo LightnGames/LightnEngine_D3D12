@@ -7,6 +7,7 @@
 #include "SharedMaterial.h"
 #include "Camera.h"
 #include "AABB.h"
+#include "RenderPass.h"
 
 #define ENABLE_AABB_DEBUG_DRAW
 
@@ -64,7 +65,7 @@ struct InitSettingsPerStaticMultiMesh {
 	VectorArray<String> textureNames;
 };
 
-class StaticMultiMeshRCG {
+class StaticMultiMeshRenderPass :public IRenderPass{
 public:
 	//カリング対象の行列データと描画情報を渡して初期化
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerStaticMultiMesh& initInfo);
@@ -76,13 +77,11 @@ public:
 	void onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex);
 
 	//GPUカリング後の情報で描画
-	void setupRenderCommand(RenderSettings& settings);
+	void setupRenderCommand(RenderSettings& settings) override;
 	void drawGeometries(RenderSettings& settings);
 
 	//破棄
-	void destroy();
-
-	ConstantBufferFrame cb;
+	void destroy() override;
 
 	RootSignature rootSignature;
 	PipelineState pipelineState;
@@ -91,7 +90,7 @@ public:
 
 private:
 	//GPUカリングの結果を格納するバッファのリソースバリアを設定
-	void culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex);
+	void culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex) const;
 
 private:
 

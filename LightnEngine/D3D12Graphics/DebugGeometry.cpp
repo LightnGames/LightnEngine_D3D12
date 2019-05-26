@@ -14,16 +14,19 @@ void DebugLineRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	};
 
-	SharedMaterialCreateSettings materialSettings;
-	materialSettings.name = "GizmoT";
-	materialSettings.vertexShaderName = "GizmoLine.hlsl";
-	materialSettings.pixelShaderName = "GizmoLine.hlsl";
-	materialSettings.vsTextures = {};
-	materialSettings.psTextures = {};
-	materialSettings.inputLayouts = inputLayouts;
-	materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-	manager.createSharedMaterial(device, materialSettings);
-	manager.loadSharedMaterial("GizmoT", &_material);
+	VertexShader vs;
+	PixelShader ps;
+	vs.create("Shaders/GizmoLine.hlsl", inputLayouts);
+	ps.create("Shaders/GizmoLine.hlsl");
+
+	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(1);
+	parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	parameterDescs[0].Descriptor.ShaderRegister = 0;
+	parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+	_rootSignature.create(device, parameterDescs, nullptr);
+	_pipelineState.create(device, &_rootSignature, &vs, &ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugLineVertex), MAX_GIZMO);
@@ -33,7 +36,13 @@ void DebugLineRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 void DebugLineRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
-	_material->setupRenderCommand(settings);
+
+	commandList->SetPipelineState(_pipelineState._pipelineState.Get());
+	commandList->SetGraphicsRootSignature(_rootSignature._rootSignature.Get());
+
+	commandList->SetGraphicsRootConstantBufferView(0, settings.cameraConstantBuffer);
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 	commandList->IASetVertexBuffers(0, 1, &_perInstanceData[frameIndex]._vertexBufferView);
 	commandList->DrawInstanced(2, instanceCount, 0, 0);
 }
@@ -54,17 +63,20 @@ void DebugCubeRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		{ "COLOR",          0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 64, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	};
 
+	VertexShader vs;
+	PixelShader ps;
+	vs.create("Shaders/GizmoGeometry.hlsl", inputLayouts);
+	ps.create("Shaders/GizmoGeometry.hlsl");
 
-	SharedMaterialCreateSettings materialSettings;
-	materialSettings.name = "GizmoB";
-	materialSettings.vertexShaderName = "GizmoGeometry.hlsl";
-	materialSettings.pixelShaderName = "GizmoGeometry.hlsl";
-	materialSettings.vsTextures = {};
-	materialSettings.psTextures = {};
-	materialSettings.inputLayouts = inputLayouts;
-	materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-	manager.createSharedMaterial(device, materialSettings);
-	manager.loadSharedMaterial("GizmoB", &_material);
+	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(1);
+	parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	parameterDescs[0].Descriptor.ShaderRegister = 0;
+	parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+	_rootSignature.create(device, parameterDescs, nullptr);
+	_pipelineState.create(device, &_rootSignature, &vs, &ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
+
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugGeometryVertex), MAX_GIZMO);
@@ -105,7 +117,12 @@ void DebugCubeRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 void DebugCubeRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
-	_material->setupRenderCommand(settings);
+	commandList->SetPipelineState(_pipelineState._pipelineState.Get());
+	commandList->SetGraphicsRootSignature(_rootSignature._rootSignature.Get());
+
+	commandList->SetGraphicsRootConstantBufferView(0, settings.cameraConstantBuffer);
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 
 	D3D12_VERTEX_BUFFER_VIEW views[] = { _geometryVertexBuffer._vertexBufferView, _perInstanceData[frameIndex]._vertexBufferView };
 	commandList->IASetVertexBuffers(0, 2, views);
@@ -143,16 +160,19 @@ void DebugSphereRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContex
 	};
 
 
-	SharedMaterialCreateSettings materialSettings;
-	materialSettings.name = "GizmoS";
-	materialSettings.vertexShaderName = "GizmoGeometry.hlsl";
-	materialSettings.pixelShaderName = "GizmoGeometry.hlsl";
-	materialSettings.vsTextures = {};
-	materialSettings.psTextures = {};
-	materialSettings.inputLayouts = inputLayouts;
-	materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-	manager.createSharedMaterial(device, materialSettings);
-	manager.loadSharedMaterial("GizmoS", &_material);
+	VertexShader vs;
+	PixelShader ps;
+	vs.create("Shaders/GizmoGeometry.hlsl", inputLayouts);
+	ps.create("Shaders/GizmoGeometry.hlsl");
+
+	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(1);
+	parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	parameterDescs[0].Descriptor.ShaderRegister = 0;
+	parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+	_rootSignature.create(device, parameterDescs, nullptr);
+	_pipelineState.create(device, &_rootSignature, &vs, &ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugGeometryVertex), MAX_GIZMO);
@@ -206,10 +226,16 @@ void DebugSphereRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandContex
 void DebugSphereRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
-	_material->setupRenderCommand(settings);
+	commandList->SetPipelineState(_pipelineState._pipelineState.Get());
+	commandList->SetGraphicsRootSignature(_rootSignature._rootSignature.Get());
+
+	commandList->SetGraphicsRootConstantBufferView(0, settings.cameraConstantBuffer);
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 
 	D3D12_VERTEX_BUFFER_VIEW views[] = { _geometryVertexBuffer._vertexBufferView, _perInstanceData[frameIndex]._vertexBufferView };
 	commandList->IASetVertexBuffers(0, 2, views);
+	commandList->IASetIndexBuffer(nullptr);
 	commandList->DrawInstanced(96, instanceCount, 0, 0);
 }
 
@@ -231,17 +257,19 @@ void DebugCapsuleRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 		{ "HEIGHT",         0, DXGI_FORMAT_R32_FLOAT,          1, 80, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 	};
 
+	VertexShader vs;
+	PixelShader ps;
+	vs.create("Shaders/DebugDrawCapsule.hlsl", inputLayouts);
+	ps.create("Shaders/DebugDrawCapsule.hlsl");
 
-	SharedMaterialCreateSettings materialSettings;
-	materialSettings.name = "GizmoC";
-	materialSettings.vertexShaderName = "DebugDrawCapsule.hlsl";
-	materialSettings.pixelShaderName = "DebugDrawCapsule.hlsl";
-	materialSettings.vsTextures = {};
-	materialSettings.psTextures = {};
-	materialSettings.inputLayouts = inputLayouts;
-	materialSettings.topology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-	manager.createSharedMaterial(device, materialSettings);
-	manager.loadSharedMaterial("GizmoC", &_material);
+	VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(1);
+	parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	parameterDescs[0].Descriptor.ShaderRegister = 0;
+	parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+	_rootSignature.create(device, parameterDescs, nullptr);
+	_pipelineState.create(device, &_rootSignature, &vs, &ps, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
 
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		_perInstanceData[i].createDirectEmptyVertex(device, sizeof(DebugCapsuleRender), MAX_GIZMO);
@@ -321,10 +349,16 @@ void DebugCapsuleRender::create(RefPtr<ID3D12Device> device, RefPtr<CommandConte
 void DebugCapsuleRender::setupRenderCommand(RenderSettings& settings, uint32 instanceCount) const {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
-	_material->setupRenderCommand(settings);
+	commandList->SetPipelineState(_pipelineState._pipelineState.Get());
+	commandList->SetGraphicsRootSignature(_rootSignature._rootSignature.Get());
+
+	commandList->SetGraphicsRootConstantBufferView(0, settings.cameraConstantBuffer);
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 
 	D3D12_VERTEX_BUFFER_VIEW views[] = { _geometryVertexBuffer._vertexBufferView, _perInstanceData[frameIndex]._vertexBufferView };
 	commandList->IASetVertexBuffers(0, 2, views);
+	commandList->IASetIndexBuffer(nullptr);
 	commandList->DrawInstanced(136, instanceCount, 0, 0);
 }
 

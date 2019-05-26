@@ -13,6 +13,7 @@
 #include "DebugGeometry.h"
 
 #include "StaticMultiMesh.h"
+#include "RenderPass.h"
 #include <LinerAllocator.h>
 
 #ifdef _DEBUG
@@ -69,9 +70,13 @@ private:
 	ImguiWindow _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
+	UnorderedMap<String, IRenderPass*> _mainPass;
 
-	uint32 _gpuCommandCount;
-	LinerAllocator _gpuCommandArray;
-	VectorArray<StaticMultiMeshRCG*> _multiRcgs;
+	SingleMeshRenderInstance _sky;
+	SingleMeshRenderPass2 _singleRcgs;
+
+	VectorArray<StaticMultiMeshRenderPass*> _multiRcgs;
+
+	ConstantBufferFrame _mainCameraConstantBuffer;
 };
 

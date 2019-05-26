@@ -69,7 +69,7 @@ void ConstantBufferFrame::writeBufferData(const void* dataPtr, uint32 length, ui
 	memcpy(dataPtrs[bufferIndex], dataPtr, length);
 }
 
-SharedMaterial::SharedMaterial(
+SingleMeshRenderPass::SingleMeshRenderPass(
 	const ShaderReflectionResult& vsReflection,
 	const ShaderReflectionResult& psReflection,
 	const RefPipelineState& pipelineState,
@@ -84,21 +84,11 @@ SharedMaterial::SharedMaterial(
 	_topology(topology) {
 }
 
-SharedMaterial::~SharedMaterial() {
-	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-	if (_srvPixel.isEnable()) {
-		manager.discardShaderResourceView(_srvPixel);
-	}
-
-	if (_srvVertex.isEnable()) {
-		manager.discardShaderResourceView(_srvVertex);
-	}
-
-	_vertexConstantBuffer.shutdown();
-	_pixelConstantBuffer.shutdown();
+SingleMeshRenderPass::~SingleMeshRenderPass() {
+	destroy();
 }
 
-void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
+void SingleMeshRenderPass::setupRenderCommand(RenderSettings& settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 
@@ -130,7 +120,7 @@ void SharedMaterial::setupRenderCommand(RenderSettings& settings) const{
 	drawGeometries(settings);
 }
 
-void SharedMaterial::drawGeometries(RenderSettings& settings) const{
+void SingleMeshRenderPass::drawGeometries(RenderSettings& settings) const{
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	const uint32 frameIndex = settings.frameIndex;
 
@@ -147,11 +137,25 @@ void SharedMaterial::drawGeometries(RenderSettings& settings) const{
 	}
 }
 
-void SharedMaterial::addMeshInstance(const InstanceInfoPerMaterial& instanceInfo){
+void SingleMeshRenderPass::destroy(){
+	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
+	if (_srvPixel.isEnable()) {
+		manager.discardShaderResourceView(_srvPixel);
+	}
+
+	if (_srvVertex.isEnable()) {
+		manager.discardShaderResourceView(_srvVertex);
+	}
+
+	_vertexConstantBuffer.shutdown();
+	_pixelConstantBuffer.shutdown();
+}
+
+void SingleMeshRenderPass::addMeshInstance(const InstanceInfoPerMaterial& instanceInfo){
 	_meshes.emplace_back(instanceInfo);
 }
 
-void SharedMaterial::flushInstanceData(uint32 frameIndex){
+void SingleMeshRenderPass::flushInstanceData(uint32 frameIndex){
 	VectorArray<Matrix4> m;
 	m.reserve(_meshes.size());
 	for (const auto& mesh : _meshes) {
@@ -161,7 +165,7 @@ void SharedMaterial::flushInstanceData(uint32 frameIndex){
 	_instanceVertexBuffer[frameIndex].writeData(m.data(), static_cast<uint32>(m.size() * sizeof(Matrix4)));
 }
 
-void SharedMaterial::setSizeInstance(RefPtr<ID3D12Device> device) {
+void SingleMeshRenderPass::setSizeInstance(RefPtr<ID3D12Device> device) {
 	for (uint32 i = 0; i < FrameCount; ++i) {
 		_instanceVertexBuffer[i].createDirectEmptyVertex(device, sizeof(Matrix4), MAX_INSTANCE_PER_MATERIAL);
 	}

@@ -52,7 +52,7 @@ void GFXInterface::createSharedMaterial(const SharedMaterialCreateSettings& sett
 #endif
 }
 
-void GFXInterface::loadSharedMaterial(const String& materialName, RefAddressOf<SharedMaterial> dstMaterial){
+void GFXInterface::loadSharedMaterial(const String& materialName, RefAddressOf<SingleMeshRenderPass> dstMaterial){
 #ifdef D3D12
 	_graphicsCore->getGpuResourceManager()->loadSharedMaterial(materialName, dstMaterial);
 #endif

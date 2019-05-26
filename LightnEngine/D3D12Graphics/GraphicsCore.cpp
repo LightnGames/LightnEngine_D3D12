@@ -8,8 +8,6 @@
 
 #include "ThirdParty/Imgui/imgui.h"
 
-RootSignature depthPrePassSignature;
-PipelineState depthPrePassState;
 GraphicsCore::GraphicsCore() :
 	_width(1280),
 	_height(720),
@@ -72,9 +70,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 	//デバッグ描画機能初期化
 	_debugGeometryRender.create(_device.Get(), &_graphicsCommandContext);
 
-	//GPUコマンド格納アロケータ初期化
-	_gpuCommandArray.init(163840);
-
 	//スワップチェーン生成
 	{
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -124,13 +119,29 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
 
-	return;
-	DefaultPipelineStateDescSet psoDescSet = {};
+	_mainCameraConstantBuffer.create(_device.Get(), { sizeof(CameraConstantRaw) });
 
-	VertexShader vs;
-	PixelShader ps;
-	depthPrePassSignature.create(_device.Get(), &vs, &ps);
-	depthPrePassState.create(_device.Get(), &depthPrePassSignature, &vs, &ps, psoDescSet);
+	String diffuseEnv("cubemapEnvHDR.dds");
+	createTextures({ diffuseEnv });
+
+	InitSettingsPerSingleMesh singleMeshPassInfo = {};
+	singleMeshPassInfo.vertexShaderName = "Shaders/skyShaders.hlsl";
+	singleMeshPassInfo.pixelShaderName = "Shaders/skyShaders.hlsl";
+	singleMeshPassInfo.textureNames = { diffuseEnv };
+	_singleRcgs.create(_device.Get(), &_graphicsCommandContext, singleMeshPassInfo);
+	_mainPass.insert({ "Sky", &_singleRcgs });
+
+	String skyName("skySphere.mesh");
+	createMeshSets({ skyName });
+
+	RefPtr<VertexAndIndexBuffer> skyV;
+	_gpuResourceManager.loadVertexAndIndexBuffer(skyName, &skyV);
+
+	InstanceInfoPerMaterial instanceInfo(&_sky._mtxWorld, skyV->getRefVertexAndIndexBuffer(0));
+	_singleRcgs.addMeshInstance(instanceInfo);
+
+	Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
+	_sky.updateWorldMatrix(skyMtxWorld);
 }
 
 void GraphicsCore::onUpdate() {
@@ -165,40 +176,13 @@ void GraphicsCore::onUpdate() {
 	mainCamera->computeViewMatrix();
 	mainCamera->computeFlustomNormals();
 
-	static Vector3 positionV = -Vector3::forward * 23 + Vector3::up * 5;
-	static float pitchV = 0;
-	static float yawV = 0;
-	static float rollV = 0;
-	static float fovV = 60;
-	static float farZV = 10;
-	static float nearZV = 0.5f;
+	CameraConstantRaw cr;
+	cr.mtxView = mainCamera->getViewMatrixTransposed();
+	cr.mtxProj = mainCamera->getProjectionMatrixTransposed();
+	cr.cameraPosition = mainCamera->getPosition();
 
-	ImGui::Begin("Virtual Camera");
-	ImGui::DragFloat3("Position", (float*)& positionV, 0.05f);
-	ImGui::SliderAngle("Picth", &pitchV);
-	ImGui::SliderAngle("Yaw", &yawV);
-	ImGui::SliderAngle("Roll", &rollV);
-	ImGui::SliderFloat("Fov", &fovV, 0, 120);
-	ImGui::SliderFloat("NearZ", &nearZV, 0.001f, 10);
-	ImGui::SliderFloat("FarZ", &farZV, 10, 1000);
-	ImGui::End();
-
-	Camera virtualCamera;
-	virtualCamera.setPosition(positionV);
-	virtualCamera.setRotationEuler(pitchV, yawV, rollV, true);
-	virtualCamera.setFieldOfView(fovV);
-	virtualCamera.setNearZ(nearZV);
-	virtualCamera.setFarZ(farZV);
-	virtualCamera.setAspectRate(_width, _height);
-	virtualCamera.computeProjectionMatrix();
-	virtualCamera.computeViewMatrix();
-
-	virtualCamera.computeFlustomNormals();
-	virtualCamera.debugDrawFlustom();
-
-	for (auto&& multiRcg : _multiRcgs) {
-		multiRcg->updateCullingCameraInfo(virtualCamera, _frameIndex);
-	}
+	_mainCameraConstantBuffer.writeBufferData(&cr, sizeof(CameraConstantRaw), 0);
+	_mainCameraConstantBuffer.flashBufferData(_frameIndex);
 }
 
 void GraphicsCore::onRender() {
@@ -230,33 +214,11 @@ void GraphicsCore::onRender() {
 	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//描画設定
-	RenderSettings renderSettings(commandList, _frameIndex);
+	RenderSettings renderSettings(commandList, _mainCameraConstantBuffer.constantBuffers[_frameIndex][0]->getGpuVirtualAddress(), _frameIndex);
 
-	//マテリアルごとにメッシュを描画
-	RefPtr<Camera> mainCamera = _gpuResourceManager.getMainCamera();
-	auto& materials = _gpuResourceManager.getMaterials();
-	for (auto& material : materials) {
-		SharedMaterial& sharedMaterial = material.second;
-		sharedMaterial.setParameter<Matrix4>("mtxView", mainCamera->getViewMatrixTransposed());
-		sharedMaterial.setParameter<Matrix4>("mtxProj", mainCamera->getProjectionMatrixTransposed());
-		sharedMaterial.setParameter<Vector3>("cameraPos", mainCamera->getPosition());
-		sharedMaterial._vertexConstantBuffer.flashBufferData(_frameIndex);
-		sharedMaterial._pixelConstantBuffer.flashBufferData(_frameIndex);
-		sharedMaterial.flushInstanceData(_frameIndex);
-
-		sharedMaterial.setupRenderCommand(renderSettings);
-	}
-
-	CameraConstantRaw cr;
-	cr.mtxView = mainCamera->getViewMatrixTransposed();
-	cr.mtxProj = mainCamera->getProjectionMatrixTransposed();
-	cr.cameraPosition = mainCamera->getPosition();
-
-	for (auto&& multiRcg : _multiRcgs) {
-		multiRcg->cb.writeBufferData(&cr, sizeof(CameraConstantRaw), 0);
-		multiRcg->cb.flashBufferData(_frameIndex);
-
-		multiRcg->setupRenderCommand(renderSettings);
+	//メインパス
+	for (auto&& pass : _mainPass) {
+		pass.second->setupRenderCommand(renderSettings);
 	}
 
 	//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
@@ -289,11 +251,10 @@ void GraphicsCore::onDestroy() {
 		_frameResources[i].shutdown();
 	}
 
-	for (auto&& multiRcg : _multiRcgs) {
-		multiRcg->destroy();
+	for (auto&& renderPass : _mainPass) {
+		renderPass.second->destroy();
 	}
 
-	_gpuCommandArray.shutdown();
 	_debugGeometryRender.destroy();
 
 	_imguiWindow.shutdown();
@@ -320,10 +281,11 @@ void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& sett
 }
 
 StaticMultiMeshRender GraphicsCore::createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas){
-	StaticMultiMeshRCG* multiRCG = new StaticMultiMeshRCG();
+	StaticMultiMeshRenderPass* multiRCG = new StaticMultiMeshRenderPass();
 	multiRCG->create(_device.Get(), &_graphicsCommandContext, meshDatas);
 
 	_multiRcgs.emplace_back(multiRCG);
+	_mainPass.insert({ "Test",multiRCG });
 
 	return StaticMultiMeshRender(multiRCG);
 }

@@ -4,8 +4,9 @@
 #include <LMath.h>
 #include "GraphicsConstantSettings.h"
 #include "GpuResource.h"
+#include "PipelineState.h"
 
-class SharedMaterial;
+class SingleMeshRenderPass;
 class CommandContext;
 struct RenderSettings;
 
@@ -47,7 +48,8 @@ public:
 	virtual void destroy();
 
 protected:
-	RefPtr<SharedMaterial> _material;
+	RootSignature _rootSignature;
+	PipelineState _pipelineState;
 	VertexBufferDynamic _perInstanceData[FrameCount];
 };
 
