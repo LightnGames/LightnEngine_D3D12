@@ -1,5 +1,4 @@
 #include "RenderableEntity.h"
-#include "MeshRender.h"
 #include "SharedMaterial.h"
 #include "GpuResource.h"
 #include "GpuResourceManager.h"

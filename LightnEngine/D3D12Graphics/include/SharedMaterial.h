@@ -69,33 +69,6 @@ struct ConstantBufferFrame {
 	BufferView constantBufferViews[FrameCount];
 };
 
-//描画コマンド構築のみに必要な最小限のデータをパックした構造体
-struct RefSharedMaterial {
-	RefSharedMaterial(
-		const RefPipelineState& pipelineState,
-		const RefRootsignature& rootSignature,
-		const RefBufferView& srvPixel,
-		const RefBufferView& srvVertex,
-		const RefConstantBufferViews& vertexConstantViews,
-		const RefConstantBufferViews& pixelConstantViews,
-		D3D_PRIMITIVE_TOPOLOGY topology) :
-		pipelineState(pipelineState),
-		rootSignature(rootSignature),
-		srvPixel(srvPixel),
-		srvVertex(srvVertex),
-		vertexConstantViews(vertexConstantViews),
-		pixelConstantViews(pixelConstantViews),
-		topology(topology){}
-
-	const RefPipelineState pipelineState;
-	const RefRootsignature rootSignature;
-	const RefBufferView srvPixel;
-	const RefConstantBufferViews vertexConstantViews;
-	const RefBufferView srvVertex;
-	const RefConstantBufferViews pixelConstantViews;
-	const D3D_PRIMITIVE_TOPOLOGY topology;
-};
-
 //マテリアルの描画範囲定義
 struct MaterialDrawRange {
 	MaterialDrawRange() :indexCount(0), indexOffset(0) {}
@@ -129,14 +102,6 @@ struct VertexAndIndexBuffer {
 	IndexBuffer indexBuffer;
 	AABB boundingBox;
 	VectorArray<MaterialDrawRange> materialDrawRanges;
-};
-
-//マテリアルごとのインデックス範囲データ
-struct MaterialSlot {
-	MaterialSlot(const MaterialDrawRange& range, const RefSharedMaterial& material) :range(range), material(material) {}
-
-	const RefSharedMaterial material;
-	const MaterialDrawRange range;
 };
 
 struct RenderSettings {
@@ -206,41 +171,6 @@ public:
 		}
 
 		return nullptr;
-	}
-
-	//コマンド構築データのみのマテリアルデータ構造体を取得
-	RefSharedMaterial getRefSharedMaterial() const {
-		//それぞれでデスクリプターテーブルのバインドインデックスを取得
-		uint32 descriptorTableIndex = 0;
-		uint32 srvPixelIndex = 0;
-		uint32 pixelConstantIndex = 0;
-		uint32 srvVertexIndex = 0;
-		uint32 vertexConstantIndex = 0;
-
-		if (_srvPixel.isEnable()) {
-			srvPixelIndex = descriptorTableIndex++;
-		}
-
-		if (_pixelConstantBuffer.isEnableBuffer()) {
-			pixelConstantIndex = descriptorTableIndex++;
-		}
-
-		if (_srvVertex.isEnable()) {
-			srvVertexIndex = descriptorTableIndex++;
-		}
-
-		if (_vertexConstantBuffer.isEnableBuffer()) {
-			vertexConstantIndex = descriptorTableIndex++;
-		}
-
-		return RefSharedMaterial(
-			_pipelineState,
-			_rootSignature,
-			_srvPixel.getRefBufferView(srvPixelIndex),
-			_srvVertex.getRefBufferView(srvVertexIndex),
-			_vertexConstantBuffer.getRefBufferViews(vertexConstantIndex),
-			_pixelConstantBuffer.getRefBufferViews(pixelConstantIndex),
-			_topology);
 	}
 
 	void addMeshInstance(const InstanceInfoPerMaterial& instanceInfo);

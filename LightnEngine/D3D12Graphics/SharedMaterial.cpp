@@ -2,7 +2,6 @@
 #include "PipelineState.h"
 #include "DescriptorHeap.h"
 #include "GpuResource.h"
-#include "MeshRender.h"
 
 ConstantBufferFrame::ConstantBufferFrame() :constantBufferViews{} {
 }

@@ -4,7 +4,6 @@
 #include "D3D12Util.h"
 #include "D3D12Helper.h"
 #include "SharedMaterial.h"
-#include "MeshRender.h"
 #include "StaticMultiMesh.h"
 
 #include "ThirdParty/Imgui/imgui.h"

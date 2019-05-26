@@ -37,7 +37,6 @@
     <ClInclude Include="include\GraphicsConstantSettings.h" />
     <ClInclude Include="include\GraphicsCore.h" />
     <ClInclude Include="include\ImguiWindow.h" />
-    <ClInclude Include="include\MeshRender.h" />
     <ClInclude Include="include\PipelineState.h" />
     <ClInclude Include="include\RenderableEntity.h" />
     <ClInclude Include="include\SharedMaterial.h" />
@@ -69,7 +68,6 @@
     <ClCompile Include="AABB.cpp" />
     <ClCompile Include="StaticMultiMesh.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MeshRender.cpp" />
     <ClCompile Include="RenderableEntity.cpp" />
     <ClCompile Include="SharedMaterial.cpp" />
     <ClCompile Include="ThirdParty\DirectXTex\DDSTextureLoader12.cpp" />
