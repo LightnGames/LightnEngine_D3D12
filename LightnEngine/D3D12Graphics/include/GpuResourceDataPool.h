@@ -13,7 +13,6 @@ struct GpuResourceDataPool {
 		pixelShaders.clear();
 		pipelineStates.clear();
 		rootSignatures.clear();
-		sharedMaterials.clear();
 		textures.clear();
 		vertexAndIndexBuffers.clear();
 	}
@@ -22,7 +21,6 @@ struct GpuResourceDataPool {
 	UnorderedMap<String, PixelShader> pixelShaders;
 	UnorderedMap<String, PipelineState> pipelineStates;
 	UnorderedMap<String, RootSignature> rootSignatures;
-	UnorderedMap<String, SingleMeshRenderPass> sharedMaterials;
 	UnorderedMap<String, Texture2D> textures;
 	UnorderedMap<String, VertexAndIndexBuffer> vertexAndIndexBuffers;
 };

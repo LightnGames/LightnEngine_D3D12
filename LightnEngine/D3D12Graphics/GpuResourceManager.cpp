@@ -20,115 +20,115 @@ GpuResourceManager::~GpuResourceManager() {
 }
 
 void GpuResourceManager::createSharedMaterial(RefPtr<ID3D12Device> device, const SharedMaterialCreateSettings& settings) {
-	const String vertexShaderFullPath = "Shaders/" + settings.vertexShaderName;
-	const String pixelShaderFullPath = "Shaders/" + settings.pixelShaderName;
+	//const String vertexShaderFullPath = "Shaders/" + settings.vertexShaderName;
+	//const String pixelShaderFullPath = "Shaders/" + settings.pixelShaderName;
 
-	//頂点シェーダーキャッシュがあればそれを使う。なければ新規生成
-	RefPtr<VertexShader> vertexShader = nullptr;
-	if (_resourcePool->vertexShaders.count(vertexShaderFullPath) > 0) {
-		loadVertexShader(vertexShaderFullPath, &vertexShader);
-	}
-	else {
-		vertexShader = createVertexShader(vertexShaderFullPath, settings.inputLayouts);
-	}
+	////頂点シェーダーキャッシュがあればそれを使う。なければ新規生成
+	//RefPtr<VertexShader> vertexShader = nullptr;
+	//if (_resourcePool->vertexShaders.count(vertexShaderFullPath) > 0) {
+	//	loadVertexShader(vertexShaderFullPath, &vertexShader);
+	//}
+	//else {
+	//	vertexShader = createVertexShader(vertexShaderFullPath, settings.inputLayouts);
+	//}
 
-	//ピクセルシェーダーキャッシュがあればそれを使う。なければ新規生成
-	RefPtr<PixelShader> pixelShader = nullptr;
-	if (_resourcePool->pixelShaders.count(pixelShaderFullPath) > 0) {
-		loadPixelShader(pixelShaderFullPath, &pixelShader);
-	}
-	else {
-		pixelShader = createPixelShader(pixelShaderFullPath);
-	}
+	////ピクセルシェーダーキャッシュがあればそれを使う。なければ新規生成
+	//RefPtr<PixelShader> pixelShader = nullptr;
+	//if (_resourcePool->pixelShaders.count(pixelShaderFullPath) > 0) {
+	//	loadPixelShader(pixelShaderFullPath, &pixelShader);
+	//}
+	//else {
+	//	pixelShader = createPixelShader(pixelShaderFullPath);
+	//}
 
-	//ルートシグネチャキャッシュがあればそれを使う。なければ新規生成
-	RefPtr<RootSignature> rootSignature = nullptr;
-	if (_resourcePool->rootSignatures.count(settings.name) > 0) {
-		rootSignature = &_resourcePool->rootSignatures.at(settings.name);
-	}
-	else {
-		auto itr = _resourcePool->rootSignatures.emplace(std::piecewise_construct,
-			std::make_tuple(settings.name),
-			std::make_tuple());
+	////ルートシグネチャキャッシュがあればそれを使う。なければ新規生成
+	//RefPtr<RootSignature> rootSignature = nullptr;
+	//if (_resourcePool->rootSignatures.count(settings.name) > 0) {
+	//	rootSignature = &_resourcePool->rootSignatures.at(settings.name);
+	//}
+	//else {
+	//	auto itr = _resourcePool->rootSignatures.emplace(std::piecewise_construct,
+	//		std::make_tuple(settings.name),
+	//		std::make_tuple());
 
-		rootSignature = &(*itr.first).second;
-		rootSignature->create(device, vertexShader, pixelShader);
-	}
+	//	rootSignature = &(*itr.first).second;
+	//	rootSignature->create(device, vertexShader, pixelShader);
+	//}
 
-	//パイプラインステートキャッシュがあればそれを使う。なければ新規生成
-	RefPtr<PipelineState> pipelineState = nullptr;
-	if (_resourcePool->pipelineStates.count(settings.name) > 0) {
-		pipelineState = &_resourcePool->pipelineStates.at(settings.name);
-	}
-	else {
-		auto itr = _resourcePool->pipelineStates.emplace(std::piecewise_construct,
-			std::make_tuple(settings.name),
-			std::make_tuple());
+	////パイプラインステートキャッシュがあればそれを使う。なければ新規生成
+	//RefPtr<PipelineState> pipelineState = nullptr;
+	//if (_resourcePool->pipelineStates.count(settings.name) > 0) {
+	//	pipelineState = &_resourcePool->pipelineStates.at(settings.name);
+	//}
+	//else {
+	//	auto itr = _resourcePool->pipelineStates.emplace(std::piecewise_construct,
+	//		std::make_tuple(settings.name),
+	//		std::make_tuple());
 
-		pipelineState = &(*itr.first).second;
-		pipelineState->create(device, rootSignature, vertexShader, pixelShader, castTopologyToType(settings.topology));
-	}
+	//	pipelineState = &(*itr.first).second;
+	//	pipelineState->create(device, rootSignature, vertexShader, pixelShader, castTopologyToType(settings.topology));
+	//}
 
-	assert(_resourcePool->sharedMaterials.count(settings.name) == 0 && "その名前のマテリアルはすでに存在します！");
+	//assert(_resourcePool->sharedMaterials.count(settings.name) == 0 && "その名前のマテリアルはすでに存在します！");
 
-	//生成したマテリアルをキャッシュに登録
-	const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
-	const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
-	auto itr = _resourcePool->sharedMaterials.emplace(std::piecewise_construct,
-		std::make_tuple(settings.name),
-		std::make_tuple(vsReflection,
-			psReflection,
-			pipelineState->getRefPipelineState(),
-			rootSignature->getRefRootSignature(),
-			settings.topology));
+	////生成したマテリアルをキャッシュに登録
+	//const ShaderReflectionResult& vsReflection = vertexShader->shaderReflectionResult;
+	//const ShaderReflectionResult& psReflection = pixelShader->shaderReflectionResult;
+	//auto itr = _resourcePool->sharedMaterials.emplace(std::piecewise_construct,
+	//	std::make_tuple(settings.name),
+	//	std::make_tuple(vsReflection,
+	//		psReflection,
+	//		pipelineState->getRefPipelineState(),
+	//		rootSignature->getRefRootSignature(),
+	//		settings.topology));
 
-	SingleMeshRenderPass& material = (*itr.first).second;
-	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
+	//SingleMeshRenderPass& material = (*itr.first).second;
+	//DescriptorHeapManager& manager = DescriptorHeapManager::instance();
 
-	//頂点シェーダーテクスチャSRV生成
-	if (vsReflection.srvRangeDescs.size() > 0) {
-		VectorArray<RefPtr<ID3D12Resource>> textures(settings.vsTextures.size());
+	////頂点シェーダーテクスチャSRV生成
+	//if (vsReflection.srvRangeDescs.size() > 0) {
+	//	VectorArray<RefPtr<ID3D12Resource>> textures(settings.vsTextures.size());
 
-		for (size_t i = 0; i < settings.vsTextures.size(); ++i) {
-			RefPtr<Texture2D> texturePtr;
-			loadTexture(settings.vsTextures[i], &texturePtr);
+	//	for (size_t i = 0; i < settings.vsTextures.size(); ++i) {
+	//		RefPtr<Texture2D> texturePtr;
+	//		loadTexture(settings.vsTextures[i], &texturePtr);
 
-			textures[i] = texturePtr->get();
-		}
-		//settings.vsTextures.size()
-		manager.createTextureShaderResourceView(textures.data(), &material._srvVertex, static_cast<uint32>(settings.vsTextures.size()));
-	}
-	//assert(vertexShader->shaderReflectionResult.srvRangeDescs.size()== settings.vsTextures.size() && "頂点シェーダー定義と指定したテクスチャ枚数が異なります！");
+	//		textures[i] = texturePtr->get();
+	//	}
+	//	//settings.vsTextures.size()
+	//	manager.createTextureShaderResourceView(textures.data(), &material._srvVertex, static_cast<uint32>(settings.vsTextures.size()));
+	//}
+	////assert(vertexShader->shaderReflectionResult.srvRangeDescs.size()== settings.vsTextures.size() && "頂点シェーダー定義と指定したテクスチャ枚数が異なります！");
 
-	//ピクセルシェーダーテクスチャSRV生成
-	if (psReflection.srvRangeDescs.size() > 0) {
-		VectorArray<RefPtr<ID3D12Resource>> textures(settings.psTextures.size());
+	////ピクセルシェーダーテクスチャSRV生成
+	//if (psReflection.srvRangeDescs.size() > 0) {
+	//	VectorArray<RefPtr<ID3D12Resource>> textures(settings.psTextures.size());
 
-		for (size_t i = 0; i < settings.psTextures.size(); ++i) {
-			RefPtr<Texture2D> texturePtr;
-			loadTexture(settings.psTextures[i], &texturePtr);
+	//	for (size_t i = 0; i < settings.psTextures.size(); ++i) {
+	//		RefPtr<Texture2D> texturePtr;
+	//		loadTexture(settings.psTextures[i], &texturePtr);
 
-			textures[i] = texturePtr->get();
-		}
+	//		textures[i] = texturePtr->get();
+	//	}
 
-		manager.createTextureShaderResourceView(textures.data(), &material._srvPixel, static_cast<uint32>(settings.psTextures.size()));
-	}
-	//assert(pixelShader->shaderReflectionResult.srvRangeDescs.size() == settings.psTextures.size() && "ピクセルシェーダー定義と指定したテクスチャ枚数が異なります！");
+	//	manager.createTextureShaderResourceView(textures.data(), &material._srvPixel, static_cast<uint32>(settings.psTextures.size()));
+	//}
+	////assert(pixelShader->shaderReflectionResult.srvRangeDescs.size() == settings.psTextures.size() && "ピクセルシェーダー定義と指定したテクスチャ枚数が異なります！");
 
 
-	//頂点シェーダーの定数バッファサイズを取得して定数バッファ本体を生成
-	VectorArray<uint32> vertexCbSizes = vertexShader->getConstantBufferSizes();
-	if (!vertexCbSizes.empty()) {
-		material._vertexConstantBuffer.create(device, vertexCbSizes);
-	}
+	////頂点シェーダーの定数バッファサイズを取得して定数バッファ本体を生成
+	//VectorArray<uint32> vertexCbSizes = vertexShader->getConstantBufferSizes();
+	//if (!vertexCbSizes.empty()) {
+	//	material._vertexConstantBuffer.create(device, vertexCbSizes);
+	//}
 
-	//ピクセルシェーダーの定数バッファサイズを取得して定数バッファ本体を生成
-	VectorArray<uint32> pixelCbSizes = pixelShader->getConstantBufferSizes();
-	if (!pixelCbSizes.empty()) {
-		material._pixelConstantBuffer.create(device, pixelCbSizes);
-	}
+	////ピクセルシェーダーの定数バッファサイズを取得して定数バッファ本体を生成
+	//VectorArray<uint32> pixelCbSizes = pixelShader->getConstantBufferSizes();
+	//if (!pixelCbSizes.empty()) {
+	//	material._pixelConstantBuffer.create(device, pixelCbSizes);
+	//}
 
-	material.setSizeInstance(device);
+	//material.setSizeInstance(device);
 }
 
 //テクスチャをまとめて生成する。まとめて送るのでCPUオーバーヘッドが少ない
@@ -403,10 +403,10 @@ RefPtr<PixelShader> GpuResourceManager::createPixelShader(const String& fileName
 	return pixelShader;
 }
 
-void GpuResourceManager::loadSharedMaterial(const String & materialName, RefAddressOf<SingleMeshRenderPass> dstMaterial) const {
-	assert(_resourcePool->sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
-	*dstMaterial = &_resourcePool->sharedMaterials.at(materialName);
-}
+//void GpuResourceManager::loadSharedMaterial(const String & materialName, RefAddressOf<SingleMeshRenderPass> dstMaterial) const {
+//	assert(_resourcePool->sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
+//	*dstMaterial = &_resourcePool->sharedMaterials.at(materialName);
+//}
 
 void GpuResourceManager::loadTexture(const String & textureName, RefAddressOf<Texture2D> dstTexture) const {
 	assert(_resourcePool->textures.count(textureName) > 0 && "テクスチャが見つかりません");
@@ -432,9 +432,9 @@ void GpuResourceManager::shutdown() {
 	_resourcePool.reset();
 }
 
-UnorderedMap<String, SingleMeshRenderPass>& GpuResourceManager::getMaterials() const {
-	return _resourcePool->sharedMaterials;
-}
+//UnorderedMap<String, SingleMeshRenderPass>& GpuResourceManager::getMaterials() const {
+//	return _resourcePool->sharedMaterials;
+//}
 
 RefPtr<Camera> GpuResourceManager::getMainCamera(){
 	return &_mainCamera;

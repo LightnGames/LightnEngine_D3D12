@@ -13,7 +13,6 @@
 #include "DebugGeometry.h"
 
 #include "StaticMultiMesh.h"
-#include "RenderPass.h"
 #include <LinerAllocator.h>
 
 #ifdef _DEBUG
@@ -21,6 +20,45 @@
 #endif
 
 using namespace Microsoft::WRL;
+
+struct RenderPassSet {
+	RefPtr<SingleMeshRenderMaterial> mainPass;
+	RefPtr<SingleMeshRenderMaterial> depthPass;
+};
+
+class StaticSingleMesh {
+public:
+	//void create(const String& name, VectorArray<String>& materialNames) {
+	//	GpuResourceManager& manager = GpuResourceManager::instance();
+	//	manager.loadVertexAndIndexBuffer(name, &_mesh);
+
+	//	_materials.resize(_mesh->materialDrawRanges.size());
+	//	for (size_t i = 0; i < _materials.size(); ++i) {
+
+	//	}
+	//}
+
+	void setupRenderCommand(RenderSettings& settings) const {
+		for (size_t i = 0; i < _mesh->materialDrawRanges.size(); ++i) {
+			_materials[i]->setupRenderCommand(settings, _mtxWorld, _mesh->getRefVertexAndIndexBuffer(i));
+		}
+	}
+
+	Matrix4 _mtxWorld;
+	VectorArray<RefPtr<SingleMeshRenderMaterial>> _materials;
+	RefPtr<VertexAndIndexBuffer> _mesh;
+};
+
+class StaticMultiMesh {
+public:
+	void setupCommand(RenderSettings& settings) {
+		for (auto&& material : _materials) {
+			material->setupRenderCommand(settings);
+		}
+	}
+
+	VectorArray<RefPtr<StaticMultiMeshMaterial>> _materials;
+};
 
 class GraphicsCore :private NonCopyable {
 public:
@@ -36,7 +74,10 @@ public:
 	void createMeshSets(const VectorArray<String>& fileNames);
 	void createSharedMaterial(const SharedMaterialCreateSettings& settings);
 
-	StaticMultiMeshRender createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas);
+	void createSingleMeshMaterial(const String& name, const InitSettingsPerSingleMesh& singleMeshMaterialInfo);
+
+	SingleMeshRenderInstance createSingleMeshRenderInstance(const String& name, const VectorArray<String>& materialNames);
+	StaticMultiMeshRenderInstance createStaticMultiMeshRender(const String& name, const InitSettingsPerStaticMultiMesh& meshDatas);
 
 	RefPtr<GpuResourceManager> getGpuResourceManager();
 	RefPtr<DebugGeometryRender> getDebugGeometryRender();
@@ -70,13 +111,11 @@ private:
 	ImguiWindow _imguiWindow;
 
 	RefPtr<FrameResource> _currentFrameResource;
-	UnorderedMap<String, IRenderPass*> _mainPass;
+	UnorderedMap<String, SingleMeshRenderMaterial> _singleMeshRenderMaterials;
+	UnorderedMap<String, StaticMultiMeshMaterial> _multiMeshRenderMaterials;
 
-	SingleMeshRenderInstance _sky;
-	SingleMeshRenderPass2 _singleRcgs;
-
-	VectorArray<StaticMultiMeshRenderPass*> _multiRcgs;
+	VectorArray<StaticSingleMesh> _singleMeshes;
+	VectorArray<StaticMultiMesh> _multiMeshes;
 
 	ConstantBufferFrame _mainCameraConstantBuffer;
 };
-

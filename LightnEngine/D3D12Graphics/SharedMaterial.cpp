@@ -68,105 +68,105 @@ void ConstantBufferFrame::flashBufferData(uint32 frameIndex) {
 void ConstantBufferFrame::writeBufferData(const void* dataPtr, uint32 length, uint32 bufferIndex) {
 	memcpy(dataPtrs[bufferIndex], dataPtr, length);
 }
-
-SingleMeshRenderPass::SingleMeshRenderPass(
-	const ShaderReflectionResult& vsReflection,
-	const ShaderReflectionResult& psReflection,
-	const RefPipelineState& pipelineState,
-	const RefRootsignature& rootSignature,
-	D3D_PRIMITIVE_TOPOLOGY topology)
-	:_vsReflection(vsReflection),
-	_psReflection(psReflection),
-	_pipelineState(pipelineState),
-	_rootSignature(rootSignature),
-	_srvVertex(),
-	_srvPixel(),
-	_topology(topology) {
-}
-
-SingleMeshRenderPass::~SingleMeshRenderPass() {
-	destroy();
-}
-
-void SingleMeshRenderPass::setupRenderCommand(RenderSettings& settings) {
-	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-	const uint32 frameIndex = settings.frameIndex;
-
-	commandList->SetPipelineState(_pipelineState.pipelineState);
-	commandList->SetGraphicsRootSignature(_rootSignature.rootSignature);
-
-	//このマテリアルで有効なリソースビューをセットする
-	UINT descriptorTableIndex = 0;
-	if (_srvPixel.isEnable()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvPixel.gpuHandle);
-		descriptorTableIndex++;
-	}
-
-	if (_pixelConstantBuffer.isEnableBuffer()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _pixelConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
-		descriptorTableIndex++;
-	}
-
-	if (_srvVertex.isEnable()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvVertex.gpuHandle);
-		descriptorTableIndex++;
-	}
-
-	if (_vertexConstantBuffer.isEnableBuffer()) {
-		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _vertexConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
-		descriptorTableIndex++;
-	}
-
-	drawGeometries(settings);
-}
-
-void SingleMeshRenderPass::drawGeometries(RenderSettings& settings) const{
-	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-	const uint32 frameIndex = settings.frameIndex;
-
-	commandList->IASetPrimitiveTopology(_topology);
-
-	for (size_t i = 0; i < _meshes.size(); ++i) {
-		const InstanceInfoPerMaterial& mesh = _meshes[i];
-		const RefVertexAndIndexBuffer& drawInfo = mesh.drawInfo;
-		D3D12_VERTEX_BUFFER_VIEW views[2] = { drawInfo.vertexView.view, _instanceVertexBuffer[frameIndex]._vertexBufferView };
-
-		commandList->IASetVertexBuffers(0, 2, views);
-		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
-		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, i);
-	}
-}
-
-void SingleMeshRenderPass::destroy(){
-	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
-	if (_srvPixel.isEnable()) {
-		manager.discardShaderResourceView(_srvPixel);
-	}
-
-	if (_srvVertex.isEnable()) {
-		manager.discardShaderResourceView(_srvVertex);
-	}
-
-	_vertexConstantBuffer.shutdown();
-	_pixelConstantBuffer.shutdown();
-}
-
-void SingleMeshRenderPass::addMeshInstance(const InstanceInfoPerMaterial& instanceInfo){
-	_meshes.emplace_back(instanceInfo);
-}
-
-void SingleMeshRenderPass::flushInstanceData(uint32 frameIndex){
-	VectorArray<Matrix4> m;
-	m.reserve(_meshes.size());
-	for (const auto& mesh : _meshes) {
-		m.emplace_back(mesh.mtxWorld->transpose());
-	}
-
-	_instanceVertexBuffer[frameIndex].writeData(m.data(), static_cast<uint32>(m.size() * sizeof(Matrix4)));
-}
-
-void SingleMeshRenderPass::setSizeInstance(RefPtr<ID3D12Device> device) {
-	for (uint32 i = 0; i < FrameCount; ++i) {
-		_instanceVertexBuffer[i].createDirectEmptyVertex(device, sizeof(Matrix4), MAX_INSTANCE_PER_MATERIAL);
-	}
-}
+//
+//SingleMeshRenderPass::SingleMeshRenderPass(
+//	const ShaderReflectionResult& vsReflection,
+//	const ShaderReflectionResult& psReflection,
+//	const RefPipelineState& pipelineState,
+//	const RefRootsignature& rootSignature,
+//	D3D_PRIMITIVE_TOPOLOGY topology)
+//	:_vsReflection(vsReflection),
+//	_psReflection(psReflection),
+//	_pipelineState(pipelineState),
+//	_rootSignature(rootSignature),
+//	_srvVertex(),
+//	_srvPixel(),
+//	_topology(topology) {
+//}
+//
+//SingleMeshRenderPass::~SingleMeshRenderPass() {
+//	destroy();
+//}
+//
+//void SingleMeshRenderPass::setupRenderCommand(RenderSettings& settings) {
+//	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+//	const uint32 frameIndex = settings.frameIndex;
+//
+//	commandList->SetPipelineState(_pipelineState.pipelineState);
+//	commandList->SetGraphicsRootSignature(_rootSignature.rootSignature);
+//
+//	//このマテリアルで有効なリソースビューをセットする
+//	UINT descriptorTableIndex = 0;
+//	if (_srvPixel.isEnable()) {
+//		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvPixel.gpuHandle);
+//		descriptorTableIndex++;
+//	}
+//
+//	if (_pixelConstantBuffer.isEnableBuffer()) {
+//		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _pixelConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
+//		descriptorTableIndex++;
+//	}
+//
+//	if (_srvVertex.isEnable()) {
+//		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _srvVertex.gpuHandle);
+//		descriptorTableIndex++;
+//	}
+//
+//	if (_vertexConstantBuffer.isEnableBuffer()) {
+//		commandList->SetGraphicsRootDescriptorTable(descriptorTableIndex, _vertexConstantBuffer.constantBufferViews[frameIndex].gpuHandle);
+//		descriptorTableIndex++;
+//	}
+//
+//	drawGeometries(settings);
+//}
+//
+//void SingleMeshRenderPass::drawGeometries(RenderSettings& settings) const{
+//	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+//	const uint32 frameIndex = settings.frameIndex;
+//
+//	commandList->IASetPrimitiveTopology(_topology);
+//
+//	for (size_t i = 0; i < _meshes.size(); ++i) {
+//		const InstanceInfoPerMaterial& mesh = _meshes[i];
+//		const RefVertexAndIndexBuffer& drawInfo = mesh.drawInfo;
+//		D3D12_VERTEX_BUFFER_VIEW views[2] = { drawInfo.vertexView.view, _instanceVertexBuffer[frameIndex]._vertexBufferView };
+//
+//		commandList->IASetVertexBuffers(0, 2, views);
+//		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
+//		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, i);
+//	}
+//}
+//
+//void SingleMeshRenderPass::destroy(){
+//	DescriptorHeapManager& manager = DescriptorHeapManager::instance();
+//	if (_srvPixel.isEnable()) {
+//		manager.discardShaderResourceView(_srvPixel);
+//	}
+//
+//	if (_srvVertex.isEnable()) {
+//		manager.discardShaderResourceView(_srvVertex);
+//	}
+//
+//	_vertexConstantBuffer.shutdown();
+//	_pixelConstantBuffer.shutdown();
+//}
+//
+//void SingleMeshRenderPass::addMeshInstance(const InstanceInfoPerMaterial& instanceInfo){
+//	_meshes.emplace_back(instanceInfo);
+//}
+//
+//void SingleMeshRenderPass::flushInstanceData(uint32 frameIndex){
+//	VectorArray<Matrix4> m;
+//	m.reserve(_meshes.size());
+//	for (const auto& mesh : _meshes) {
+//		m.emplace_back(mesh.mtxWorld->transpose());
+//	}
+//
+//	_instanceVertexBuffer[frameIndex].writeData(m.data(), static_cast<uint32>(m.size() * sizeof(Matrix4)));
+//}
+//
+//void SingleMeshRenderPass::setSizeInstance(RefPtr<ID3D12Device> device) {
+//	for (uint32 i = 0; i < FrameCount; ++i) {
+//		_instanceVertexBuffer[i].createDirectEmptyVertex(device, sizeof(Matrix4), MAX_INSTANCE_PER_MATERIAL);
+//	}
+//}

@@ -104,9 +104,9 @@ public:
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
 
 		_mesh.updateWorldMatrix(mtxWorld);
-		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
-		_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
-		_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
+		//_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
+		//_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
+		//_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
 		_sky.updateWorldMatrix(skyMtxWorld);
@@ -209,9 +209,9 @@ public:
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
 
 		_mesh.updateWorldMatrix(mtxWorld);
-		_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
-		_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
-		_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
+		//_mesh.getMaterial(0)->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
+		//_mesh.getMaterial(0)->setParameter<Vector3>("color", color);
+		//_mesh.getMaterial(0)->setParameter<float>("intensity", intensity);
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
 		_sky.updateWorldMatrix(skyMtxWorld);
@@ -327,11 +327,11 @@ public:
 				float metallic = y / (float)(yNum-1);
 				float roughness = x / (float)(xNum-1);
 				_meshes[index].updateWorldMatrix(mtxWorld.multiply(Matrix4::translateXYZ(offset)));
-				_meshes[index].getMaterial(0)->setParameter<Vector3>("direction", lightDir);
-				_meshes[index].getMaterial(0)->setParameter<Vector3>("color", color);
-				_meshes[index].getMaterial(0)->setParameter<float>("intensity", intensity);
-				_meshes[index].getMaterial(0)->setParameter<float>("p_metallic", metallic);
-				_meshes[index].getMaterial(0)->setParameter<float>("p_roughness", roughness);
+				//_meshes[index].getMaterial(0)->setParameter<Vector3>("direction", lightDir);
+				//_meshes[index].getMaterial(0)->setParameter<Vector3>("color", color);
+				//_meshes[index].getMaterial(0)->setParameter<float>("intensity", intensity);
+				//_meshes[index].getMaterial(0)->setParameter<float>("p_metallic", metallic);
+				//_meshes[index].getMaterial(0)->setParameter<float>("p_roughness", roughness);
 			}
 		}
 
@@ -457,9 +457,9 @@ public:
 
 		_mesh.updateWorldMatrix(mtxWorld);
 		for (auto&& material : _mesh.getMaterials()) {
-			material->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
-			material->setParameter<Vector3>("color", color);
-			material->setParameter<float>("intensity", intensity);
+			//material->setParameter<Vector3>("direction", Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward));
+			//material->setParameter<Vector3>("color", color);
+			//material->setParameter<float>("intensity", intensity);
 		}
 
 		Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
@@ -634,7 +634,7 @@ public:
 
 		graphicsCore->createMeshSets(initSettings.meshNames);
 		graphicsCore->createTextures(initSettings.textureNames);
-		graphicsCore->createStaticMultiMeshRender(initSettings);
+		graphicsCore->createStaticMultiMeshRender("mul",initSettings);
 	}
 
 	void onUpdate() override {

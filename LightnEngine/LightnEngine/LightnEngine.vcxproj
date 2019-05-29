@@ -97,7 +97,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)MemoryAllocator\include;$(SolutionDir)Math\include;$(SolutionDir)Utility\include;$(SolutionDir)TaskSystem\include;$(SolutionDir)D3D12Graphics\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;TaskSystem_$(Configuration).lib;D3D12Graphics_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;TaskSystem_$(Configuration).lib;D3D12Graphics_$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Utility\lib;$(SolutionDir)TaskSystem\lib;$(SolutionDir)Math\lib;$(SolutionDir)D3D12Graphics\lib;$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -129,7 +129,7 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;TaskSystem_$(Configuration).lib;D3D12Graphics_$(Configuration).lib;libfbxsdk-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;Math_$(Configuration).lib;Utility_$(Configuration).lib;TaskSystem_$(Configuration).lib;D3D12Graphics_$(Configuration).lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Utility\lib;$(SolutionDir)TaskSystem\lib;$(SolutionDir)Math\lib;$(SolutionDir)D3D12Graphics\lib;$(SolutionDir)Library\ThirdParty\FbxSDK\lib\vs2015\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>

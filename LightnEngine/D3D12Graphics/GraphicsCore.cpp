@@ -124,24 +124,17 @@ void GraphicsCore::onInit(HWND hwnd) {
 	String diffuseEnv("cubemapEnvHDR.dds");
 	createTextures({ diffuseEnv });
 
-	InitSettingsPerSingleMesh singleMeshPassInfo = {};
-	singleMeshPassInfo.vertexShaderName = "Shaders/skyShaders.hlsl";
-	singleMeshPassInfo.pixelShaderName = "Shaders/skyShaders.hlsl";
-	singleMeshPassInfo.textureNames = { diffuseEnv };
-	_singleRcgs.create(_device.Get(), &_graphicsCommandContext, singleMeshPassInfo);
-	_mainPass.insert({ "Sky", &_singleRcgs });
+	InitSettingsPerSingleMesh singleMeshMaterialInfo = {};
+	singleMeshMaterialInfo.vertexShaderName = "Shaders/skyShaders.hlsl";
+	singleMeshMaterialInfo.pixelShaderName = "Shaders/skyShaders.hlsl";
+	singleMeshMaterialInfo.textureNames = { diffuseEnv };
+	createSingleMeshMaterial("SkyMaterial", singleMeshMaterialInfo);
 
 	String skyName("skySphere.mesh");
 	createMeshSets({ skyName });
 
-	RefPtr<VertexAndIndexBuffer> skyV;
-	_gpuResourceManager.loadVertexAndIndexBuffer(skyName, &skyV);
-
-	InstanceInfoPerMaterial instanceInfo(&_sky._mtxWorld, skyV->getRefVertexAndIndexBuffer(0));
-	_singleRcgs.addMeshInstance(instanceInfo);
-
-	Matrix4 skyMtxWorld = Matrix4::scaleXYZ(Vector3::one * 100);
-	_sky.updateWorldMatrix(skyMtxWorld);
+	SingleMeshRenderInstance instance = createSingleMeshRenderInstance(skyName, { "SkyMaterial" });
+	instance.updateWorldMatrix(Matrix4::scaleXYZ(Vector3::one * 100));
 }
 
 void GraphicsCore::onUpdate() {
@@ -186,8 +179,8 @@ void GraphicsCore::onUpdate() {
 }
 
 void GraphicsCore::onRender() {
-	for (auto&& multiRcg : _multiRcgs) {
-		multiRcg->onCompute(&_graphicsCommandContext, _frameIndex);
+	for (auto&& multiRcg : _multiMeshRenderMaterials) {
+		multiRcg.second.onCompute(&_graphicsCommandContext, _frameIndex);
 	}
 
 	auto commandListSet = _graphicsCommandContext.requestCommandListSet();
@@ -216,9 +209,12 @@ void GraphicsCore::onRender() {
 	//描画設定
 	RenderSettings renderSettings(commandList, _mainCameraConstantBuffer.constantBuffers[_frameIndex][0]->getGpuVirtualAddress(), _frameIndex);
 
-	//メインパス
-	for (auto&& pass : _mainPass) {
-		pass.second->setupRenderCommand(renderSettings);
+	for (const auto& mesh : _singleMeshes) {
+		mesh.setupRenderCommand(renderSettings);
+	}
+
+	for (auto&& mesh : _multiMeshes) {
+		mesh.setupCommand(renderSettings);
 	}
 
 	//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
@@ -251,10 +247,15 @@ void GraphicsCore::onDestroy() {
 		_frameResources[i].shutdown();
 	}
 
-	for (auto&& renderPass : _mainPass) {
-		renderPass.second->destroy();
+	for (auto&& material : _singleMeshRenderMaterials) {
+		material.second.destroy();
 	}
 
+	for (auto&& material : _multiMeshRenderMaterials) {
+		material.second.destroy();
+	}
+
+	_mainCameraConstantBuffer.shutdown();
 	_debugGeometryRender.destroy();
 
 	_imguiWindow.shutdown();
@@ -280,14 +281,43 @@ void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& sett
 	_gpuResourceManager.createSharedMaterial(_device.Get(), settings);
 }
 
-StaticMultiMeshRender GraphicsCore::createStaticMultiMeshRender(const InitSettingsPerStaticMultiMesh& meshDatas){
-	StaticMultiMeshRenderPass* multiRCG = new StaticMultiMeshRenderPass();
-	multiRCG->create(_device.Get(), &_graphicsCommandContext, meshDatas);
+void GraphicsCore::createSingleMeshMaterial(const String& name, const InitSettingsPerSingleMesh& singleMeshMaterialInfo){
+	auto itr = _singleMeshRenderMaterials.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
 
-	_multiRcgs.emplace_back(multiRCG);
-	_mainPass.insert({ "Test",multiRCG });
+	RefPtr<SingleMeshRenderMaterial> material = &(*itr.first).second;
+	material->create(_device.Get(), &_graphicsCommandContext, singleMeshMaterialInfo);
+}
 
-	return StaticMultiMeshRender(multiRCG);
+SingleMeshRenderInstance GraphicsCore::createSingleMeshRenderInstance(const String& name, const VectorArray<String>& materialNames){
+	StaticSingleMesh singleMesh;
+	_gpuResourceManager.loadVertexAndIndexBuffer(name, &singleMesh._mesh);
+
+	for (const auto& materialName : materialNames) {
+		singleMesh._materials.emplace_back(&_singleMeshRenderMaterials.at(materialName));
+	}
+
+	_singleMeshes.emplace_back(singleMesh);
+
+	SingleMeshRenderInstance instance;
+	instance._mesh = &_singleMeshes.back();
+	return instance;
+}
+
+StaticMultiMeshRenderInstance GraphicsCore::createStaticMultiMeshRender(const String& name, const InitSettingsPerStaticMultiMesh& meshDatas){
+	auto itr = _multiMeshRenderMaterials.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
+
+	RefPtr<StaticMultiMeshMaterial> material = &(*itr.first).second;
+	material->create(_device.Get(), &_graphicsCommandContext, meshDatas);
+
+	StaticMultiMesh multiMesh;
+	multiMesh._materials.emplace_back(material);
+	_multiMeshes.emplace_back(multiMesh);
+
+	return StaticMultiMeshRenderInstance(material);
 }
 
 RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager() {

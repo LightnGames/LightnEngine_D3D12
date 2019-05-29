@@ -10,7 +10,6 @@ struct VSInput
 	float3 normal : NORMAL;
 	float3 tangent : TANGENT;
 	float2 uv : TEXCOORD;
-	float4x4 mtxWorld : MATRIX0;
 };
 
 TextureCube _texture : register(t0);
@@ -23,6 +22,11 @@ cbuffer CameraInfo : register(b0)
 	float3 cameraPos;
 }
 
+cbuffer WorldMatrix : register(b1)
+{
+	float4x4 mtxWorld;
+}
+
 cbuffer ConstantPS : register(b2)
 {
     float4 col;
@@ -33,7 +37,7 @@ PSInput VSMain(VSInput input)
 {
     PSInput result;
 
-    float4 worldPos = mul(float4(input.position, 1), input.mtxWorld);
+    float4 worldPos = mul(float4(input.position, 1), mtxWorld);
 	float4 viewPos = float4(mul(worldPos.xyz, (float3x3)mtxView), 1);
     result.position = mul(viewPos, mtxProj);
 

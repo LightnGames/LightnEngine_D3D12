@@ -7,9 +7,6 @@
 #include "GpuResource.h"
 #include "BufferView.h"
 #include "AABB.h"
-#include "RenderPass.h"
-
-#define MAX_INSTANCE_PER_MATERIAL 256
 
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
@@ -99,6 +96,14 @@ struct VertexAndIndexBuffer {
 		return RefVertexAndIndexBuffer(vertexBuffer.getRefVertexBufferView(), indexBuffer.getRefIndexBufferView(), materialDrawRanges[materialIndex]);
 	}
 
+	D3D12_VERTEX_BUFFER_VIEW getVertexView() const {
+		return vertexBuffer._vertexBufferView;
+	}
+
+	D3D12_INDEX_BUFFER_VIEW getIndexView() const {
+		return indexBuffer._indexBufferView;
+	}
+
 	VertexBuffer vertexBuffer;
 	IndexBuffer indexBuffer;
 	AABB boundingBox;
@@ -115,88 +120,11 @@ struct RenderSettings {
 };
 
 struct InstanceInfoPerMaterial {
-	InstanceInfoPerMaterial(RefPtr<Matrix4> mtxWorld, RefVertexAndIndexBuffer drawInfo) :
+	InstanceInfoPerMaterial(Matrix4 mtxWorld, RefVertexAndIndexBuffer drawInfo) :
 		mtxWorld(mtxWorld), drawInfo(drawInfo) {}
 
-	RefPtr<Matrix4> mtxWorld;
+	Matrix4 mtxWorld;
 	RefVertexAndIndexBuffer drawInfo;
-};
-
-class SingleMeshRenderPass : public IRenderPass {
-public:
-	SingleMeshRenderPass(
-		const ShaderReflectionResult& vsReflection,
-		const ShaderReflectionResult& psReflection,
-		const RefPipelineState& pipelineState,
-		const RefRootsignature& rootSignature,
-		D3D_PRIMITIVE_TOPOLOGY topology);
-
-	~SingleMeshRenderPass();
-
-	//このマテリアルを描画するための描画コマンドを積み込む
-	void setupRenderCommand(RenderSettings& settings) override;
-
-	//マテリアルに属している頂点情報を描画
-	void drawGeometries(RenderSettings& settings) const;
-
-	void destroy() override;
-
-	//パラメータ名と値から直接更新
-	template <class T>
-	void setParameter(const String& name, const T& parameter) {
-		RefPtr<T> data = getParameter<T>(name);
-
-		if (data != nullptr) {
-			*data = parameter;
-		}
-	}
-
-	//名前から更新する領域のポインタを取得
-	template <class T>
-	RefPtr<T> getParameter(const String& name) {
-		//頂点シェーダー定義からパラメータを検索
-
-		//定数バッファ
-		for (size_t i = 0; i < _vsReflection.constantBuffers.size(); ++i) {
-			const auto variable = _vsReflection.constantBuffers[i].getVariable(name);
-			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_vertexConstantBuffer.dataPtrs[i]) + variable->startOffset);
-			}
-		}
-
-		//ピクセルシェーダー定義からパラメータを検索
-
-		//定数バッファ
-		for (size_t i = 0; i < _psReflection.constantBuffers.size(); ++i) {
-			const auto variable = _psReflection.constantBuffers[i].getVariable(name);
-			if (variable != nullptr) {
-				return reinterpret_cast<T*>(reinterpret_cast<byte*>(_pixelConstantBuffer.dataPtrs[i]) + variable->startOffset);
-			}
-		}
-
-		return nullptr;
-	}
-
-	void addMeshInstance(const InstanceInfoPerMaterial& instanceInfo);
-	void flushInstanceData(uint32 frameIndex);
-	void setSizeInstance(RefPtr<ID3D12Device> device);
-
-	const D3D_PRIMITIVE_TOPOLOGY _topology;
-
-	const RefPipelineState _pipelineState;
-	const RefRootsignature _rootSignature;
-
-	const ShaderReflectionResult _vsReflection;
-	const ShaderReflectionResult _psReflection;
-
-	BufferView _srvPixel;
-	BufferView _srvVertex;
-
-	ConstantBufferFrame _vertexConstantBuffer;
-	ConstantBufferFrame _pixelConstantBuffer;
-
-	VertexBufferDynamic _instanceVertexBuffer[FrameCount];
-	VectorArray<InstanceInfoPerMaterial> _meshes;
 };
 
 struct InitSettingsPerSingleMesh {
@@ -205,11 +133,24 @@ struct InitSettingsPerSingleMesh {
 	VectorArray<String> textureNames;
 };
 
+struct StaticMeshInstanceCommands {
+	void setupRenderCommand(RenderSettings& settings) const {
+		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+		commandList->IASetVertexBuffers(0, 1, &drawInfo.vertexView.view);
+		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
+		commandList->SetGraphicsRoot32BitConstants(2, 16, &mtxWorld, 0);
+		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, 0);
+	}
+
+	Matrix4 mtxWorld;
+	RefVertexAndIndexBuffer drawInfo;
+};
+
 #include "GpuResourceManager.h"
 #include "DescriptorHeap.h"
-class SingleMeshRenderPass2 : public IRenderPass {
+class SingleMeshRenderMaterial {
 public:
-	SingleMeshRenderPass2() {
+	SingleMeshRenderMaterial() {
 	}
 
 	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerSingleMesh& initInfo) {
@@ -218,10 +159,6 @@ public:
 			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-			{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		};
 		
 		VertexShader vs;
@@ -238,7 +175,7 @@ public:
 		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(2);
+		VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(3);
 		parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 		parameterDescs[0].Descriptor.ShaderRegister = 0;
@@ -248,6 +185,11 @@ public:
 		parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 		parameterDescs[1].DescriptorTable.NumDescriptorRanges = 1;
 		parameterDescs[1].DescriptorTable.pDescriptorRanges = &srvRange;
+
+		parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		parameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		parameterDescs[2].Constants.Num32BitValues = 16;
+		parameterDescs[2].Constants.ShaderRegister = 1;
 
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
 		samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
@@ -278,58 +220,32 @@ public:
 		}
 
 		descriptorManager.createTextureShaderResourceView(ppTextures.data(), &_textureSrv, textureCount);
-
-		_meshes.reserve(MAX_INSTANCE_PER_MATERIAL);
-
-		for (uint32 i = 0; i < FrameCount; ++i) {
-			_instanceVertexBuffer[i].createDirectEmptyVertex(device, sizeof(Matrix4), MAX_INSTANCE_PER_MATERIAL);
-		}
 	}
 
-	void setupRenderCommand(RenderSettings& settings) override {
+	void setupRenderCommand(RenderSettings& settings, const Matrix4& mtxWorld, const RefVertexAndIndexBuffer& drawInfo) const{
 		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-		const uint32 frameIndex = settings.frameIndex;
-
-		VectorArray<Matrix4> m;
-		m.reserve(_meshes.size());
-		for (const auto& mesh : _meshes) {
-			m.emplace_back(mesh.mtxWorld->transpose());
-		}
-
-		_instanceVertexBuffer[frameIndex].writeData(m.data(), static_cast<uint32>(m.size() * sizeof(Matrix4)));
-
+		//マテリアル設定
 		commandList->SetPipelineState(_pipelineState._pipelineState.Get());
 		commandList->SetGraphicsRootSignature(_rootSignature._rootSignature.Get());
-
 		commandList->SetGraphicsRootConstantBufferView(0, settings.cameraConstantBuffer);
 		commandList->SetGraphicsRootDescriptorTable(1, _textureSrv.gpuHandle);
-
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		for (size_t i = 0; i < _meshes.size(); ++i) {
-			const InstanceInfoPerMaterial& mesh = _meshes[i];
-			const RefVertexAndIndexBuffer& drawInfo = mesh.drawInfo;
-			D3D12_VERTEX_BUFFER_VIEW views[2] = { drawInfo.vertexView.view, _instanceVertexBuffer[frameIndex]._vertexBufferView };
-
-			commandList->IASetVertexBuffers(0, 2, views);
-			commandList->IASetIndexBuffer(&drawInfo.indexView.view);
-			commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, i);
-		}
+		//メッシュ描画
+		commandList->IASetVertexBuffers(0, 1, &drawInfo.vertexView.view);
+		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
+		commandList->SetGraphicsRoot32BitConstants(2, 16, &mtxWorld, 0);
+		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, 0);
 	}
 
-	void destroy() override {
 
-	}
-
-	void addMeshInstance(const InstanceInfoPerMaterial& instanceInfo) {
-		_meshes.emplace_back(instanceInfo);
+	void destroy() {
+		_rootSignature.destroy();
+		_pipelineState.destroy();
 	}
 
 	RootSignature _rootSignature;
 	PipelineState _pipelineState;
 
 	BufferView _textureSrv;
-
-	VertexBufferDynamic _instanceVertexBuffer[FrameCount];
-	VectorArray<InstanceInfoPerMaterial> _meshes;
 };

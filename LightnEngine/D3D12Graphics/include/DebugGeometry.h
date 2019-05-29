@@ -6,7 +6,7 @@
 #include "GpuResource.h"
 #include "PipelineState.h"
 
-class SingleMeshRenderPass;
+class SingleMeshRenderMaterial;
 class CommandContext;
 struct RenderSettings;
 

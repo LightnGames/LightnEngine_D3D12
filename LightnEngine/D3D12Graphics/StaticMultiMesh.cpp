@@ -5,7 +5,7 @@
 #include "GpuResourceManager.h"
 #include "DebugGeometry.h"
 
-void StaticMultiMeshRenderPass::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerStaticMultiMesh& initInfo) {
+void StaticMultiMeshMaterial::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerStaticMultiMesh& initInfo) {
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
 
@@ -168,7 +168,7 @@ void StaticMultiMeshRenderPass::create(RefPtr<ID3D12Device> device, RefPtr<Comma
 		srvRange.NumDescriptors = _meshCount;
 		srvRange.BaseShaderRegister = 2;
 		srvRange.RegisterSpace = 0;
-		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+		//srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 		D3D12_DESCRIPTOR_RANGE1 uavRange = {};
@@ -183,12 +183,12 @@ void StaticMultiMeshRenderPass::create(RefPtr<ID3D12Device> device, RefPtr<Comma
 		parameterDesc[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 		parameterDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[0].Descriptor.ShaderRegister = 0;
-		parameterDesc[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		//parameterDesc[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
 		parameterDesc[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 		parameterDesc[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[1].Descriptor.ShaderRegister = 1;
-		parameterDesc[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		//parameterDesc[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
 		parameterDesc[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		parameterDesc[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -370,7 +370,7 @@ void StaticMultiMeshRenderPass::create(RefPtr<ID3D12Device> device, RefPtr<Comma
 	commandContext->waitForIdle();
 }
 
-void StaticMultiMeshRenderPass::onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex) {
+void StaticMultiMeshMaterial::onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex) {
 	DescriptorHeapManager& _descriptorHeapManager = DescriptorHeapManager::instance();
 
 	auto computeCommandListSet = commandContext->requestCommandListSet();
@@ -426,7 +426,7 @@ void StaticMultiMeshRenderPass::onCompute(RefPtr<CommandContext> commandContext,
 }
 
 #include "ThirdParty/Imgui/imgui.h"
-void StaticMultiMeshRenderPass::setupRenderCommand(RenderSettings & settings) {
+void StaticMultiMeshMaterial::setupRenderCommand(RenderSettings & settings) {
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
@@ -472,7 +472,7 @@ void StaticMultiMeshRenderPass::setupRenderCommand(RenderSettings & settings) {
 	drawGeometries(settings);
 }
 
-void StaticMultiMeshRenderPass::drawGeometries(RenderSettings& settings){
+void StaticMultiMeshMaterial::drawGeometries(RenderSettings& settings){
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
@@ -502,7 +502,7 @@ void StaticMultiMeshRenderPass::drawGeometries(RenderSettings& settings){
 #endif
 }
 
-void StaticMultiMeshRenderPass::destroy() {
+void StaticMultiMeshMaterial::destroy() {
 	_indirectArgumentSourceBuffer.destroy();
 	_indirectArgumentDstBuffer.destroy();
 
@@ -526,7 +526,7 @@ void StaticMultiMeshRenderPass::destroy() {
 	_gpuCullingCameraConstantBuffers.shutdown();
 }
 
-void StaticMultiMeshRenderPass::updateCullingCameraInfo(const Camera & camera, uint32 frameIndex) {
+void StaticMultiMeshMaterial::updateCullingCameraInfo(const Camera & camera, uint32 frameIndex) {
 	GpuCullingCameraConstant gpuCullingConstant;
 	gpuCullingConstant.cameraPosition = camera.getPosition();
 
@@ -538,7 +538,7 @@ void StaticMultiMeshRenderPass::updateCullingCameraInfo(const Camera & camera, u
 	_gpuCullingCameraConstantBuffers.flashBufferData(frameIndex);
 }
 
-void StaticMultiMeshRenderPass::culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex) const{
+void StaticMultiMeshMaterial::culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> commandList, D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter, uint32 frameIndex) const{
 	VectorArray<D3D12_RESOURCE_BARRIER> barriers(_meshCount);
 	for (uint32 i = 0; i < _meshCount; ++i) {
 		barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
