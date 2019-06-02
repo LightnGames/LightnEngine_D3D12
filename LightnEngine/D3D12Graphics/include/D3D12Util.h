@@ -1,6 +1,25 @@
 #pragma once
 #include <d3d12.h>
 
+constexpr D3D12_STATIC_SAMPLER_DESC WrapSamplerDesc() {
+	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.MipLODBias = 0;
+	samplerDesc.MaxAnisotropy = 0;
+	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	samplerDesc.MinLOD = 0.0f;
+	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+	samplerDesc.ShaderRegister = 0;
+	samplerDesc.RegisterSpace = 0;
+	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	return samplerDesc;
+}
+
 //ヒープ属性
 struct LTND3D12_HEAP_PROPERTIES :public D3D12_HEAP_PROPERTIES {
 	LTND3D12_HEAP_PROPERTIES() = default;
@@ -33,7 +52,7 @@ struct LTND3D12_HEAP_PROPERTIES :public D3D12_HEAP_PROPERTIES {
 //リソースバリア
 struct LTND3D12_RESOURCE_BARRIER :public D3D12_RESOURCE_BARRIER {
 	LTND3D12_RESOURCE_BARRIER() = default;
-	explicit LTND3D12_RESOURCE_BARRIER(const D3D12_RESOURCE_BARRIER& o):D3D12_RESOURCE_BARRIER(o){}
+	explicit LTND3D12_RESOURCE_BARRIER(const D3D12_RESOURCE_BARRIER& o) :D3D12_RESOURCE_BARRIER(o) {}
 
 	static inline LTND3D12_RESOURCE_BARRIER transition(
 		_In_ ID3D12Resource* pResource,
@@ -42,7 +61,7 @@ struct LTND3D12_RESOURCE_BARRIER :public D3D12_RESOURCE_BARRIER {
 		UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE) {
 		LTND3D12_RESOURCE_BARRIER result = {};
-		D3D12_RESOURCE_BARRIER &barrier = result;
+		D3D12_RESOURCE_BARRIER& barrier = result;
 		result.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		result.Flags = flags;
 		barrier.Transition.pResource = pResource;
@@ -57,11 +76,11 @@ struct LTND3D12_RESOURCE_BARRIER :public D3D12_RESOURCE_BARRIER {
 		_In_ ID3D12Resource* pResourceBefore,
 		_In_ ID3D12Resource* pResourceAfter) {
 		LTND3D12_RESOURCE_BARRIER result = {};
-		D3D12_RESOURCE_BARRIER &barrier = result;
+		D3D12_RESOURCE_BARRIER& barrier = result;
 		result.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
 		barrier.Aliasing.pResourceBefore = pResourceBefore;
 		barrier.Aliasing.pResourceAfter = pResourceAfter;
-		
+
 		return result;
 	}
 
@@ -78,8 +97,8 @@ struct LTND3D12_RESOURCE_BARRIER :public D3D12_RESOURCE_BARRIER {
 struct LTND3D12_TEXTURE_COPY_LOCATION :public D3D12_TEXTURE_COPY_LOCATION {
 	LTND3D12_TEXTURE_COPY_LOCATION() = default;
 
-	explicit LTND3D12_TEXTURE_COPY_LOCATION(const D3D12_TEXTURE_COPY_LOCATION& o):
-		D3D12_TEXTURE_COPY_LOCATION(o){ }
+	explicit LTND3D12_TEXTURE_COPY_LOCATION(const D3D12_TEXTURE_COPY_LOCATION& o) :
+		D3D12_TEXTURE_COPY_LOCATION(o) { }
 
 	LTND3D12_TEXTURE_COPY_LOCATION(_In_ ID3D12Resource* pRes) {
 		pResource = pRes;
@@ -108,11 +127,11 @@ inline void memcpySubresources(
 	UINT numRows,
 	UINT numSlices) {
 	for (UINT z = 0; z < numSlices; ++z) {
-		BYTE* pDestSlice = reinterpret_cast<BYTE*>(pDest->pData) + pDest->SlicePitch*z;
-		const BYTE* pSrcSlice = reinterpret_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch*z;
+		BYTE* pDestSlice = reinterpret_cast<BYTE*>(pDest->pData) + pDest->SlicePitch * z;
+		const BYTE* pSrcSlice = reinterpret_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch * z;
 		for (UINT y = 0; y < numRows; ++y) {
-			memcpy(pDestSlice + pDest->RowPitch*y,
-				pSrcSlice + pSrc->RowPitch*y, rowSizeInBytes);
+			memcpy(pDestSlice + pDest->RowPitch * y,
+				pSrcSlice + pSrc->RowPitch * y, rowSizeInBytes);
 		}
 	}
 }
@@ -150,7 +169,7 @@ inline UINT64 updateSubresources(
 			return 0;
 		}
 
-		D3D12_MEMCPY_DEST destData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch)*SIZE_T(pNumRows[i]) };
+		D3D12_MEMCPY_DEST destData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
 		memcpySubresources(&destData, &pSrcData[i], static_cast<SIZE_T>(pRowSizesInBytes[i]), pNumRows[i], pLayouts[i].Footprint.Depth);
 	}
 	pIntermediate->Unmap(0, nullptr);
@@ -171,13 +190,13 @@ inline UINT64 updateSubresources(
 
 //ヒープ領域を新たに確保してから更新
 inline UINT64 updateSubresources(
-	_In_ ID3D12GraphicsCommandList* pCmdList,
-	_In_ ID3D12Resource* pDestinationResource,
-	_In_ ID3D12Resource* pIntermediate,
+	_In_ ID3D12GraphicsCommandList * pCmdList,
+	_In_ ID3D12Resource * pDestinationResource,
+	_In_ ID3D12Resource * pIntermediate,
 	UINT64 intermediateOffset,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES) UINT firstSubresources,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES - firstSubresources) UINT numSubresources,
-	_In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA* pSrcData) {
+	_In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA * pSrcData) {
 
 	UINT64 requiredSize = 0;
 	UINT64 memToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * numSubresources;
@@ -192,10 +211,10 @@ inline UINT64 updateSubresources(
 
 	auto pLayouts = reinterpret_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
 	UINT64* pRowSizesInBytes = reinterpret_cast<UINT64*>(pLayouts + numSubresources);
-	UINT* pNumRows = reinterpret_cast<UINT*>(pRowSizesInBytes + numSubresources);
+	UINT * pNumRows = reinterpret_cast<UINT*>(pRowSizesInBytes + numSubresources);
 
 	auto desc = pDestinationResource->GetDesc();
-	ID3D12Device* pDevice = nullptr;
+	ID3D12Device * pDevice = nullptr;
 	pDestinationResource->GetDevice(__uuidof(*pDevice), reinterpret_cast<void**>(&pDevice));
 	pDevice->GetCopyableFootprints(&desc, firstSubresources, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizesInBytes, &requiredSize);
 	pDevice->Release();
@@ -208,13 +227,13 @@ inline UINT64 updateSubresources(
 //スタック領域から更新
 template<UINT MaxSubresources>
 inline UINT64 updateSubresources(
-	_In_ ID3D12GraphicsCommandList* pCmdList,
-	_In_ ID3D12Resource* pDestinationResource,
-	_In_ ID3D12Resource* pIntermediate,
+	_In_ ID3D12GraphicsCommandList * pCmdList,
+	_In_ ID3D12Resource * pDestinationResource,
+	_In_ ID3D12Resource * pIntermediate,
 	UINT64 intermediateOffset,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES) UINT firstSubresources,
 	_In_range_(0, D3D12_REQ_SUBRESOURCES - firstSubresources) UINT numSubresources,
-	_In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA* pSrcData) {
+	_In_reads_(numSubresources) D3D12_SUBRESOURCE_DATA * pSrcData) {
 
 	UINT64 requiredSize = 0;
 	D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts[MaxSubresources];

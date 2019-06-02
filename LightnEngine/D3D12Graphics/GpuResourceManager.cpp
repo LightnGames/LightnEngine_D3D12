@@ -372,13 +372,80 @@ void GpuResourceManager::createVertexAndIndexBuffer(RefPtr<ID3D12Device> device,
 	commandContext.waitForIdle();
 }
 
-void GpuResourceManager::createRootSignature(RefPtr<ID3D12Device> device, const String& name, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters, RefPtr<D3D12_STATIC_SAMPLER_DESC> staticSampler){
+RefPtr<GpuBuffer> GpuResourceManager::createOnlyGpuBuffer(const String& name){
+	auto itr = _resourcePool->gpuBuffers.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
+
+	return &(*itr.first).second;
+}
+
+RefPtr<RootSignature> GpuResourceManager::createRootSignature(RefPtr<ID3D12Device> device, const String& name, const VectorArray<D3D12_ROOT_PARAMETER1>& rootParameters, RefPtr<D3D12_STATIC_SAMPLER_DESC> staticSampler){
 	auto itr = _resourcePool->rootSignatures.emplace(std::piecewise_construct,
 		std::make_tuple(name),
 		std::make_tuple());
 
 	RefPtr<RootSignature> rootSignature = &(*itr.first).second;
 	rootSignature->create(device, rootParameters, staticSampler);
+
+	return rootSignature;
+}
+
+RefPtr<ConstantBuffer> GpuResourceManager::createConstantBuffer(RefPtr<ID3D12Device> device, const String& name, uint32 size){
+	auto itr = _resourcePool->constantBuffers.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
+
+	auto constantBuffer = &(*itr.first).second;
+	constantBuffer->create(device, size);
+
+	return constantBuffer;
+}
+
+RefPtr<PipelineState> GpuResourceManager::createPipelineState(RefPtr<ID3D12Device> device, const String& name, RefPtr<RootSignature> rootSignature, const RefPtr<VertexShader> vertexShader, const RefPtr<PixelShader> pixelShader, const DefaultPipelineStateDescSet& psoDescSet){
+	auto itr = _resourcePool->pipelineStates.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
+
+	RefPtr<PipelineState> pipelineState = &(*itr.first).second;
+	pipelineState->create(device, rootSignature, vertexShader, pixelShader, psoDescSet);
+
+	return pipelineState;
+}
+
+RefPtr<PipelineState> GpuResourceManager::createComputePipelineState(RefPtr<ID3D12Device> device, const String& name, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc){
+	auto itr = _resourcePool->pipelineStates.emplace(std::piecewise_construct,
+		std::make_tuple(name),
+		std::make_tuple());
+
+	RefPtr<PipelineState> pipelineState = &(*itr.first).second;
+	pipelineState->createCompute(device, desc);
+	
+	return pipelineState;
+}
+
+RefPtr<BufferView> GpuResourceManager::createTextureBufferView(const String& viewName, const VectorArray<String>& textureNames){
+	RefPtr<BufferView> bufferView = createOnlyBufferView(viewName);
+
+	VectorArray<RefPtr<ID3D12Resource>> ppTextures(textureNames.size());
+	for (size_t i = 0; i < ppTextures.size(); ++i) {
+		RefPtr<Texture2D> texture;
+		loadTexture(textureNames[i], &texture);
+		ppTextures[i] = texture->get();
+	}
+
+	DescriptorHeapManager& descriptorManager = DescriptorHeapManager::instance();
+	descriptorManager.createTextureShaderResourceView(ppTextures.data(), bufferView, ppTextures.size());
+
+	return bufferView;
+}
+
+RefPtr<BufferView> GpuResourceManager::createOnlyBufferView(const String& viewName){
+	auto itr = _resourcePool->bufferViews.emplace(std::piecewise_construct,
+		std::make_tuple(viewName),
+		std::make_tuple());
+
+	return &(*itr.first).second;
 }
 
 RefPtr<VertexShader> GpuResourceManager::createVertexShader(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& inputLayouts){
@@ -407,6 +474,11 @@ RefPtr<PixelShader> GpuResourceManager::createPixelShader(const String& fileName
 //	assert(_resourcePool->sharedMaterials.count(materialName) > 0 && "マテリアルが見つかりません");
 //	*dstMaterial = &_resourcePool->sharedMaterials.at(materialName);
 //}
+
+void GpuResourceManager::loadConstantBuffer(const String& constantBufferName, RefAddressOf<ConstantBuffer> dstBuffer) const{
+	assert(_resourcePool->constantBuffers.count(constantBufferName) > 0 && "定数バッファが見つかりません");
+	*dstBuffer = &_resourcePool->constantBuffers.at(constantBufferName);
+}
 
 void GpuResourceManager::loadTexture(const String & textureName, RefAddressOf<Texture2D> dstTexture) const {
 	assert(_resourcePool->textures.count(textureName) > 0 && "テクスチャが見つかりません");

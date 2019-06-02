@@ -128,6 +128,10 @@ struct InstanceInfoPerMaterial {
 };
 
 struct InitSettingsPerSingleMesh {
+	String getShaderNameSet() const {
+		return vertexShaderName + "_" + pixelShaderName;
+	}
+
 	String vertexShaderName;
 	String pixelShaderName;
 	VectorArray<String> textureNames;
@@ -191,21 +195,7 @@ public:
 		parameterDescs[2].Constants.Num32BitValues = 16;
 		parameterDescs[2].Constants.ShaderRegister = 1;
 
-		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-		samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
-		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 0;
-		samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		samplerDesc.MinLOD = 0.0f;
-		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-		samplerDesc.ShaderRegister = 0;
-		samplerDesc.RegisterSpace = 0;
-		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
+		D3D12_STATIC_SAMPLER_DESC samplerDesc = WrapSamplerDesc();
 		_rootSignature.create(device, parameterDescs, &samplerDesc);
 		_pipelineState.create(device, &_rootSignature, &vs, &ps);
 
@@ -248,4 +238,135 @@ public:
 	PipelineState _pipelineState;
 
 	BufferView _textureSrv;
+};
+
+enum class ResourceType {
+	CONSTANT_BUFFER,
+	SHADER_RESOURCE
+};
+
+struct DescriptorSet {
+	DescriptorSet() {}
+	DescriptorSet(uint32 rootParameterIndex, RefBufferView viewAddress)
+		:rootParameterIndex(rootParameterIndex), viewAddress(viewAddress) {}
+	uint32 rootParameterIndex;
+	RefBufferView viewAddress;
+};
+
+struct DescriptorPerFrameSet {
+	uint32 rootParameterIndex;
+	D3D12_GPU_VIRTUAL_ADDRESS resourceAddress[FrameCount];
+	ResourceType type;
+};
+
+struct GpuResourceSet {
+	uint32 rootParameterIndex;
+	D3D12_GPU_VIRTUAL_ADDRESS resourceAddress;
+
+	ResourceType type;
+};
+
+struct RootConstantSet {
+	uint32 rootParameterIndex;
+	uint32 num32bitCount;
+	VectorArray<byte> dataPtr;
+};
+
+struct MaterialCommandBase {
+	virtual ~MaterialCommandBase() {}
+
+	virtual void setupCommand(RenderSettings& settings) = 0;
+
+	VectorArray<DescriptorSet> _descriptors;
+	VectorArray<DescriptorPerFrameSet> _descriptorPerFrames;
+	VectorArray<GpuResourceSet> _gpuResources;
+	VectorArray<RootConstantSet> _rootConstants;
+	D3D12_PRIMITIVE_TOPOLOGY _topology;
+	RefRootSignature _rootSignature;
+	RefPipelineState _pipelineState;
+};
+
+struct MaterialCommandGraphics :public MaterialCommandBase {
+	void setupCommand(RenderSettings& settings) override {
+		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+		const uint32 frameIndex = settings.frameIndex;
+
+		commandList->SetPipelineState(_pipelineState.pipelineState);
+		commandList->SetGraphicsRootSignature(_rootSignature.rootSignature);
+		commandList->IASetPrimitiveTopology(_topology);
+
+		for (const auto& descriptor : _descriptors) {
+			commandList->SetGraphicsRootDescriptorTable(descriptor.rootParameterIndex, descriptor.viewAddress.gpuHandle);
+		}
+
+		for (const auto& descriptor : _descriptorPerFrames) {
+			switch (descriptor.type) {
+			case ResourceType::CONSTANT_BUFFER:
+				commandList->SetGraphicsRootConstantBufferView(descriptor.rootParameterIndex, descriptor.resourceAddress[frameIndex]);
+				break;
+
+			case ResourceType::SHADER_RESOURCE:
+				commandList->SetGraphicsRootShaderResourceView(descriptor.rootParameterIndex, descriptor.resourceAddress[frameIndex]);
+				break;
+			}
+		}
+
+		for (const auto& gpuResource : _gpuResources) {
+			switch (gpuResource.type) {
+			case ResourceType::CONSTANT_BUFFER:
+				commandList->SetGraphicsRootConstantBufferView(gpuResource.rootParameterIndex, gpuResource.resourceAddress);
+				break;
+
+			case ResourceType::SHADER_RESOURCE:
+				commandList->SetGraphicsRootShaderResourceView(gpuResource.rootParameterIndex, gpuResource.resourceAddress);
+				break;
+			}
+		}
+
+		for (const auto& rootConstant : _rootConstants) {
+			commandList->SetGraphicsRoot32BitConstants(rootConstant.rootParameterIndex, rootConstant.dataPtr.size() / 4, rootConstant.dataPtr.data(), 0);
+		}
+	}
+};
+
+struct MaterialCommandCompute :public MaterialCommandBase {
+	void setupCommand(RenderSettings& settings) override {
+		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+		const uint32 frameIndex = settings.frameIndex;
+
+		commandList->SetPipelineState(_pipelineState.pipelineState);
+		commandList->SetComputeRootSignature(_rootSignature.rootSignature);
+
+		for (const auto& descriptor : _descriptors) {
+			commandList->SetComputeRootDescriptorTable(descriptor.rootParameterIndex, descriptor.viewAddress.gpuHandle);
+		}
+
+		for (const auto& descriptor : _descriptorPerFrames) {
+			switch (descriptor.type) {
+			case ResourceType::CONSTANT_BUFFER:
+				commandList->SetComputeRootConstantBufferView(descriptor.rootParameterIndex, descriptor.resourceAddress[frameIndex]);
+				break;
+
+			case ResourceType::SHADER_RESOURCE:
+				commandList->SetComputeRootShaderResourceView(descriptor.rootParameterIndex, descriptor.resourceAddress[frameIndex]);
+				break;
+			}
+		}
+
+		for (const auto& gpuResource : _gpuResources) {
+			switch (gpuResource.type) {
+			case ResourceType::CONSTANT_BUFFER:
+				commandList->SetComputeRootConstantBufferView(gpuResource.rootParameterIndex, gpuResource.resourceAddress);
+				break;
+
+			case ResourceType::SHADER_RESOURCE:
+				commandList->SetComputeRootShaderResourceView(gpuResource.rootParameterIndex, gpuResource.resourceAddress);
+				break;
+			}
+		}
+
+		for (const auto& rootConstant : _rootConstants) {
+			commandList->SetComputeRoot32BitConstants(rootConstant.rootParameterIndex, rootConstant.dataPtr.size() / 4, rootConstant.dataPtr.data(), 0);
+		}
+	}
 };

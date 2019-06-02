@@ -8,15 +8,18 @@
 #include <Utility.h>
 #include "stdafx.h"
 #include "D3D12Helper.h"
+#include "D3D12Util.h"
 #include "GraphicsConstantSettings.h"
 
 //参照のみのオブジェクト
-struct RefRootsignature {
-	RefRootsignature(RefPtr<ID3D12RootSignature> rootSignature) :rootSignature(rootSignature) {}
+struct RefRootSignature {
+	RefRootSignature() :rootSignature(nullptr) {}
+	RefRootSignature(RefPtr<ID3D12RootSignature> rootSignature) :rootSignature(rootSignature) {}
 	RefPtr<ID3D12RootSignature> rootSignature;
 };
 
 struct RefPipelineState {
+	RefPipelineState() :pipelineState(nullptr) {}
 	RefPipelineState(RefPtr<ID3D12PipelineState> pipelineState) :pipelineState(pipelineState) {}
 	RefPtr<ID3D12PipelineState> pipelineState;
 };
@@ -415,20 +418,7 @@ public:
 		}
 
 		//とりあえずこの静的サンプラーを使用(現在はこれで固定)
-		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-		samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
-		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.MipLODBias = 0;
-		samplerDesc.MaxAnisotropy = 0;
-		samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		samplerDesc.MinLOD = 0.0f;
-		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-		samplerDesc.ShaderRegister = 0;
-		samplerDesc.RegisterSpace = 0;
-		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		D3D12_STATIC_SAMPLER_DESC samplerDesc = WrapSamplerDesc();
 
 		//ルートシグネチャのサポートバージョンをチェック(してるだけ。。。)
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
@@ -441,8 +431,8 @@ public:
 	}
 
 	//参照のみのコピーオブジェクトを取得
-	RefRootsignature getRefRootSignature() const {
-		return RefRootsignature(_rootSignature.Get());
+	RefRootSignature getRefRootSignature() const {
+		return RefRootSignature(_rootSignature.Get());
 	}
 
 	void destroy() {

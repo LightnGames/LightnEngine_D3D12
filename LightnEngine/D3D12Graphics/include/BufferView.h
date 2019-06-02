@@ -4,13 +4,14 @@
 
 //バッファビュー参照用コピー、バッファビュー自体の寿命は管理しない
 struct RefBufferView {
+	RefBufferView() {}
 	RefBufferView(uint32 descriptorIndex, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) :
 		descriptorIndex(descriptorIndex), gpuHandle(gpuHandle) {}
 
 	inline constexpr bool isEnable() const { return gpuHandle.ptr != 0; }
 
-	const uint32 descriptorIndex;
-	const D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+	uint32 descriptorIndex;
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
 };
 
 //バッファービュー本体、この本体のみバッファビューの破棄ができる

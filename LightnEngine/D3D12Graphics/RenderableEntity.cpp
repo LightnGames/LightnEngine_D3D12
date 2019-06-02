@@ -29,7 +29,7 @@ VectorArray<RefPtr<SingleMeshRenderMaterial>>& SingleMeshRenderInstance::getMate
 
 void SingleMeshRenderInstance::updateWorldMatrix(const Matrix4& worldMatrix){
 	_mtxWorld = worldMatrix.transpose();
-	_mesh->_mtxWorld = _mtxWorld.transpose();
+	_mesh->updateWorldMatrix(_mtxWorld.transpose());
 }
 
 StaticMultiMeshRenderInstance::StaticMultiMeshRenderInstance(RefPtr<StaticMultiMeshMaterial> rcg):_rcg(rcg){

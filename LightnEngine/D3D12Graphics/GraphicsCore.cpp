@@ -128,12 +128,12 @@ void GraphicsCore::onInit(HWND hwnd) {
 	singleMeshMaterialInfo.vertexShaderName = "Shaders/skyShaders.hlsl";
 	singleMeshMaterialInfo.pixelShaderName = "Shaders/skyShaders.hlsl";
 	singleMeshMaterialInfo.textureNames = { diffuseEnv };
-	createSingleMeshMaterial("SkyMaterial", singleMeshMaterialInfo);
+	//createSingleMeshMaterial("SkyMaterial", singleMeshMaterialInfo);
 
 	String skyName("skySphere.mesh");
 	createMeshSets({ skyName });
 
-	SingleMeshRenderInstance instance = createSingleMeshRenderInstance(skyName, { "SkyMaterial" });
+	SingleMeshRenderInstance instance = createSingleMeshRenderInstance(skyName, { singleMeshMaterialInfo });
 	instance.updateWorldMatrix(Matrix4::scaleXYZ(Vector3::one * 100));
 }
 
@@ -179,8 +179,8 @@ void GraphicsCore::onUpdate() {
 }
 
 void GraphicsCore::onRender() {
-	for (auto&& multiRcg : _multiMeshRenderMaterials) {
-		multiRcg.second.onCompute(&_graphicsCommandContext, _frameIndex);
+	for (auto&& multiRcg : _multiMeshes) {
+		multiRcg.onCompute(&_graphicsCommandContext, _frameIndex);
 	}
 
 	auto commandListSet = _graphicsCommandContext.requestCommandListSet();
@@ -209,7 +209,7 @@ void GraphicsCore::onRender() {
 	//•`‰æÝ’è
 	RenderSettings renderSettings(commandList, _mainCameraConstantBuffer.constantBuffers[_frameIndex][0]->getGpuVirtualAddress(), _frameIndex);
 
-	for (const auto& mesh : _singleMeshes) {
+	for (auto&& mesh : _singleMeshes) {
 		mesh.setupRenderCommand(renderSettings);
 	}
 
@@ -247,14 +247,6 @@ void GraphicsCore::onDestroy() {
 		_frameResources[i].shutdown();
 	}
 
-	for (auto&& material : _singleMeshRenderMaterials) {
-		material.second.destroy();
-	}
-
-	for (auto&& material : _multiMeshRenderMaterials) {
-		material.second.destroy();
-	}
-
 	_mainCameraConstantBuffer.shutdown();
 	_debugGeometryRender.destroy();
 
@@ -282,23 +274,19 @@ void GraphicsCore::createSharedMaterial(const SharedMaterialCreateSettings& sett
 }
 
 void GraphicsCore::createSingleMeshMaterial(const String& name, const InitSettingsPerSingleMesh& singleMeshMaterialInfo){
-	auto itr = _singleMeshRenderMaterials.emplace(std::piecewise_construct,
-		std::make_tuple(name),
-		std::make_tuple());
+	//auto itr = _singleMeshRenderMaterials.emplace(std::piecewise_construct,
+	//	std::make_tuple(name),
+	//	std::make_tuple());
 
-	RefPtr<SingleMeshRenderMaterial> material = &(*itr.first).second;
-	material->create(_device.Get(), &_graphicsCommandContext, singleMeshMaterialInfo);
+	//RefPtr<SingleMeshRenderMaterial> material = &(*itr.first).second;
+	//material->create(_device.Get(), &_graphicsCommandContext, singleMeshMaterialInfo);
 }
 
-SingleMeshRenderInstance GraphicsCore::createSingleMeshRenderInstance(const String& name, const VectorArray<String>& materialNames){
+SingleMeshRenderInstance GraphicsCore::createSingleMeshRenderInstance(const String& name, const VectorArray<InitSettingsPerSingleMesh>& materialInfos){
 	StaticSingleMesh singleMesh;
-	_gpuResourceManager.loadVertexAndIndexBuffer(name, &singleMesh._mesh);
+	singleMesh.create(_device.Get(), name, _mainCameraConstantBuffer, materialInfos);
 
-	for (const auto& materialName : materialNames) {
-		singleMesh._materials.emplace_back(&_singleMeshRenderMaterials.at(materialName));
-	}
-
-	_singleMeshes.emplace_back(singleMesh);
+	_singleMeshes.emplace_back(std::move(singleMesh));
 
 	SingleMeshRenderInstance instance;
 	instance._mesh = &_singleMeshes.back();
@@ -306,18 +294,19 @@ SingleMeshRenderInstance GraphicsCore::createSingleMeshRenderInstance(const Stri
 }
 
 StaticMultiMeshRenderInstance GraphicsCore::createStaticMultiMeshRender(const String& name, const InitSettingsPerStaticMultiMesh& meshDatas){
-	auto itr = _multiMeshRenderMaterials.emplace(std::piecewise_construct,
-		std::make_tuple(name),
-		std::make_tuple());
+	//auto itr = _multiMeshRenderMaterials.emplace(std::piecewise_construct,
+	//	std::make_tuple(name),
+	//	std::make_tuple());
 
-	RefPtr<StaticMultiMeshMaterial> material = &(*itr.first).second;
-	material->create(_device.Get(), &_graphicsCommandContext, meshDatas);
+	//RefPtr<StaticMultiMeshMaterial> material = &(*itr.first).second;
+	//material->create(_device.Get(), &_graphicsCommandContext, meshDatas);
 
 	StaticMultiMesh multiMesh;
-	multiMesh._materials.emplace_back(material);
-	_multiMeshes.emplace_back(multiMesh);
+	multiMesh.create(_device.Get(), &_graphicsCommandContext, _mainCameraConstantBuffer, meshDatas);
+	_multiMeshes.emplace_back(std::move(multiMesh));
 
-	return StaticMultiMeshRenderInstance(material);
+	//return StaticMultiMeshRenderInstance(material);
+	return StaticMultiMeshRenderInstance(nullptr);
 }
 
 RefPtr<GpuResourceManager> GraphicsCore::getGpuResourceManager() {

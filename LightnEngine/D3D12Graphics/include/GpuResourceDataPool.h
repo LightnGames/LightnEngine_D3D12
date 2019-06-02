@@ -15,6 +15,10 @@ struct GpuResourceDataPool {
 		rootSignatures.clear();
 		textures.clear();
 		vertexAndIndexBuffers.clear();
+		constantBuffers.clear();
+		bufferViews.clear();
+		gpuBuffers.clear();
+		gpuDynamicBuffers.clear();
 	}
 
 	UnorderedMap<String, VertexShader> vertexShaders;
@@ -23,4 +27,8 @@ struct GpuResourceDataPool {
 	UnorderedMap<String, RootSignature> rootSignatures;
 	UnorderedMap<String, Texture2D> textures;
 	UnorderedMap<String, VertexAndIndexBuffer> vertexAndIndexBuffers;
+	UnorderedMap<String, ConstantBuffer> constantBuffers;
+	UnorderedMap<String, BufferView> bufferViews;
+	UnorderedMap<String, GpuBuffer> gpuBuffers;
+	UnorderedMap<String, GpuBufferDynamic> gpuDynamicBuffers;
 };
