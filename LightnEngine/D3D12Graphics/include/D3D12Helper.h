@@ -2,6 +2,8 @@
 #include "stdafx.h"
 #include <iostream>
 
+#define NAME_GPU_RESOURCE
+
 inline std::string HrToString(HRESULT hr) {
 	char str[64] = {};
 	printf_s(str, "HRESULT of 0x%08X", static_cast<UINT>(hr));
@@ -33,7 +35,7 @@ inline D3D12_PRIMITIVE_TOPOLOGY_TYPE castTopologyToType(D3D_PRIMITIVE_TOPOLOGY t
 	return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 }
 
-#ifdef DEBUG
+#ifdef NAME_GPU_RESOURCE
 inline void SetName(ID3D12Object* pObject, LPCWSTR name) {
 	pObject->SetName(name);
 }
@@ -49,8 +51,8 @@ inline void SetName(ID3D12Object* pObject, LPCWSTR name) {}
 inline void SetNameIndexed(ID3D12Object* pObject, LPCWSTR name, UINT index) {}
 #endif
 
-#define NAME_D3D12_OBJECT(x) SetName((x).Get(), L#x)
-#define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x, n)
+#define NAME_D3D12_OBJECT(x) SetName(x, L#x)
+#define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n], L#x, n)
 
 //UAVカウンタを同じバッファ内に含める。バッファを4Kにアラインする
 inline constexpr UINT AlignForUavCounter(UINT bufferSize){

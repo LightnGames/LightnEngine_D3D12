@@ -14,7 +14,6 @@ struct VSInput
 	float3 normal : NORMAL;
 	float3 tangent : TANGENT;
 	float2 uv : TEXCOORD;
-	float4x4 mtxWorld : MATRIX0;
 };
 
 cbuffer CameraInfo : register(b0)
@@ -24,11 +23,16 @@ cbuffer CameraInfo : register(b0)
 	float3 cameraPos;
 }
 
+cbuffer WorldMatrix : register(b1)
+{
+	float4x4 mtxWorld;
+}
+
 PSInput VSMain(VSInput input)
 {
     PSInput result;
 
-    float4 worldPos = mul(float4(input.position, 1), input.mtxWorld);
+    float4 worldPos = mul(float4(input.position, 1), mtxWorld);
     float4 viewPos = mul(worldPos, mtxView);
     result.position = mul(viewPos, mtxProj);
     result.normal = mul(input.normal, (float3x3) input.mtxWorld);

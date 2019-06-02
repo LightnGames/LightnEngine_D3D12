@@ -84,7 +84,7 @@ public:
 			nullptr,
 			IID_PPV_ARGS(&_resource)));
 
-		NAME_D3D12_OBJECT(_resource);
+		NAME_D3D12_OBJECT(_resource.Get());
 
 		T* mapPtrC = nullptr;
 		(*uploadHeap)->Map(0, nullptr, reinterpret_cast<void**>(&mapPtrC));
@@ -190,7 +190,7 @@ public:
 			D3D12_RESOURCE_STATE_DEPTH_WRITE,
 			&depthOptimizedClearValue,
 			IID_PPV_ARGS(&_resource));
-		NAME_D3D12_OBJECT(_resource);
+		NAME_D3D12_OBJECT(_resource.Get());
 	}
 
 	//直ちにテクスチャを生成し、操作が完了するまでスレッドを停止する
@@ -246,7 +246,7 @@ public:
 		textureBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 		textureBufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 		throwIfFailed(device->CreateCommittedResource(&LTND3D12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &textureBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(uploadHeap)));
-		NAME_D3D12_OBJECT(_resource);
+		NAME_D3D12_OBJECT(_resource.Get());
 
 		//テクスチャデータをセット
 		D3D12_SUBRESOURCE_DATA textureData = {};

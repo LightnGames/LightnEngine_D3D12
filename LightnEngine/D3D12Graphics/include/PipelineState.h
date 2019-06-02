@@ -289,7 +289,7 @@ public:
 class VertexShader :public Shader {
 public:
 	void create(const String& fileName, const VectorArray<D3D12_INPUT_ELEMENT_DESC>& layouts, UINT flags = 0) {
-		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "VSMain", "vs_5_1", flags, 0, &shader, nullptr));
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_1", flags, 0, &shader, nullptr));
 		inputLayouts = layouts;
 
 		shaderReflectionResult = getShaderReflection(getByteCode());
@@ -313,7 +313,7 @@ public:
 class PixelShader :public Shader {
 public:
 	void create(const String& fileName, UINT flags = 0) {
-		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "PSMain", "ps_5_1", flags, 0, &shader, nullptr));
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PSMain", "ps_5_1", flags, 0, &shader, nullptr));
 		shaderReflectionResult = getShaderReflection(getByteCode());
 	}
 
@@ -333,7 +333,7 @@ public:
 class ComputeShader :public Shader {
 public:
 	void create(const String& fileName, UINT flags = 0) {
-		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, nullptr, "CSMain", "cs_5_1", flags, 0, &shader, nullptr));
+		throwIfFailed(D3DCompileFromFile(convertWString(fileName).c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "CSMain", "cs_5_1", flags, 0, &shader, nullptr));
 	}
 };
 
@@ -377,7 +377,7 @@ public:
 		ComPtr<ID3DBlob> error;
 		throwIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
 		throwIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_rootSignature)));
-		NAME_D3D12_OBJECT(_rootSignature);
+		NAME_D3D12_OBJECT(_rootSignature.Get());
 	}
 
 	void create(RefPtr<ID3D12Device> device, const RefPtr<VertexShader> vertexShader, const RefPtr<PixelShader> pixelShader) {
@@ -538,13 +538,13 @@ public:
 		}
 
 		throwIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
-		NAME_D3D12_OBJECT(_pipelineState);
+		NAME_D3D12_OBJECT(_pipelineState.Get());
 	}
 
 	//ComputePupelineStateを作成
 	void createCompute(RefPtr<ID3D12Device> device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc) {
 		throwIfFailed(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&_pipelineState)));
-		NAME_D3D12_OBJECT(_pipelineState);
+		NAME_D3D12_OBJECT(_pipelineState.Get());
 	}
 
 	//参照のみのコピーオブジェクトを取得

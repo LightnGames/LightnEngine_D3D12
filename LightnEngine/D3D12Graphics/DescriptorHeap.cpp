@@ -25,7 +25,7 @@ void DescriptorHeap::create(RefPtr<ID3D12Device> device, uint32 maxDescriptorCou
 	heapDesc.Type = _descriptorHeapType;
 	heapDesc.Flags = flags;
 	throwIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_descriptorHeap)));
-	NAME_D3D12_OBJECT(_descriptorHeap);
+	NAME_D3D12_OBJECT(_descriptorHeap.Get());
 
 	_incrimentSize = device->GetDescriptorHandleIncrementSize(_descriptorHeapType);
 	_cpuHandleStart = _descriptorHeap->GetCPUDescriptorHandleForHeapStart();
