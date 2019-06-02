@@ -41,7 +41,6 @@
     <ClInclude Include="include\RenderableEntity.h" />
     <ClInclude Include="include\RenderCommand.h" />
     <ClInclude Include="include\SharedMaterial.h" />
-    <ClInclude Include="include\StaticMultiMesh.h" />
     <ClInclude Include="include\stdafx.h" />
     <ClInclude Include="include\ThirdParty\DirectXTex\DDSTextureLoader12.h" />
     <ClInclude Include="ThirdParty\DirectXTex\DDSTextureLoader12.h" />
@@ -68,7 +67,6 @@
     <ClCompile Include="ImguiWindow.cpp" />
     <ClCompile Include="AABB.cpp" />
     <ClCompile Include="RenderCommand.cpp" />
-    <ClCompile Include="StaticMultiMesh.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RenderableEntity.cpp" />
     <ClCompile Include="SharedMaterial.cpp" />

@@ -149,3 +149,12 @@ Vector3 Camera::getFrustumPlaneNormal(uint32 index) const{
 Vector2 Camera::getTanHeightXY() const{
 	return Vector2(1 / _mtxProj[0][0], 1 / _mtxProj[1][1]);
 }
+
+CameraConstantBuffer Camera::getCameraConstantBuffer() const{
+	CameraConstantBuffer cameraBuffer;
+	cameraBuffer.mtxView = getViewMatrixTransposed();
+	cameraBuffer.mtxProj = getProjectionMatrixTransposed();
+	cameraBuffer.cameraPosition = getPosition();
+
+	return cameraBuffer;
+}

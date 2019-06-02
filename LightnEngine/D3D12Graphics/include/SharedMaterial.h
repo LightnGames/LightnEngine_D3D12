@@ -42,7 +42,7 @@ struct ConstantBufferFrame {
 
 	void shutdown();
 
-	void create(RefPtr<ID3D12Device> device, const VectorArray<uint32>& bufferSizes);//要素ごとにサイズを指定
+	void create(RefPtr<ID3D12Device> device, uint32 bufferSize);//要素ごとにサイズを指定
 
 	//この定数バッファは有効か？(初期化されていれば配列が０以上なのでそれで判断)
 	bool isEnableBuffer() const;
@@ -51,19 +51,10 @@ struct ConstantBufferFrame {
 	void flashBufferData(uint32 frameIndex);
 
 	//バッファのデータポインタを更新
-	void writeBufferData(const void* dataPtr, uint32 length, uint32 bufferIndex);
+	void writeBufferData(const void* dataPtr, uint32 length);
 
-	//バッファビューの参照用コピーをフレームバッファリングする数分取得
-	RefConstantBufferViews getRefBufferViews(uint32 descriptorIndex) const{
-		return RefConstantBufferViews{
-			constantBufferViews[0].getRefBufferView(descriptorIndex),
-			constantBufferViews[1].getRefBufferView(descriptorIndex),
-			constantBufferViews[2].getRefBufferView(descriptorIndex)
-		};
-	}
-
-	VectorArray<byte*> dataPtrs;
-	VectorArray<ConstantBuffer*> constantBuffers[FrameCount];
+	VectorArray<byte> dataPtrs;
+	ConstantBuffer constantBuffers[FrameCount];
 	BufferView constantBufferViews[FrameCount];
 };
 
@@ -137,109 +128,6 @@ struct InitSettingsPerSingleMesh {
 	VectorArray<String> textureNames;
 };
 
-struct StaticMeshInstanceCommands {
-	void setupRenderCommand(RenderSettings& settings) const {
-		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-		commandList->IASetVertexBuffers(0, 1, &drawInfo.vertexView.view);
-		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
-		commandList->SetGraphicsRoot32BitConstants(2, 16, &mtxWorld, 0);
-		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, 0);
-	}
-
-	Matrix4 mtxWorld;
-	RefVertexAndIndexBuffer drawInfo;
-};
-
-#include "GpuResourceManager.h"
-#include "DescriptorHeap.h"
-class SingleMeshRenderMaterial {
-public:
-	SingleMeshRenderMaterial() {
-	}
-
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitSettingsPerSingleMesh& initInfo) {
-		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		};
-		
-		VertexShader vs;
-		PixelShader ps;
-		vs.create(initInfo.vertexShaderName, inputLayouts);
-		ps.create(initInfo.pixelShaderName);
-
-		uint32 textureCount = initInfo.textureNames.size();
-
-		D3D12_DESCRIPTOR_RANGE1 srvRange = {};
-		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRange.BaseShaderRegister = 0;
-		srvRange.NumDescriptors = textureCount;
-		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-		VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(3);
-		parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		parameterDescs[0].Descriptor.ShaderRegister = 0;
-		parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
-
-		parameterDescs[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		parameterDescs[1].DescriptorTable.NumDescriptorRanges = 1;
-		parameterDescs[1].DescriptorTable.pDescriptorRanges = &srvRange;
-
-		parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-		parameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		parameterDescs[2].Constants.Num32BitValues = 16;
-		parameterDescs[2].Constants.ShaderRegister = 1;
-
-		D3D12_STATIC_SAMPLER_DESC samplerDesc = WrapSamplerDesc();
-		_rootSignature.create(device, parameterDescs, &samplerDesc);
-		_pipelineState.create(device, &_rootSignature, &vs, &ps);
-
-		DescriptorHeapManager& descriptorManager = DescriptorHeapManager::instance();
-		GpuResourceManager& resourceManager = GpuResourceManager::instance();
-
-		VectorArray<RefPtr<ID3D12Resource>> ppTextures(textureCount);
-		for (uint32 i = 0; i < textureCount; ++i) {
-			RefPtr<Texture2D> texture;
-			resourceManager.loadTexture(initInfo.textureNames[i], &texture);
-			ppTextures[i] = texture->get();
-		}
-
-		descriptorManager.createTextureShaderResourceView(ppTextures.data(), &_textureSrv, textureCount);
-	}
-
-	void setupRenderCommand(RenderSettings& settings, const Matrix4& mtxWorld, const RefVertexAndIndexBuffer& drawInfo) const{
-		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-		//マテリアル設定
-		commandList->SetPipelineState(_pipelineState._pipelineState.Get());
-		commandList->SetGraphicsRootSignature(_rootSignature._rootSignature.Get());
-		commandList->SetGraphicsRootConstantBufferView(0, settings.cameraConstantBuffer);
-		commandList->SetGraphicsRootDescriptorTable(1, _textureSrv.gpuHandle);
-		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		//メッシュ描画
-		commandList->IASetVertexBuffers(0, 1, &drawInfo.vertexView.view);
-		commandList->IASetIndexBuffer(&drawInfo.indexView.view);
-		commandList->SetGraphicsRoot32BitConstants(2, 16, &mtxWorld, 0);
-		commandList->DrawIndexedInstanced(drawInfo.drawRange.indexCount, 1, drawInfo.drawRange.indexOffset, 0, 0);
-	}
-
-
-	void destroy() {
-		_rootSignature.destroy();
-		_pipelineState.destroy();
-	}
-
-	RootSignature _rootSignature;
-	PipelineState _pipelineState;
-
-	BufferView _textureSrv;
-};
-
 enum class ResourceType {
 	CONSTANT_BUFFER,
 	SHADER_RESOURCE
@@ -253,7 +141,7 @@ struct DescriptorSet {
 	RefBufferView viewAddress;
 };
 
-struct DescriptorPerFrameSet {
+struct GpuResourcePerFrameSet {
 	uint32 rootParameterIndex;
 	D3D12_GPU_VIRTUAL_ADDRESS resourceAddress[FrameCount];
 	ResourceType type;
@@ -262,13 +150,11 @@ struct DescriptorPerFrameSet {
 struct GpuResourceSet {
 	uint32 rootParameterIndex;
 	D3D12_GPU_VIRTUAL_ADDRESS resourceAddress;
-
 	ResourceType type;
 };
 
 struct RootConstantSet {
 	uint32 rootParameterIndex;
-	uint32 num32bitCount;
 	VectorArray<byte> dataPtr;
 };
 
@@ -278,7 +164,7 @@ struct MaterialCommandBase {
 	virtual void setupCommand(RenderSettings& settings) = 0;
 
 	VectorArray<DescriptorSet> _descriptors;
-	VectorArray<DescriptorPerFrameSet> _descriptorPerFrames;
+	VectorArray<GpuResourcePerFrameSet> _gpuResourcePerFrames;
 	VectorArray<GpuResourceSet> _gpuResources;
 	VectorArray<RootConstantSet> _rootConstants;
 	D3D12_PRIMITIVE_TOPOLOGY _topology;
@@ -299,7 +185,7 @@ struct MaterialCommandGraphics :public MaterialCommandBase {
 			commandList->SetGraphicsRootDescriptorTable(descriptor.rootParameterIndex, descriptor.viewAddress.gpuHandle);
 		}
 
-		for (const auto& descriptor : _descriptorPerFrames) {
+		for (const auto& descriptor : _gpuResourcePerFrames) {
 			switch (descriptor.type) {
 			case ResourceType::CONSTANT_BUFFER:
 				commandList->SetGraphicsRootConstantBufferView(descriptor.rootParameterIndex, descriptor.resourceAddress[frameIndex]);
@@ -324,7 +210,8 @@ struct MaterialCommandGraphics :public MaterialCommandBase {
 		}
 
 		for (const auto& rootConstant : _rootConstants) {
-			commandList->SetGraphicsRoot32BitConstants(rootConstant.rootParameterIndex, rootConstant.dataPtr.size() / 4, rootConstant.dataPtr.data(), 0);
+			const uint32 num32bitCount = static_cast<uint32>(rootConstant.dataPtr.size() / 4);
+			commandList->SetGraphicsRoot32BitConstants(rootConstant.rootParameterIndex, num32bitCount, rootConstant.dataPtr.data(), 0);
 		}
 	}
 };
@@ -341,7 +228,7 @@ struct MaterialCommandCompute :public MaterialCommandBase {
 			commandList->SetComputeRootDescriptorTable(descriptor.rootParameterIndex, descriptor.viewAddress.gpuHandle);
 		}
 
-		for (const auto& descriptor : _descriptorPerFrames) {
+		for (const auto& descriptor : _gpuResourcePerFrames) {
 			switch (descriptor.type) {
 			case ResourceType::CONSTANT_BUFFER:
 				commandList->SetComputeRootConstantBufferView(descriptor.rootParameterIndex, descriptor.resourceAddress[frameIndex]);
@@ -366,7 +253,8 @@ struct MaterialCommandCompute :public MaterialCommandBase {
 		}
 
 		for (const auto& rootConstant : _rootConstants) {
-			commandList->SetComputeRoot32BitConstants(rootConstant.rootParameterIndex, rootConstant.dataPtr.size() / 4, rootConstant.dataPtr.data(), 0);
+			const uint32 num32bitCount = static_cast<uint32>(rootConstant.dataPtr.size() / 4);
+			commandList->SetComputeRoot32BitConstants(rootConstant.rootParameterIndex, num32bitCount, rootConstant.dataPtr.data(), 0);
 		}
 	}
 };

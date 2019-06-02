@@ -12,7 +12,6 @@
 #include "RenderableEntity.h"
 #include "DebugGeometry.h"
 
-#include "StaticMultiMesh.h"
 #include "RenderCommand.h"
 #include <LinerAllocator.h>
 

@@ -6,6 +6,7 @@ struct PSInput
 	float3 binormal : BINORMAL;
 	float2 uv : TEXCOORD;
 	float3 viewDir : VIEWDIR;
+	uint4 textureIndices :TEXTUREINDICES;
 };
 
 struct VSInput {
@@ -23,6 +24,10 @@ cbuffer CameraInfo : register(b0)
 	float3 cameraPos;
 }
 
+cbuffer TextureIndices: register(b1) {
+	uint4 textureIndices;
+}
+
 PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 {
 	PSInput result;
@@ -36,6 +41,7 @@ PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 
 	result.uv = input.uv;
 	result.viewDir = normalize(cameraPos - worldPos.xyz);
+	result.textureIndices = textureIndices;
 
 	return result;
 }
@@ -43,13 +49,9 @@ PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 Texture2D t_albedo[] : register(t0);
 SamplerState t_sampler : register(s0);
 
-cbuffer TextureIndices: register(b0) {
-	uint4 textureIndices;
-}
-
 float4 PSMain(PSInput input) : SV_Target
 {
-	float4 color = t_albedo[textureIndices.x].Sample(t_sampler, input.uv);
+	float4 color = t_albedo[input.textureIndices.x].Sample(t_sampler, input.uv);
 	//float4 color = input.color;
 	return pow(color, 1.0f / 2.2f);
 }

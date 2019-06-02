@@ -4,7 +4,6 @@
 #include "D3D12Util.h"
 #include "D3D12Helper.h"
 #include "SharedMaterial.h"
-#include "StaticMultiMesh.h"
 
 #include "ThirdParty/Imgui/imgui.h"
 
@@ -119,7 +118,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_frameIndex = _swapChain->GetCurrentBackBufferIndex();
 	_currentFrameResource = &_frameResources[_frameIndex];
 
-	_mainCameraConstantBuffer.create(_device.Get(), { sizeof(CameraConstantRaw) });
+	_mainCameraConstantBuffer.create(_device.Get(), { sizeof(CameraConstantBuffer) });
 
 	String diffuseEnv("cubemapEnvHDR.dds");
 	createTextures({ diffuseEnv });
@@ -128,7 +127,6 @@ void GraphicsCore::onInit(HWND hwnd) {
 	singleMeshMaterialInfo.vertexShaderName = "Shaders/skyShaders.hlsl";
 	singleMeshMaterialInfo.pixelShaderName = "Shaders/skyShaders.hlsl";
 	singleMeshMaterialInfo.textureNames = { diffuseEnv };
-	//createSingleMeshMaterial("SkyMaterial", singleMeshMaterialInfo);
 
 	String skyName("skySphere.mesh");
 	createMeshSets({ skyName });
@@ -169,68 +167,116 @@ void GraphicsCore::onUpdate() {
 	mainCamera->computeViewMatrix();
 	mainCamera->computeFlustomNormals();
 
-	CameraConstantRaw cr;
-	cr.mtxView = mainCamera->getViewMatrixTransposed();
-	cr.mtxProj = mainCamera->getProjectionMatrixTransposed();
-	cr.cameraPosition = mainCamera->getPosition();
-
-	_mainCameraConstantBuffer.writeBufferData(&cr, sizeof(CameraConstantRaw), 0);
+	CameraConstantBuffer cr = mainCamera->getCameraConstantBuffer();
+	_mainCameraConstantBuffer.writeBufferData(&cr, sizeof(CameraConstantBuffer));
 	_mainCameraConstantBuffer.flashBufferData(_frameIndex);
 }
 
 void GraphicsCore::onRender() {
-	for (auto&& multiRcg : _multiMeshes) {
-		multiRcg.onCompute(&_graphicsCommandContext, _frameIndex);
-	}
-
-	auto commandListSet = _graphicsCommandContext.requestCommandListSet();
-	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
-
-	//デスクリプタヒープをセット
+	D3D12_GPU_VIRTUAL_ADDRESS cameraBufferAddress = _mainCameraConstantBuffer.constantBuffers[_frameIndex].getGpuVirtualAddress();
 	RefPtr<ID3D12DescriptorHeap> ppHeap[] = { _descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
-	commandList->SetDescriptorHeaps(1, ppHeap);
+	
+	//GPUカリング
+	{
+		auto commandListSet = _graphicsCommandContext.requestCommandListSet();
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
-	//ビューポート設定
-	commandList->RSSetViewports(1, &_viewPort);
-	commandList->RSSetScissorRects(1, &_scissorRect);
+		//デスクリプタヒープをセット
+		commandList->SetDescriptorHeaps(1, ppHeap);
 
-	//コマンド積む用のリソースバリアを展開
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		//描画設定
+		RenderSettings renderSettings(commandList, cameraBufferAddress, _frameIndex);
+		for (auto&& multiMesh : _multiMeshes) {
+			multiMesh.onCompute(renderSettings);
+		}
 
-	//レンダーターゲット・デプスステンシルバッファをセット
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv.cpuHandle;
-	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &_dsv.cpuHandle);
-
-	//レンダーターゲットクリア
-	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-	//描画設定
-	RenderSettings renderSettings(commandList, _mainCameraConstantBuffer.constantBuffers[_frameIndex][0]->getGpuVirtualAddress(), _frameIndex);
-
-	for (auto&& mesh : _singleMeshes) {
-		mesh.setupRenderCommand(renderSettings);
+		//コマンドキューにコマンドリストを渡して実行
+		_graphicsCommandContext.executeCommandList(commandListSet);
+		_graphicsCommandContext.discardCommandListSet(commandListSet);
+		_graphicsCommandContext.waitForIdle();
 	}
 
-	for (auto&& mesh : _multiMeshes) {
-		mesh.setupCommand(renderSettings);
+	//デプスプリパス
+	{
+		auto commandListSet = _graphicsCommandContext.requestCommandListSet();
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
+
+		//デスクリプタヒープをセット
+		commandList->SetDescriptorHeaps(1, ppHeap);
+
+		//ビューポート設定
+		commandList->RSSetViewports(1, &_viewPort);
+		commandList->RSSetScissorRects(1, &_scissorRect);
+
+		//デプスパスなのでデプスバッファのみバインド
+		commandList->OMSetRenderTargets(0, nullptr, FALSE, &_dsv.cpuHandle);
+
+		//デプスバッファクリア
+		commandList->ClearDepthStencilView(_dsv.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+		//デプスパスを描画
+		RenderSettings renderSettings(commandList, cameraBufferAddress, _frameIndex);
+		for (auto&& mesh : _singleMeshes) {
+			mesh.setupDepthPassCommand(renderSettings);
+		}
+
+		for (auto&& mesh : _multiMeshes) {
+			mesh.setupDepthPassCommand(renderSettings);
+		}
+
+		_graphicsCommandContext.executeCommandList(commandListSet);
+		_graphicsCommandContext.discardCommandListSet(commandListSet);
+		_graphicsCommandContext.waitForIdle();
 	}
 
-	//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
-	_debugGeometryRender.updatePerInstanceData(_frameIndex);
-	_debugGeometryRender.setupRenderCommand(renderSettings);
-	_debugGeometryRender.clearDebugDatas();
+	//メインパス
+	{
+		auto commandListSet = _graphicsCommandContext.requestCommandListSet();
+		RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
 
-	//ImguiWindow描画
-	_imguiWindow.renderFrame(commandList);
+		//デスクリプタヒープをセット
+		commandList->SetDescriptorHeaps(1, ppHeap);
 
-	//描画用リソースバリアを展開
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+		//ビューポート設定
+		commandList->RSSetViewports(1, &_viewPort);
+		commandList->RSSetScissorRects(1, &_scissorRect);
 
-	//コマンドキューにコマンドリストを渡して実行
-	_graphicsCommandContext.executeCommandList(commandListSet);
-	_graphicsCommandContext.discardCommandListSet(commandListSet);
+		//コマンド積む用のリソースバリアを展開
+		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+		//レンダーターゲット・デプスステンシルバッファをセット
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _currentFrameResource->_rtv.cpuHandle;
+		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &_dsv.cpuHandle);
+
+		//レンダーターゲットクリア
+		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+		//メインパス描画
+		RenderSettings renderSettings(commandList, cameraBufferAddress, _frameIndex);
+		for (auto&& mesh : _singleMeshes) {
+			mesh.setupMainPassCommand(renderSettings);
+		}
+
+		for (auto&& mesh : _multiMeshes) {
+			mesh.setupMainPassCommand(renderSettings);
+		}
+
+		//デバッグ描画コマンド発効　1フレームごとに描画リストはクリーンアップされる
+		_debugGeometryRender.updatePerInstanceData(_frameIndex);
+		_debugGeometryRender.setupRenderCommand(renderSettings);
+		_debugGeometryRender.clearDebugDatas();
+
+		//ImguiWindow描画
+		_imguiWindow.renderFrame(commandList);
+
+		//描画用リソースバリアを展開
+		commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_currentFrameResource->_renderTarget->get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+		//コマンドキューにコマンドリストを渡して実行
+		_graphicsCommandContext.executeCommandList(commandListSet);
+		_graphicsCommandContext.discardCommandListSet(commandListSet); 
+	}
 
 	//画面表示
 	throwIfFailed(_swapChain->Present(1, 0));

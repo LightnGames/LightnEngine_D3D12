@@ -1,14 +1,20 @@
 #include "RenderCommand.h"
 #include "DebugGeometry.h"
+#include "DescriptorHeap.h"
+#include "GpuResourceManager.h"
 
 void StaticSingleMesh::create(RefPtr<ID3D12Device> device, const String& meshName, const ConstantBufferFrame& cameraBuffer, const VectorArray<InitSettingsPerSingleMesh>& materialInfos) {
-	GpuResourceManager& manager = GpuResourceManager::instance();
-	manager.loadVertexAndIndexBuffer(meshName, &_mesh);
+	DescriptorHeapManager& descriptorManager = DescriptorHeapManager::instance();
+	GpuResourceManager& resourceManager = GpuResourceManager::instance();
 
-	_materials.resize(_mesh->materialDrawRanges.size());
-	for (size_t i = 0; i < _materials.size(); ++i) {
+	resourceManager.loadVertexAndIndexBuffer(meshName, &_mesh);
+	_mainMaterials.resize(_mesh->materialDrawRanges.size());
+	_depthMaterials.resize(_mainMaterials.size());
+
+	for (size_t i = 0; i < _mainMaterials.size(); ++i) {
 		const InitSettingsPerSingleMesh& initInfo = materialInfos[i];
-		MaterialCommandGraphics& material = _materials[i];
+		const String shaderNameSet = initInfo.getShaderNameSet();
+		MaterialCommandGraphics& material = _mainMaterials[i];
 
 		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -22,69 +28,103 @@ void StaticSingleMesh::create(RefPtr<ID3D12Device> device, const String& meshNam
 		vs.create(initInfo.vertexShaderName, inputLayouts);
 		ps.create(initInfo.pixelShaderName);
 
-		uint32 textureCount = initInfo.textureNames.size();
-
 		D3D12_DESCRIPTOR_RANGE1 srvRange = {};
 		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		srvRange.BaseShaderRegister = 0;
-		srvRange.NumDescriptors = textureCount;
+		srvRange.NumDescriptors = static_cast<uint32>(initInfo.textureNames.size());
 		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(3);
-		parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		parameterDescs[0].Descriptor.ShaderRegister = 0;
-		parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		VectorArray<D3D12_ROOT_PARAMETER1> mainParameterDescs(3);
+		mainParameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		mainParameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		mainParameterDescs[0].Descriptor.ShaderRegister = 0;
+		mainParameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
-		parameterDescs[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		parameterDescs[1].DescriptorTable.NumDescriptorRanges = 1;
-		parameterDescs[1].DescriptorTable.pDescriptorRanges = &srvRange;
+		mainParameterDescs[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		mainParameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		mainParameterDescs[1].Constants.Num32BitValues = 16;
+		mainParameterDescs[1].Constants.ShaderRegister = 1;
 
-		parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-		parameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		parameterDescs[2].Constants.Num32BitValues = 16;
-		parameterDescs[2].Constants.ShaderRegister = 1;
-
-		DescriptorHeapManager& descriptorManager = DescriptorHeapManager::instance();
-		GpuResourceManager& resourceManager = GpuResourceManager::instance();
+		mainParameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		mainParameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		mainParameterDescs[2].DescriptorTable.NumDescriptorRanges = 1;
+		mainParameterDescs[2].DescriptorTable.pDescriptorRanges = &srvRange;
 
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = WrapSamplerDesc();
-		DefaultPipelineStateDescSet pipelineStateDesc;
 
-		String shaderNameSet = initInfo.getShaderNameSet();
-		RefPtr<RootSignature> rootSignature;
-		RefPtr<PipelineState> pipelineState;
-		rootSignature = resourceManager.createRootSignature(device, shaderNameSet, parameterDescs, &samplerDesc);
-		pipelineState = resourceManager.createPipelineState(device, shaderNameSet, rootSignature, &vs, &ps, pipelineStateDesc);
+		//MainPass用パイプラインステート＆ルートシグネチャ
+		{
+			RefPtr<RootSignature> rootSignature;
+			RefPtr<PipelineState> pipelineState;
 
-		material._rootSignature = rootSignature->getRefRootSignature();
-		material._pipelineState = pipelineState->getRefPipelineState();
+			DefaultPipelineStateDescSet pipelineStateDesc;
+			pipelineStateDesc.dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_EQUAL;
 
-		material._descriptorPerFrames.resize(1);
-		material._descriptorPerFrames[0].rootParameterIndex = 0;
-		material._descriptorPerFrames[0].resourceAddress[0] = cameraBuffer.constantBuffers[0][0]->getGpuVirtualAddress();
-		material._descriptorPerFrames[0].resourceAddress[1] = cameraBuffer.constantBuffers[1][0]->getGpuVirtualAddress();
-		material._descriptorPerFrames[0].resourceAddress[2] = cameraBuffer.constantBuffers[2][0]->getGpuVirtualAddress();
-		material._descriptorPerFrames[0].type = ResourceType::CONSTANT_BUFFER;
+			rootSignature = resourceManager.createRootSignature(device, shaderNameSet, mainParameterDescs, &samplerDesc);
+			pipelineState = resourceManager.createPipelineState(device, shaderNameSet, rootSignature, &vs, &ps, pipelineStateDesc);
 
-		material._descriptors.resize(1);
-		material._descriptors[0].rootParameterIndex = 1;
-		material._descriptors[0].viewAddress = resourceManager.createTextureBufferView(shaderNameSet, initInfo.textureNames)->getRefBufferView(0);
+			material._rootSignature = rootSignature->getRefRootSignature();
+			material._pipelineState = pipelineState->getRefPipelineState(); 
+		}
 
-		material._rootConstants.resize(1);
-		material._rootConstants[0].rootParameterIndex = 2;
-		material._rootConstants[0].dataPtr.resize(sizeof(Matrix4));
+		GpuResourcePerFrameSet cameraSet;
+		cameraSet.rootParameterIndex = 0;
+		cameraSet.resourceAddress[0] = cameraBuffer.constantBuffers[0].getGpuVirtualAddress();
+		cameraSet.resourceAddress[1] = cameraBuffer.constantBuffers[1].getGpuVirtualAddress();
+		cameraSet.resourceAddress[2] = cameraBuffer.constantBuffers[2].getGpuVirtualAddress();
+		cameraSet.type = ResourceType::CONSTANT_BUFFER;
+		material._gpuResourcePerFrames.emplace_back(cameraSet);
 
+		material._descriptors.emplace_back(2, resourceManager.createTextureBufferView(shaderNameSet, initInfo.textureNames)->getRefBufferView());
+
+		RootConstantSet rootConstantSet;
+		rootConstantSet.rootParameterIndex = 1;
+		rootConstantSet.dataPtr.resize(sizeof(Matrix4));
+
+		material._rootConstants.emplace_back(rootConstantSet);
 		material._topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+		//以下DepthPrePass用マテリアル
+		const String depthShaderNameSet = shaderNameSet + String("_DepthPass");
+		MaterialCommandGraphics& depthMaterial = _depthMaterials[i];
+		VectorArray<D3D12_ROOT_PARAMETER1> depthParameterDescs(2);
+		depthParameterDescs[0] = mainParameterDescs[0];
+		depthParameterDescs[1] = mainParameterDescs[1];
+
+		//Depth用パイプラインステート＆ルートシグネチャ
+		{
+			RefPtr<RootSignature> rootSignature;
+			RefPtr<PipelineState> pipelineState;
+			DefaultPipelineStateDescSet pipelineStateDesc;
+			rootSignature = resourceManager.createRootSignature(device, depthShaderNameSet, depthParameterDescs, nullptr);
+			pipelineState = resourceManager.createPipelineState(device, depthShaderNameSet, rootSignature, &vs, nullptr, pipelineStateDesc);
+
+			depthMaterial._rootSignature = rootSignature->getRefRootSignature();
+			depthMaterial._pipelineState = pipelineState->getRefPipelineState();
+		}
+
+		depthMaterial._gpuResourcePerFrames.emplace_back(cameraSet);
+		depthMaterial._rootConstants.emplace_back(rootConstantSet);
+		depthMaterial._topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	}
 }
 
-void StaticSingleMesh::setupRenderCommand(RenderSettings& settings) {
+void StaticSingleMesh::setupDepthPassCommand(RenderSettings& settings){
 	for (size_t i = 0; i < _mesh->materialDrawRanges.size(); ++i) {
 		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
-		_materials[i].setupCommand(settings);
+		_depthMaterials[i].setupCommand(settings);
+
+		commandList->IASetVertexBuffers(0, 1, &_mesh->vertexBuffer._vertexBufferView);
+		commandList->IASetIndexBuffer(&_mesh->indexBuffer._indexBufferView);
+		commandList->DrawIndexedInstanced(_mesh->materialDrawRanges[i].indexCount, 1, _mesh->materialDrawRanges[i].indexOffset, 0, 0);
+	}
+}
+
+void StaticSingleMesh::setupMainPassCommand(RenderSettings& settings) {
+	for (size_t i = 0; i < _mesh->materialDrawRanges.size(); ++i) {
+		RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+		_mainMaterials[i].setupCommand(settings);
 
 		commandList->IASetVertexBuffers(0, 1, &_mesh->vertexBuffer._vertexBufferView);
 		commandList->IASetIndexBuffer(&_mesh->indexBuffer._indexBufferView);
@@ -93,8 +133,9 @@ void StaticSingleMesh::setupRenderCommand(RenderSettings& settings) {
 }
 
 void StaticSingleMesh::updateWorldMatrix(const Matrix4& worldMatrix) {
-	for (auto&& material : _materials) {
-		memcpy(material._rootConstants[0].dataPtr.data(), &worldMatrix, sizeof(worldMatrix));
+	for (size_t i = 0; i < _mesh->materialDrawRanges.size(); ++i) {
+		memcpy(_mainMaterials[i]._rootConstants[0].dataPtr.data(), &worldMatrix, sizeof(worldMatrix));
+		memcpy(_depthMaterials[i]._rootConstants[0].dataPtr.data(), &worldMatrix, sizeof(worldMatrix));
 	}
 }
 
@@ -102,47 +143,33 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
 
-	//const String& materialName = initInfo.materialName;
+	const String materialName("GpuDrivenMaterial");
 	const auto& meshes = initInfo.meshes;
 	const auto& textureNames = initInfo.textureNames;
 	const uint32 textureCount = static_cast<uint32>(textureNames.size());
 
-	////Shader Resource View作成
-	//VectorArray<RefPtr<ID3D12Resource>> ppTextureResources(textureNames.size());
-	//for (size_t i = 0; i < textureNames.size(); ++i) {
-	//	RefPtr<Texture2D> texture;
-	//	gpuResourceManager.loadTexture(textureNames[i], &texture);
-	//	ppTextureResources[i] = texture->get();
-	//}
+	RefPtr<BufferView> textureSRV = gpuResourceManager.createTextureBufferView(materialName + String("_Textures"), textureNames);
+	_mainPassCommand._descriptors.emplace_back(2, textureSRV->getRefBufferView());
 
-	//descriptorHeapManager.createTextureShaderResourceView(ppTextureResources.data(), &srv, textureCount);
-
-	RefPtr<BufferView> v = gpuResourceManager.createTextureBufferView("ggg", textureNames);
-	_drawCommand._descriptors.emplace_back(1, v->getRefBufferView(0));
-
-	_drawCommand._descriptorPerFrames.resize(1);
-	_drawCommand._descriptorPerFrames[0].rootParameterIndex = 0;
-	_drawCommand._descriptorPerFrames[0].resourceAddress[0] = cameraBuffer.constantBuffers[0][0]->getGpuVirtualAddress();
-	_drawCommand._descriptorPerFrames[0].resourceAddress[1] = cameraBuffer.constantBuffers[1][0]->getGpuVirtualAddress();
-	_drawCommand._descriptorPerFrames[0].resourceAddress[2] = cameraBuffer.constantBuffers[2][0]->getGpuVirtualAddress();
-	_drawCommand._descriptorPerFrames[0].type = ResourceType::CONSTANT_BUFFER;
-
-	_drawCommand._rootConstants.resize(1);
-	_drawCommand._rootConstants[0].rootParameterIndex = 2;
-	_drawCommand._rootConstants[0].dataPtr.resize(sizeof(Vector4));
-
-	_drawCommand._topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	GpuResourcePerFrameSet cameraSet;
+	cameraSet.rootParameterIndex = 0;
+	cameraSet.resourceAddress[0] = cameraBuffer.constantBuffers[0].getGpuVirtualAddress();
+	cameraSet.resourceAddress[1] = cameraBuffer.constantBuffers[1].getGpuVirtualAddress();
+	cameraSet.resourceAddress[2] = cameraBuffer.constantBuffers[2].getGpuVirtualAddress();
+	cameraSet.type = ResourceType::CONSTANT_BUFFER;
+	_mainPassCommand._gpuResourcePerFrames.emplace_back(cameraSet);
+	_depthPassCommand._gpuResourcePerFrames.emplace_back(cameraSet);
 
 	{
 		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-		{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-		{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-		{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,                            0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "MATRIX",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1,  0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "MATRIX",         1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "MATRIX",         2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+			{ "MATRIX",         3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 		};
 
 		VertexShader vs;
@@ -163,26 +190,44 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		parameterDescs[0].Descriptor.ShaderRegister = 0;
 		parameterDescs[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
-		parameterDescs[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		parameterDescs[1].DescriptorTable.NumDescriptorRanges = 1;
-		parameterDescs[1].DescriptorTable.pDescriptorRanges = &srvRange;
+		parameterDescs[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		parameterDescs[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		parameterDescs[1].Constants.Num32BitValues = 4;
+		parameterDescs[1].Constants.ShaderRegister = 1;
 
-		parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		parameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		parameterDescs[2].Constants.Num32BitValues = 4;
-		parameterDescs[2].Constants.ShaderRegister = 0;
+		parameterDescs[2].DescriptorTable.NumDescriptorRanges = 1;
+		parameterDescs[2].DescriptorTable.pDescriptorRanges = &srvRange;
 
-		DefaultPipelineStateDescSet psoDescSet;
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = WrapSamplerDesc();
 
-		RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, "ggg", parameterDescs, &samplerDesc);
-		RefPtr<PipelineState> pipelineState = gpuResourceManager.createPipelineState(device, "ggg", rootSignature, &vs, &ps, psoDescSet);
-		//rootSignature.create(device, parameterDescs, &samplerDesc);
-		//pipelineState.create(device, &rootSignature, &vs, &ps);
+		//デプスパス
+		{
+			VectorArray<D3D12_ROOT_PARAMETER1> depthParameterDescs(2);
+			depthParameterDescs[0] = parameterDescs[0];
+			depthParameterDescs[1] = parameterDescs[1];
 
-		_drawCommand._rootSignature = rootSignature->getRefRootSignature();
-		_drawCommand._pipelineState = pipelineState->getRefPipelineState();
+			DefaultPipelineStateDescSet psoDescSet;
+			RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, materialName + "_DepthPass", depthParameterDescs, nullptr);
+			RefPtr<PipelineState> pipelineState = gpuResourceManager.createPipelineState(device, materialName + "_DepthPass", rootSignature, &vs, nullptr, psoDescSet);
+
+			_depthPassCommand._rootSignature = rootSignature->getRefRootSignature();
+			_depthPassCommand._pipelineState = pipelineState->getRefPipelineState();
+			_depthPassCommand._topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		}
+
+		//メインパス
+		{
+			DefaultPipelineStateDescSet psoDescSet;
+			psoDescSet.dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_EQUAL;
+			RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, materialName + "_MainPass", parameterDescs, &samplerDesc);
+			RefPtr<PipelineState> pipelineState = gpuResourceManager.createPipelineState(device, materialName + "_MainPass", rootSignature, &vs, &ps, psoDescSet);
+
+			_mainPassCommand._rootSignature = rootSignature->getRefRootSignature();
+			_mainPassCommand._pipelineState = pipelineState->getRefPipelineState(); 
+			_mainPassCommand._topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		}
 
 		//描画元情報からGPUカリングとIndirect描画に必要な情報をまとめる
 		_meshCount = static_cast<uint32>(meshes.size());
@@ -196,7 +241,6 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 
 	//コマンドシグネチャ生成
 	{
-
 		_indirectArgumentDstCounterOffset = AlignForUavCounter(_indirectArgumentCount * sizeof(IndirectCommand));
 
 		// Each command consists of a CBV update and a DrawInstanced call.
@@ -208,29 +252,30 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		argumentDescs[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
 		argumentDescs[2].VertexBuffer.Slot = 1;
 		argumentDescs[3].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+		argumentDescs[3].Constant.RootParameterIndex = 1;
 		argumentDescs[3].Constant.Num32BitValuesToSet = 4;
 		argumentDescs[3].Constant.DestOffsetIn32BitValues = 0;
-		argumentDescs[3].Constant.RootParameterIndex = 2;
 		argumentDescs[4].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
-		_commandSignature.create(device, sizeof(IndirectCommand), argumentDescs, _drawCommand._rootSignature.rootSignature);
+		_depthPassCommandSignature.create(device, sizeof(IndirectCommand), argumentDescs, _depthPassCommand._rootSignature.rootSignature);
+		_mainPassCommandSignature.create(device, sizeof(IndirectCommand), argumentDescs, _mainPassCommand._rootSignature.rootSignature);
 	}
 
 	//GPUカリングステート
 	D3D12_HEAP_PROPERTIES defaultHeapProperties = { D3D12_HEAP_TYPE_DEFAULT };
 	D3D12_HEAP_PROPERTIES uploadHeapProperties = { D3D12_HEAP_TYPE_UPLOAD };
 	{
-		_gpuCullingCameraConstantBuffers[0] = gpuResourceManager.createConstantBuffer(device, "cb1", sizeof(GpuCullingCameraConstant));
-		_gpuCullingCameraConstantBuffers[1] = gpuResourceManager.createConstantBuffer(device, "cb2", sizeof(GpuCullingCameraConstant));
-		_gpuCullingCameraConstantBuffers[2] = gpuResourceManager.createConstantBuffer(device, "cb3", sizeof(GpuCullingCameraConstant));
-		DescriptorPerFrameSet frameSet;
+		_gpuCullingCameraConstantBuffers[0] = gpuResourceManager.createConstantBuffer(device, materialName + "_cb1", sizeof(GpuCullingCameraConstant));
+		_gpuCullingCameraConstantBuffers[1] = gpuResourceManager.createConstantBuffer(device, materialName + "_cb2", sizeof(GpuCullingCameraConstant));
+		_gpuCullingCameraConstantBuffers[2] = gpuResourceManager.createConstantBuffer(device, materialName + "_cb3", sizeof(GpuCullingCameraConstant));
+		
+		GpuResourcePerFrameSet frameSet;
 		frameSet.rootParameterIndex = 2;
 		frameSet.resourceAddress[0] = _gpuCullingCameraConstantBuffers[0]->getGpuVirtualAddress();
 		frameSet.resourceAddress[1] = _gpuCullingCameraConstantBuffers[1]->getGpuVirtualAddress();
 		frameSet.resourceAddress[2] = _gpuCullingCameraConstantBuffers[2]->getGpuVirtualAddress();
 		frameSet.type = ResourceType::CONSTANT_BUFFER;
-		_gpuCullingCommand._descriptorPerFrames.emplace_back(frameSet);
-		//_gpuCullingCameraConstantBuffers.create(device, { sizeof(GpuCullingCameraConstant) });
+		_gpuCullingCommand._gpuResourcePerFrames.emplace_back(frameSet);
 
 		D3D12_DESCRIPTOR_RANGE1 srvRange = {};
 		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -264,9 +309,8 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		parameterDesc[2].Descriptor.ShaderRegister = 0;
 		parameterDesc[2].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
-		RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, "ccvvvv", parameterDesc);
+		RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, materialName + "_GpuCullingCommand", parameterDesc);
 		_gpuCullingCommand._rootSignature = rootSignature->getRefRootSignature();
-		//_cullingComputeRootSignature.create(device, parameterDesc);
 
 		ComputeShader computeShader;
 		computeShader.create("Shaders/GpuCulling_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);//DynamicIndexingを使用
@@ -275,9 +319,8 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		computePsoDesc.pRootSignature = rootSignature->_rootSignature.Get();
 		computePsoDesc.CS = computeShader.getByteCode();
 
-		RefPtr<PipelineState> pipelineState = gpuResourceManager.createComputePipelineState(device, "compcomp", computePsoDesc);
+		RefPtr<PipelineState> pipelineState = gpuResourceManager.createComputePipelineState(device, materialName + "_GpuCullingCommand", computePsoDesc);
 		_gpuCullingCommand._pipelineState = pipelineState->getRefPipelineState();
-		//_cullingComputeState.createCompute(device, computePsoDesc);
 	}
 
 	//IndirectCommandステート
@@ -287,7 +330,7 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		srvRange.NumDescriptors = _meshCount;
 		srvRange.BaseShaderRegister = 2;
 		srvRange.RegisterSpace = 0;
-		//srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 		D3D12_DESCRIPTOR_RANGE1 uavRange = {};
@@ -302,12 +345,12 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		parameterDesc[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 		parameterDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[0].Descriptor.ShaderRegister = 0;
-		//parameterDesc[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		parameterDesc[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
 		parameterDesc[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
 		parameterDesc[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		parameterDesc[1].Descriptor.ShaderRegister = 1;
-		//parameterDesc[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+		parameterDesc[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
 		parameterDesc[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		parameterDesc[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -319,9 +362,8 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		parameterDesc[3].DescriptorTable.NumDescriptorRanges = 1;
 		parameterDesc[3].DescriptorTable.pDescriptorRanges = &uavRange;
 
-		RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, "ccvvvv2", parameterDesc);
+		RefPtr<RootSignature> rootSignature = gpuResourceManager.createRootSignature(device, materialName + "_IndirectArgumentCommand", parameterDesc);
 		_setupIndirectArgumentCommand._rootSignature = rootSignature->getRefRootSignature();
-		//_setupCommandComputeRootSignature.create(device, parameterDesc);
 
 		ComputeShader computeShader;
 		computeShader.create("Shaders/SetupIndirectCommand_cs.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);//DynamicIndexingを使用
@@ -330,9 +372,8 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		computePsoDesc.pRootSignature = rootSignature->_rootSignature.Get();
 		computePsoDesc.CS = computeShader.getByteCode();
 
-		RefPtr<PipelineState> pipelineState = gpuResourceManager.createComputePipelineState(device, "compcomp2", computePsoDesc);
+		RefPtr<PipelineState> pipelineState = gpuResourceManager.createComputePipelineState(device, materialName + "_IndirectArgumentCommand", computePsoDesc);
 		_setupIndirectArgumentCommand._pipelineState = pipelineState->getRefPipelineState();
-		//_setupCommandComputeState.createCompute(device, computePsoDesc);
 	}
 
 	ComPtr<ID3D12Resource> inCommandUploadBuffers;
@@ -382,11 +423,9 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	constexpr uint32 THREAD_BLOCK_SIZE = 256;
 	_gpuCullingDispatchCount = ((mergedMatrices.size() + (THREAD_BLOCK_SIZE - 1)) & ~(THREAD_BLOCK_SIZE - 1)) / THREAD_BLOCK_SIZE;
 
-	RefPtr<GpuBuffer> gpuDrivenInstanceMatrixBuffer = gpuResourceManager.createOnlyGpuBuffer("vvvvtt1");
+	RefPtr<GpuBuffer> gpuDrivenInstanceMatrixBuffer = gpuResourceManager.createOnlyGpuBuffer(materialName + "_GpuDrivenInstanceMatrix");
 	gpuDrivenInstanceMatrixBuffer->createDeferredGpuOnly<PerInstanceMeshInfo>(device, commandList, &inCommandUploadBuffers, mergedMatrices);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(gpuDrivenInstanceMatrixBuffer->get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-	//_gpuDrivenInstanceMatrixBuffer.createDeferredGpuOnly<PerInstanceMeshInfo>(device, commandList, &inCommandUploadBuffers, mergedMatrices);
-	//commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_gpuDrivenInstanceMatrixBuffer.get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
 	D3D12_BUFFER_SRV matrixSrvDesc = {};
 	matrixSrvDesc.FirstElement = 0;
@@ -394,10 +433,9 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	matrixSrvDesc.StructureByteStride = sizeof(PerInstanceMeshInfo);
 	matrixSrvDesc.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-	RefPtr<BufferView> gpuDrivenInstanceMatrixView = gpuResourceManager.createOnlyBufferView("trtrtrtr");
-	descriptorHeapManager.createShaderResourceView(gpuDrivenInstanceMatrixBuffer->getAdressOf(), gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
-	//descriptorHeapManager.createShaderResourceView(_gpuDrivenInstanceMatrixBuffer.getAdressOf(), &_gpuDrivenInstanceMatrixView, 1, { matrixSrvDesc });
-	_gpuCullingCommand._descriptors.emplace_back(0, gpuDrivenInstanceMatrixView->getRefBufferView(0));
+	RefPtr<BufferView> gpuDrivenInstanceMatrixSRV = gpuResourceManager.createOnlyBufferView(materialName + "_GpuDrivenInstanceMatrix");
+	descriptorHeapManager.createShaderResourceView(gpuDrivenInstanceMatrixBuffer->getAdressOf(), gpuDrivenInstanceMatrixSRV, 1, { matrixSrvDesc });
+	_gpuCullingCommand._descriptors.emplace_back(0, gpuDrivenInstanceMatrixSRV->getRefBufferView());
 
 
 	//インスタンス用行列頂点バッファとそのUAVを生成
@@ -421,26 +459,21 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 
 	//GPUカリング後のバッファをバインドするためのSRVとUAVを作成
 	VectorArray<RefPtr<ID3D12Resource>> ppCulledBuffers(_meshCount);
-	_gpuDrivenInstanceCulledBuffer.resize(_meshCount);
+	_gpuDrivenInstanceCulledBuffers.resize(_meshCount);
 
 	for (uint32 i = 0; i < _meshCount; ++i) {
-		uint32 index = i;
 		char str = i;
-		_gpuDrivenInstanceCulledBuffer[index] = gpuResourceManager.createOnlyGpuBuffer(String("gpgpgp_").append(String(&str)));
-		_gpuDrivenInstanceCulledBuffer[index]->createDirectGpuOnlyEmpty(device, _uavCounterOffsets[i] + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		ppCulledBuffers[i] = _gpuDrivenInstanceCulledBuffer[index]->get();
+		_gpuDrivenInstanceCulledBuffers[i] = gpuResourceManager.createOnlyGpuBuffer(materialName + "_GpuDrivenInstanceCulled_" + String(&str));
+		_gpuDrivenInstanceCulledBuffers[i]->createDirectGpuOnlyEmpty(device, _uavCounterOffsets[i] + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		ppCulledBuffers[i] = _gpuDrivenInstanceCulledBuffers[i]->get();
 	}
 
-	//descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledUAV, _meshCount, gpuDrivenInstanceCulledBufferUavs);
-	//descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), &_gpuDriventInstanceCulledSRV, _meshCount, gpuDrivenInstanceCulledBufferSrvs);
-
-	RefPtr<BufferView> gpuDriventInstanceCulledUAV = gpuResourceManager.createOnlyBufferView("uuuuaaaaavvvvv");
-	RefPtr<BufferView> gpuDriventInstanceCulledSRV = gpuResourceManager.createOnlyBufferView("uuuusssssaaaaavvvvv");
+	RefPtr<BufferView> gpuDriventInstanceCulledUAV = gpuResourceManager.createOnlyBufferView(materialName + "_GpuDrivenInstanceCulled_UAV");
+	RefPtr<BufferView> gpuDriventInstanceCulledSRV = gpuResourceManager.createOnlyBufferView(materialName + "_GpuDrivenInstanceCulled_SRV");
 	descriptorHeapManager.createUnorederdAcsessView(ppCulledBuffers.data(), gpuDriventInstanceCulledUAV, _meshCount, gpuDrivenInstanceCulledBufferUavs);
 	descriptorHeapManager.createShaderResourceView(ppCulledBuffers.data(), gpuDriventInstanceCulledSRV, _meshCount, gpuDrivenInstanceCulledBufferSrvs);
-	_gpuCullingCommand._descriptors.emplace_back(1, gpuDriventInstanceCulledUAV->getRefBufferView(0));
-	_setupIndirectArgumentCommand._descriptors.emplace_back(2, gpuDriventInstanceCulledSRV->getRefBufferView(0));
-
+	_gpuCullingCommand._descriptors.emplace_back(1, gpuDriventInstanceCulledUAV->getRefBufferView());
+	_setupIndirectArgumentCommand._descriptors.emplace_back(2, gpuDriventInstanceCulledSRV->getRefBufferView());
 
 	//ExecuteIndirectに渡すIndirectBufferを生成
 	VectorArray<InIndirectCommand> commands(_indirectArgumentCount);
@@ -450,7 +483,7 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		const uint32 culledBufferIndex = static_cast<uint32>(i);
 		const PerMeshData& meshInfo = meshes[i];
 		D3D12_VERTEX_BUFFER_VIEW perInstanceVertexBufferView = {};
-		perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffer[culledBufferIndex]->getGpuVirtualAddress();
+		perInstanceVertexBufferView.BufferLocation = _gpuDrivenInstanceCulledBuffers[culledBufferIndex]->getGpuVirtualAddress();
 		perInstanceVertexBufferView.StrideInBytes = sizeof(InstacingVertexData);
 		perInstanceVertexBufferView.SizeInBytes = _uavCounterOffsets[i] + sizeof(UINT);
 
@@ -467,10 +500,7 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 			command.vertexBufferView = meshVertexAndIndex->vertexBuffer._vertexBufferView;
 			command.indexBufferView = meshVertexAndIndex->indexBuffer._indexBufferView;
 			command.perInstanceVertexBufferView = perInstanceVertexBufferView;
-			command.textureIndices[0] = textureIndices.t1;
-			command.textureIndices[1] = textureIndices.t2;
-			command.textureIndices[2] = textureIndices.t3;
-			command.textureIndices[3] = textureIndices.t4;
+			command.textureIndices = textureIndices;
 			command.drawArguments.IndexCountPerInstance = meshVertexAndIndex->materialDrawRanges[j].indexCount;
 			command.drawArguments.StartIndexLocation = meshVertexAndIndex->materialDrawRanges[j].indexOffset;
 			command.drawArguments.InstanceCount = 0;
@@ -481,18 +511,16 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		}
 	}
 
-	RefPtr<GpuBuffer> indirectArgumentSourceBuffer = gpuResourceManager.createOnlyGpuBuffer("iiiiddddddd");
+	RefPtr<GpuBuffer> indirectArgumentSourceBuffer = gpuResourceManager.createOnlyGpuBuffer(materialName + "_IndirectArgumentSource");
 	indirectArgumentSourceBuffer->createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers, commands);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(indirectArgumentSourceBuffer->get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-	/*_indirectArgumentSourceBuffer.createDeferredGpuOnly<InIndirectCommand>(device, commandList, &indirectCommandUploadBuffers, commands);
-	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentSourceBuffer.get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));*/
+
 	GpuResourceSet gSet = { 0, indirectArgumentSourceBuffer->getGpuVirtualAddress(), ResourceType::SHADER_RESOURCE };
 	_setupIndirectArgumentCommand._gpuResources.emplace_back(gSet);
 
 	//GPUカリング後のIndirectBuffer
-	_indirectArgumentDstBuffer = gpuResourceManager.createOnlyGpuBuffer("iiiidddddddst");
+	_indirectArgumentDstBuffer = gpuResourceManager.createOnlyGpuBuffer(materialName + "_IndirectArgumentDst");
 	_indirectArgumentDstBuffer->createDirectGpuOnlyEmpty(device, _indirectArgumentDstCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	//_indirectArgumentDstBuffer.createDirectGpuOnlyEmpty(device, _indirectArgumentDstCounterOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 	//IndirectArgumentバッファのUAVを作成
 	D3D12_BUFFER_UAV bufferUav;
@@ -501,13 +529,12 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	bufferUav.StructureByteStride = sizeof(IndirectCommand);
 	bufferUav.CounterOffsetInBytes = _indirectArgumentDstCounterOffset;
 
-	RefPtr<BufferView> setupCommandUavView = gpuResourceManager.createOnlyBufferView("uuuuaaaaavvvvv2222");
-	descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer->getAdressOf(), setupCommandUavView, 1, { bufferUav });
-	//descriptorHeapManager.createUnorederdAcsessView(indirectArgumentDstBuffer->getAdressOf(), &_setupCommandUavView, 1, { bufferUav });
-	_setupIndirectArgumentCommand._descriptors.emplace_back(3, setupCommandUavView->getRefBufferView(0));
+	RefPtr<BufferView> setupCommandUAV = gpuResourceManager.createOnlyBufferView(materialName + "_SetupCommand_UAV");
+	descriptorHeapManager.createUnorederdAcsessView(_indirectArgumentDstBuffer->getAdressOf(), setupCommandUAV, 1, { bufferUav });
+	_setupIndirectArgumentCommand._descriptors.emplace_back(3, setupCommandUAV->getRefBufferView());
 
 	//CulledBufferのカウンタまでのバイトオフセットを格納するバッファ
-	RefPtr<GpuBuffer> indirectArgumentOffsetsBuffer = gpuResourceManager.createOnlyGpuBuffer("ofofofoof");
+	RefPtr<GpuBuffer> indirectArgumentOffsetsBuffer = gpuResourceManager.createOnlyGpuBuffer(materialName + "_IndirectArgumentOffsets");
 	ComPtr<ID3D12Resource> offsetsUpload;
 	indirectArgumentOffsetsBuffer->createDeferredGpuOnly<uint32>(device, commandList, &offsetsUpload, _uavCounterOffsets);
 
@@ -515,8 +542,8 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	_setupIndirectArgumentCommand._gpuResources.emplace_back(gSet2);
 
 	//UAVカウンタをリセットするための(UINT)0のバッファを生成
-	_uavCounterReset = gpuResourceManager.createOnlyGpuBuffer("ofofofoofcncncnc");
 	ComPtr<ID3D12Resource> uavCounterUpload;
+	_uavCounterReset = gpuResourceManager.createOnlyGpuBuffer(materialName + "_UavCounterReset");
 	_uavCounterReset->createDeferredGpuOnly<UINT>(device, commandList, &uavCounterUpload, { 0 });
 
 	//コマンド実行(アップロードバッファのテクスチャからGPU読み書き限定バッファにコピー)
@@ -527,41 +554,30 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	commandContext->waitForIdle();
 }
 
-void StaticMultiMesh::onCompute(RefPtr<CommandContext> commandContext, uint32 frameIndex) {
-	auto commandListSet = commandContext->requestCommandListSet();
-	RefPtr<ID3D12GraphicsCommandList> commandList = commandListSet.commandList;
-	RenderSettings renderSettings(commandList, 0, frameIndex);
-
-	//デスクリプタヒープをセット
-	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
-	RefPtr<ID3D12DescriptorHeap> ppHeap[] = { descriptorHeapManager.getD3dDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) };
-	commandList->SetDescriptorHeaps(1, ppHeap);
+void StaticMultiMesh::onCompute(RenderSettings & settings) {
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+	const uint32 frameIndex = settings.frameIndex;
 
 	//AppendStructuredBufferのカウンタを0にリセットする
 	for (uint32 i = 0; i < _meshCount; ++i) {
-		commandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffer[i]->get(), _uavCounterOffsets[i], _uavCounterReset->get(), 0, sizeof(UINT));
+		commandList->CopyBufferRegion(_gpuDrivenInstanceCulledBuffers[i]->get(), _uavCounterOffsets[i], _uavCounterReset->get(), 0, sizeof(UINT));
 	}
 
-	_gpuCullingCommand.setupCommand(renderSettings);
+	_gpuCullingCommand.setupCommand(settings);
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, frameIndex);
 	commandList->Dispatch(_gpuCullingDispatchCount, 1, 1);
 
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, frameIndex);
-	_setupIndirectArgumentCommand.setupCommand(renderSettings);
+	_setupIndirectArgumentCommand.setupCommand(settings);
 
 	//AppendStructuredBufferのカウンタを0にリセットする
 	commandList->CopyBufferRegion(_indirectArgumentDstBuffer->get(), _indirectArgumentDstCounterOffset, _uavCounterReset->get(), 0, sizeof(UINT));
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer->get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	commandList->Dispatch(_indirectArgumentCount, 1, 1);
-
-	commandContext->executeCommandList(commandListSet);
-	commandContext->discardCommandListSet(commandListSet);
-
-	commandContext->waitForIdle();
 }
 
 #include "ThirdParty/Imgui/imgui.h"
-void StaticMultiMesh::setupCommand(RenderSettings & settings) {
+void StaticMultiMesh::setupDepthPassCommand(RenderSettings& settings){
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
@@ -592,13 +608,12 @@ void StaticMultiMesh::setupCommand(RenderSettings & settings) {
 	virtualCamera.setAspectRate(1280, 720);
 	virtualCamera.computeProjectionMatrix();
 	virtualCamera.computeViewMatrix();
-
 	virtualCamera.computeFlustomNormals();
 	virtualCamera.debugDrawFlustom();
 
 	updateCullingCameraInfo(virtualCamera, frameIndex);
 
-	_drawCommand.setupCommand(settings);
+	_depthPassCommand.setupCommand(settings);
 
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, frameIndex);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer->get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
@@ -606,7 +621,24 @@ void StaticMultiMesh::setupCommand(RenderSettings & settings) {
 	//EXECUTION WARNING #1044: GPU_BASED_VALIDATION_RESOURCE_STATE_IMPRECISE
 	//IndirectAtgumentバッファに含まれるバーテックスバッファを一度UAVとして扱うのでGPUデバッグレイヤー上でリソースの追跡ができないと警告
 	commandList->ExecuteIndirect(
-		_commandSignature._commandSignature.Get(),
+		_depthPassCommandSignature._commandSignature.Get(),
+		_indirectArgumentCount,
+		_indirectArgumentDstBuffer->get(),
+		0,
+		_indirectArgumentDstBuffer->get(),
+		_indirectArgumentDstCounterOffset);
+}
+
+void StaticMultiMesh::setupMainPassCommand(RenderSettings & settings) {
+	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
+	uint32 frameIndex = settings.frameIndex;
+
+	_mainPassCommand.setupCommand(settings);
+
+	//EXECUTION WARNING #1044: GPU_BASED_VALIDATION_RESOURCE_STATE_IMPRECISE
+	//IndirectAtgumentバッファに含まれるバーテックスバッファを一度UAVとして扱うのでGPUデバッグレイヤー上でリソースの追跡ができないと警告
+	commandList->ExecuteIndirect(
+		_mainPassCommandSignature._commandSignature.Get(),
 		_indirectArgumentCount,
 		_indirectArgumentDstBuffer->get(),
 		0,
@@ -616,10 +648,13 @@ void StaticMultiMesh::setupCommand(RenderSettings & settings) {
 	culledBufferBarrier(commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST, frameIndex);
 	commandList->ResourceBarrier(1, &LTND3D12_RESOURCE_BARRIER::transition(_indirectArgumentDstBuffer->get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST));
 
+	//Debug用バウンディングボックスAABBを描画
+#ifdef ENABLE_AABB_DEBUG_DRAW
 	DebugGeometryRender& debug = DebugGeometryRender::instance();
 	for (const auto& aabb : _boundingBoxies) {
 		debug.debugDrawCube(aabb.center(), Quaternion::identity, aabb.size());
 	}
+#endif
 }
 
 void StaticMultiMesh::updateCullingCameraInfo(const Camera & camera, uint32 frameIndex) {
@@ -640,7 +675,7 @@ void StaticMultiMesh::culledBufferBarrier(RefPtr<ID3D12GraphicsCommandList> comm
 		barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		barriers[i].Transition.StateBefore = StateBefore;
 		barriers[i].Transition.StateAfter = StateAfter;
-		barriers[i].Transition.pResource = _gpuDrivenInstanceCulledBuffer[i]->get();
+		barriers[i].Transition.pResource = _gpuDrivenInstanceCulledBuffers[i]->get();
 	}
 
 	commandList->ResourceBarrier(_meshCount, barriers.data());

@@ -8,6 +8,13 @@ struct FrustumPlanes {
 	Vector3 normals[4];
 };
 
+//頂点シェーダーでカメラ情報を扱うときの構造体
+struct CameraConstantBuffer {
+	Matrix4 mtxView;
+	Matrix4 mtxProj;
+	Vector3 cameraPosition;
+};
+
 class Camera {
 public:
 	Camera() :
@@ -61,7 +68,6 @@ public:
 	Matrix4 getProjectionMatrix() const;
 	Vector3 getPosition() const;
 	Quaternion getRotation() const;
-
 	float getFarZ() const;
 	float getNearZ() const;
 
@@ -71,6 +77,9 @@ public:
 
 	//現在のFOVにおける1/Tan(fov/2)を取得する
 	Vector2 getTanHeightXY() const;
+
+	//シェーダーで使うカメラ構造体データを取得
+	CameraConstantBuffer getCameraConstantBuffer() const;
 
 private:
 	float _fieldOfView;

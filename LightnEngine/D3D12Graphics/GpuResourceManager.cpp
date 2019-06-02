@@ -435,7 +435,7 @@ RefPtr<BufferView> GpuResourceManager::createTextureBufferView(const String& vie
 	}
 
 	DescriptorHeapManager& descriptorManager = DescriptorHeapManager::instance();
-	descriptorManager.createTextureShaderResourceView(ppTextures.data(), bufferView, ppTextures.size());
+	descriptorManager.createTextureShaderResourceView(ppTextures.data(), bufferView, static_cast<uint32>(ppTextures.size()));
 
 	return bufferView;
 }

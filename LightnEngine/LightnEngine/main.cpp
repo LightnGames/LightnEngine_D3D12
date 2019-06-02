@@ -320,8 +320,8 @@ public:
 		Matrix4 mtxWorld = Matrix4::matrixFromQuaternion(Quaternion::euler({ pitch, yaw, roll }, true)).multiply(Matrix4::translateXYZ({ x, y, z }));
 
 		Vector3 lightDir = Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward);
-		for (int x = 0; x < xNum; ++x) {
-			for (int y = 0; y < yNum; ++y) {
+		for (uint32 x = 0; x < xNum; ++x) {
+			for (uint32 y = 0; y < yNum; ++y) {
 				Vector3 offset(x - (float)(xNum / 2.0f)+0.5f, y - (float)(yNum / 2.0f)+0.5f, 0);
 				uint32 index = x * xNum + y;
 				float metallic = y / (float)(yNum-1);
