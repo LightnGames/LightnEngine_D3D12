@@ -119,6 +119,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 	_currentFrameResource = &_frameResources[_frameIndex];
 
 	_mainCameraConstantBuffer.create(_device.Get(), { sizeof(CameraConstantBuffer) });
+	_directionalLightBuffer.create(_device.Get(), { sizeof(DirectionalLightConstantBuffer) });
 
 	String diffuseEnv("cubemapEnvHDR.dds");
 	createTextures({ diffuseEnv });
@@ -170,6 +171,28 @@ void GraphicsCore::onUpdate() {
 	CameraConstantBuffer cr = mainCamera->getCameraConstantBuffer();
 	_mainCameraConstantBuffer.writeBufferData(&cr, sizeof(CameraConstantBuffer));
 	_mainCameraConstantBuffer.flashBufferData(_frameIndex);
+
+	static float pitchL = 1.0f;
+	static float yawL = 0.2f;
+	static float rollL = 0;
+	static Vector3 color = Vector3::one;
+	static float intensity = 1.0f;
+
+	ImGui::Begin("DirectionalLight");
+	ImGui::SliderAngle("Picth", &pitchL);
+	ImGui::SliderAngle("Yaw", &yawL);
+	ImGui::SliderAngle("Roll", &rollL);
+	ImGui::SliderFloat("Intensity", &intensity, 0, 10);
+	ImGui::ColorEdit3("Color", (float*)& color);
+	ImGui::End();
+
+	DirectionalLightConstantBuffer directionalLight;
+	directionalLight.color = Color(color.x, color.y, color.z, 1);
+	directionalLight.intensity = intensity;
+	directionalLight.direction = Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward);
+
+	_directionalLightBuffer.writeBufferData(&directionalLight, sizeof(directionalLight));
+	_directionalLightBuffer.flashBufferData(_frameIndex);
 }
 
 void GraphicsCore::onRender() {
@@ -348,7 +371,7 @@ StaticMultiMeshRenderInstance GraphicsCore::createStaticMultiMeshRender(const St
 	//material->create(_device.Get(), &_graphicsCommandContext, meshDatas);
 
 	StaticMultiMesh multiMesh;
-	multiMesh.create(_device.Get(), &_graphicsCommandContext, _mainCameraConstantBuffer, meshDatas);
+	multiMesh.create(_device.Get(), &_graphicsCommandContext, _mainCameraConstantBuffer, _directionalLightBuffer, meshDatas);
 	_multiMeshes.emplace_back(std::move(multiMesh));
 
 	//return StaticMultiMeshRenderInstance(material);

@@ -1,6 +1,30 @@
 #define PI 3.1415926535897
 #define EPSILON 1e-6
 
+struct CameraInfo {
+	float4x4 mtxView;
+	float4x4 mtxProj;
+	float3 cameraPos;
+};
+
+struct DirectionalLight
+{
+	float intensity;
+	float3 direction;
+	float4 color;
+};
+
+//0~1のノーマルマップを-1~1の範囲にする
+float3 DecodeNormalMapRG(in float2 normal) {
+	float2 flipGNormal = normal;
+	flipGNormal.g = 1.0 - normal.g;
+
+	// Expand the range of the normal value from (0, +1) to (-1, +1).
+	float3 normalMap = float3(flipGNormal, 1.0);
+	normalMap = (normalMap * 2.0f) - 1.0f;
+	return normalMap;
+}
+
 //拡散反射BRDF
 float3 DiffuseBRDF(in float3 diffuseColor)
 {
@@ -62,6 +86,10 @@ float3 FresnelSchlickRoughness(in float cosTheta, in float3 F0, in float roughne
 {
 	float invR = 1 - roughness;
 	return F0 + (max(float3(invR, invR, invR), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+float3 SimpleToneMapping(in float3 color) {
+	return color / (color + float3(1.0, 1.0, 1.0)); //ToneMapping
 }
 
 float3 ToLiner(in float3 value) {

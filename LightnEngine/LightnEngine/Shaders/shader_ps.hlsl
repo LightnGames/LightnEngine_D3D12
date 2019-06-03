@@ -22,9 +22,7 @@ SamplerState t_sampler : register(s0);
 
 cbuffer DirectionalLightBuffer : register(b0)
 {
-    float intensity;
-    float3 direction;
-	float4 color;
+	DirectionalLight directionalLight;
 };
 
 float4 PSMain(PSInput input) : SV_Target
@@ -53,7 +51,7 @@ float4 PSMain(PSInput input) : SV_Target
     float3 specularColor = lerp(float3(0.04, 0.04, 0.04), albedo.rgb, metallic);
 
 	 //ライトベクトルと色を定義
-    float3 L = -direction;
+    float3 L = -directionalLight.direction;
     float3 V = input.viewDir;
     float3 H = normalize(L + V);
     float3 R = reflect(-V, N);
@@ -64,7 +62,7 @@ float4 PSMain(PSInput input) : SV_Target
     float dotNH = saturate(dot(N, H));
     float dotVH = saturate(dot(V, H));
     float dotLH = saturate(dot(L, H));
-    float3 irradistance = dotNL * color.xyz * intensity;
+    float3 irradistance = dotNL * directionalLight.color.xyz * directionalLight.intensity;
 	//return float4(irradistance,1);
 
     //ライティング済みカラー＆スペキュラ

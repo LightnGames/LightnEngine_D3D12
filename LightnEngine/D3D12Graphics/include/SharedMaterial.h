@@ -53,6 +53,9 @@ struct ConstantBufferFrame {
 	//バッファのデータポインタを更新
 	void writeBufferData(const void* dataPtr, uint32 length);
 
+	//GPU仮想アドレスをフレームバッファ分取得
+	void getVirtualAdresses(RefPtr<D3D12_GPU_VIRTUAL_ADDRESS> dstArray) const;
+
 	VectorArray<byte> dataPtrs;
 	ConstantBuffer constantBuffers[FrameCount];
 	BufferView constantBufferViews[FrameCount];

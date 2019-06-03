@@ -15,6 +15,13 @@ struct CameraConstantBuffer {
 	Vector3 cameraPosition;
 };
 
+//•½tŒõŒ¹—p@ˆÚ“®‚µ‚æ‚¤‚Ë
+struct DirectionalLightConstantBuffer {
+	float intensity;
+	Vector3 direction;
+	Color color;
+};
+
 class Camera {
 public:
 	Camera() :

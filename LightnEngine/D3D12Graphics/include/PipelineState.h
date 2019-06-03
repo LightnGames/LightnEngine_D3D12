@@ -46,8 +46,9 @@ struct ShaderReflectionCBV {
 			{ "uint3", 12 },
 			{ "uint4", 16 }
 		};
-
-		size = dataTable.at(this->type);
+		if (dataTable.count(name) > 0) {
+			size = dataTable.at(this->type);
+		}
 	}
 };
 

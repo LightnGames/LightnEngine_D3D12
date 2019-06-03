@@ -73,7 +73,7 @@ struct InitSettingsPerStaticMultiMesh {
 
 class StaticMultiMesh {
 public:
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const ConstantBufferFrame& cameraBuffer, const InitSettingsPerStaticMultiMesh& initInfo);
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const ConstantBufferFrame& cameraBuffer, const ConstantBufferFrame& lightBuffer, const InitSettingsPerStaticMultiMesh& initInfo);
 	
 	//GPUƒJƒŠƒ“ƒO
 	void onCompute(RenderSettings& settings);

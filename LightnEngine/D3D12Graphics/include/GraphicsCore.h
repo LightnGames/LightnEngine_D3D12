@@ -77,4 +77,5 @@ private:
 	VectorArray<StaticMultiMesh> _multiMeshes;
 
 	ConstantBufferFrame _mainCameraConstantBuffer;
+	ConstantBufferFrame _directionalLightBuffer;
 };

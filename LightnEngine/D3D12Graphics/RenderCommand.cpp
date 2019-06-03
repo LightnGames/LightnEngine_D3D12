@@ -139,9 +139,10 @@ void StaticSingleMesh::updateWorldMatrix(const Matrix4& worldMatrix) {
 	}
 }
 
-void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const ConstantBufferFrame& cameraBuffer, const InitSettingsPerStaticMultiMesh& initInfo) {
+void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const ConstantBufferFrame& cameraBuffer, const ConstantBufferFrame& lightBuffer, const InitSettingsPerStaticMultiMesh& initInfo) {
 	DescriptorHeapManager& descriptorHeapManager = DescriptorHeapManager::instance();
 	GpuResourceManager& gpuResourceManager = GpuResourceManager::instance();
+
 
 	const String materialName("GpuDrivenMaterial");
 	const auto& meshes = initInfo.meshes;
@@ -149,16 +150,26 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 	const uint32 textureCount = static_cast<uint32>(textureNames.size());
 
 	RefPtr<BufferView> textureSRV = gpuResourceManager.createTextureBufferView(materialName + String("_Textures"), textureNames);
-	_mainPassCommand._descriptors.emplace_back(2, textureSRV->getRefBufferView());
+	_mainPassCommand._descriptors.emplace_back(3, textureSRV->getRefBufferView());
+
+	String diffuseEnv("cubemapEnvHDR.dds");
+	String specularEnv("cubemapSpecularHDR.dds");
+	String specularBrdf("cubemapBrdf.dds");
+	RefPtr<BufferView> environmentSRV = gpuResourceManager.createTextureBufferView(materialName + String("_EnvTextures"), { diffuseEnv,specularEnv,specularBrdf });
+	_mainPassCommand._descriptors.emplace_back(2, environmentSRV->getRefBufferView());
 
 	GpuResourcePerFrameSet cameraSet;
+	cameraBuffer.getVirtualAdresses(cameraSet.resourceAddress);
 	cameraSet.rootParameterIndex = 0;
-	cameraSet.resourceAddress[0] = cameraBuffer.constantBuffers[0].getGpuVirtualAddress();
-	cameraSet.resourceAddress[1] = cameraBuffer.constantBuffers[1].getGpuVirtualAddress();
-	cameraSet.resourceAddress[2] = cameraBuffer.constantBuffers[2].getGpuVirtualAddress();
 	cameraSet.type = ResourceType::CONSTANT_BUFFER;
 	_mainPassCommand._gpuResourcePerFrames.emplace_back(cameraSet);
 	_depthPassCommand._gpuResourcePerFrames.emplace_back(cameraSet);
+
+	GpuResourcePerFrameSet directionalLightSet;
+	lightBuffer.getVirtualAdresses(directionalLightSet.resourceAddress);
+	directionalLightSet.rootParameterIndex = 4;
+	directionalLightSet.type = ResourceType::CONSTANT_BUFFER;
+	_mainPassCommand._gpuResourcePerFrames.emplace_back(directionalLightSet);
 
 	{
 		VectorArray<D3D12_INPUT_ELEMENT_DESC> inputLayouts = {
@@ -177,14 +188,21 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		vs.create("Shaders/Indirect.hlsl", inputLayouts);
 		ps.create("Shaders/Indirect.hlsl", D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES);
 
-		D3D12_DESCRIPTOR_RANGE1 srvRange = {};
-		srvRange.BaseShaderRegister = 0;
-		srvRange.NumDescriptors = textureCount;
-		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		D3D12_DESCRIPTOR_RANGE1 environmentSrvRange = {};
+		environmentSrvRange.BaseShaderRegister = 0;
+		environmentSrvRange.NumDescriptors = 3;
+		environmentSrvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		environmentSrvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+		environmentSrvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(3);
+		D3D12_DESCRIPTOR_RANGE1 textureSrvRange = {};
+		textureSrvRange.BaseShaderRegister = 3;
+		textureSrvRange.NumDescriptors = textureCount;
+		textureSrvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		textureSrvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+		textureSrvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		VectorArray<D3D12_ROOT_PARAMETER1> parameterDescs(5);
 		parameterDescs[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		parameterDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 		parameterDescs[0].Descriptor.ShaderRegister = 0;
@@ -198,7 +216,17 @@ void StaticMultiMesh::create(RefPtr<ID3D12Device> device, RefPtr<CommandContext>
 		parameterDescs[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		parameterDescs[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 		parameterDescs[2].DescriptorTable.NumDescriptorRanges = 1;
-		parameterDescs[2].DescriptorTable.pDescriptorRanges = &srvRange;
+		parameterDescs[2].DescriptorTable.pDescriptorRanges = &environmentSrvRange;
+
+		parameterDescs[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		parameterDescs[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		parameterDescs[3].DescriptorTable.NumDescriptorRanges = 1;
+		parameterDescs[3].DescriptorTable.pDescriptorRanges = &textureSrvRange;
+
+		parameterDescs[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		parameterDescs[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		parameterDescs[4].Descriptor.ShaderRegister = 0;
+		parameterDescs[4].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
 		D3D12_STATIC_SAMPLER_DESC samplerDesc = WrapSamplerDesc();
 

@@ -48,3 +48,9 @@ void ConstantBufferFrame::flashBufferData(uint32 frameIndex) {
 void ConstantBufferFrame::writeBufferData(const void* dataPtr, uint32 length) {
 	memcpy(dataPtrs.data(), dataPtr, length);
 }
+
+void ConstantBufferFrame::getVirtualAdresses(RefPtr<D3D12_GPU_VIRTUAL_ADDRESS> dstArray) const{
+	dstArray[0] = constantBuffers[0].getGpuVirtualAddress();
+	dstArray[1] = constantBuffers[1].getGpuVirtualAddress();
+	dstArray[2] = constantBuffers[2].getGpuVirtualAddress();
+}
