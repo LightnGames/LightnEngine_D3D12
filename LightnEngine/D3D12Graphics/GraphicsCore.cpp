@@ -120,6 +120,7 @@ void GraphicsCore::onInit(HWND hwnd) {
 
 	_mainCameraConstantBuffer.create(_device.Get(), { sizeof(CameraConstantBuffer) });
 	_directionalLightBuffer.create(_device.Get(), { sizeof(DirectionalLightConstantBuffer) });
+	_pointlLightBuffer.create(_device.Get(), { sizeof(PointLightConstantBuffer) });
 
 	String diffuseEnv("cubemapEnvHDR.dds");
 	createTextures({ diffuseEnv });
@@ -191,8 +192,16 @@ void GraphicsCore::onUpdate() {
 	directionalLight.intensity = intensity;
 	directionalLight.direction = Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward);
 
+	PointLightConstantBuffer pointLight;
+	pointLight.position = Vector3::zero;
+	pointLight.color = Color::green;
+	pointLight.attenuation = Vector3::zero;
+
 	_directionalLightBuffer.writeBufferData(&directionalLight, sizeof(directionalLight));
 	_directionalLightBuffer.flashBufferData(_frameIndex);
+
+	_pointlLightBuffer.writeBufferData(&pointLight, sizeof(pointLight));
+	_pointlLightBuffer.flashBufferData(_frameIndex);
 }
 
 void GraphicsCore::onRender() {
@@ -370,8 +379,10 @@ StaticMultiMeshRenderInstance GraphicsCore::createStaticMultiMeshRender(const St
 	//RefPtr<StaticMultiMeshMaterial> material = &(*itr.first).second;
 	//material->create(_device.Get(), &_graphicsCommandContext, meshDatas);
 
+	InitBufferInfo bufferInfo = { _mainCameraConstantBuffer,_directionalLightBuffer,_pointlLightBuffer };
+
 	StaticMultiMesh multiMesh;
-	multiMesh.create(_device.Get(), &_graphicsCommandContext, _mainCameraConstantBuffer, _directionalLightBuffer, meshDatas);
+	multiMesh.create(_device.Get(), &_graphicsCommandContext, bufferInfo, meshDatas);
 	_multiMeshes.emplace_back(std::move(multiMesh));
 
 	//return StaticMultiMeshRenderInstance(material);

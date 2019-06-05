@@ -22,6 +22,12 @@ struct DirectionalLightConstantBuffer {
 	Color color;
 };
 
+struct PointLightConstantBuffer {
+	Vector4 position;
+	Color color;
+	Vector4 attenuation;
+};
+
 class Camera {
 public:
 	Camera() :

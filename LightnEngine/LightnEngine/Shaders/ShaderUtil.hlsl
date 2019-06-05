@@ -7,11 +7,16 @@ struct CameraInfo {
 	float3 cameraPos;
 };
 
-struct DirectionalLight
-{
+struct DirectionalLight {
 	float intensity;
 	float3 direction;
 	float4 color;
+};
+
+struct PointLight {
+	float4 position;
+	float4 color;
+	float4 attenuation;
 };
 
 //0~1のノーマルマップを-1~1の範囲にする

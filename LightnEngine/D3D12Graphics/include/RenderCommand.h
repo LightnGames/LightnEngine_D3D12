@@ -71,9 +71,15 @@ struct InitSettingsPerStaticMultiMesh {
 	VectorArray<String> textureNames;
 };
 
+struct InitBufferInfo {
+	ConstantBufferFrame& cameraBuffer;
+	ConstantBufferFrame& directionalLightBuffer;
+	ConstantBufferFrame& pointLightBuffer;
+};
+
 class StaticMultiMesh {
 public:
-	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const ConstantBufferFrame& cameraBuffer, const ConstantBufferFrame& lightBuffer, const InitSettingsPerStaticMultiMesh& initInfo);
+	void create(RefPtr<ID3D12Device> device, RefPtr<CommandContext> commandContext, const InitBufferInfo& bufferInfo, const InitSettingsPerStaticMultiMesh& initInfo);
 	
 	//GPUƒJƒŠƒ“ƒO
 	void onCompute(RenderSettings& settings);

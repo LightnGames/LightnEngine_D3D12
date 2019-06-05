@@ -78,4 +78,5 @@ private:
 
 	ConstantBufferFrame _mainCameraConstantBuffer;
 	ConstantBufferFrame _directionalLightBuffer;
+	ConstantBufferFrame _pointlLightBuffer;
 };

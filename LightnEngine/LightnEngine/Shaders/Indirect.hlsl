@@ -54,13 +54,15 @@ Texture2D brdfLUT : register(t2);
 Texture2D textures[] : register(t3);
 SamplerState t_sampler : register(s0);
 
-cbuffer DirectionalLightBuffer : register(b0)
-{
+cbuffer DirectionalLightBuffer : register(b0){
 	DirectionalLight directionalLight;
 };
 
-float4 PSMain(PSInput input) : SV_Target
-{
+cbuffer PointLightBuffer : register(b1) {
+	PointLight pointLight;
+};
+
+float4 PSMain(PSInput input) : SV_Target{
 	float3 albedo = textures[input.textureIndices.x].Sample(t_sampler, input.uv).rgb;
 	//float2 normal = t_normal.Sample(t_sampler, input.uv).rg;
 	//float metallic = t_metallic.Sample(t_sampler, input.uv).r;
