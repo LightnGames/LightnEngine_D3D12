@@ -8,6 +8,7 @@ struct PSInput
 	float3 binormal : BINORMAL;
 	float2 uv : TEXCOORD;
 	float3 viewDir : VIEWDIR;
+	float3 worldPosition :WORLDPOSITION;
 	uint4 textureIndices :TEXTUREINDICES;
 };
 
@@ -44,6 +45,7 @@ PSInput VSMain(VSInput input, uint vertexId : SV_VertexID)
 	result.uv = input.uv;
 	result.viewDir = normalize(camera.cameraPos - worldPos.xyz);
 	result.textureIndices = textureIndices;
+	result.worldPosition = worldPos.xyz;
 
 	return result;
 }
@@ -62,41 +64,62 @@ cbuffer PointLightBuffer : register(b1) {
 	PointLight pointLight;
 };
 
+float getSquareFalloffAttenuation(float distanceSquare, float falloff) {
+	float factor = distanceSquare * falloff;
+	float smoothFactor = saturate(1.0 - factor * factor);
+	// We would normally divide by the square distance here
+	// but we do it at the call site
+	return smoothFactor * smoothFactor;
+}
+
+float getDistanceAttenuation(float3 posToLight, float falloff, float distancePower) {
+	float distanceSquare = dot(posToLight, posToLight) * distancePower;
+	float attenuation = getSquareFalloffAttenuation(distanceSquare, falloff);
+	// Assume a punctual light occupies a volume of 1cm to avoid a division by 0
+	return attenuation * 1.0 / max(distanceSquare, EPSILON);
+}
+
+float computePreExposedIntensity(float intensity, float exposure) {
+	return intensity * exposure;
+}
+
 float4 PSMain(PSInput input) : SV_Target{
 	float3 albedo = textures[input.textureIndices.x].Sample(t_sampler, input.uv).rgb;
-	//float2 normal = t_normal.Sample(t_sampler, input.uv).rg;
-	//float metallic = t_metallic.Sample(t_sampler, input.uv).r;
-	//float roughness = t_roughness.Sample(t_sampler, input.uv).r;
-	//float ao = t_ao.Sample(t_sampler, input.uv).r;
+	float2 normalMap = textures[input.textureIndices.y].Sample(t_sampler, input.uv).rg;
+	float3 arm = textures[input.textureIndices.z].Sample(t_sampler, input.uv).rgb;
 
-	float2 normal = float2(0.5,0.5);
-	float metallic = 0;
-	float roughness = 1;
-	float ao = 1;
+	//float2 normal = float2(0.5,0.5);
+	float metallic = arm.b;
+	float roughness = arm.g;
+	float ao = arm.r;
+	//float metallic = 1;
+	//float roughness = 0;
+
+
+	//return float4(normalMap,1, 1);
+	//return float4(ao, 0, 0, 1);
 
 	//テクスチャを前準備
 	albedo = ToLiner(albedo);
-	float3 bumpMap = DecodeNormalMapRG(normal);
+	float3 bumpMap = DecodeNormalMapRG(normalMap);
 
 	//ノーマルマップを反映
 	float3 N = (bumpMap.x * input.tangent) + (bumpMap.y * input.binormal) + (bumpMap.z * input.normal);
 	N = normalize(N);
-	//N = input.normal;
 	//return float4(N, 1);
 
 	//PBRベースカラーを算出
-	float3 diffuseColor = lerp(albedo.rgb, float3(0.04, 0.04, 0.04), metallic);
-	float3 specularColor = lerp(float3(0.04, 0.04, 0.04), albedo.rgb, metallic);
+	float3 diffuseColor = lerp(albedo, float3(0.04, 0.04, 0.04), metallic);
+	float3 specularColor = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
 	//ライトベクトルと色を定義
 	float3 L = -directionalLight.direction;
 	float3 V = input.viewDir;
 	float3 H = normalize(L + V);
 	float3 R = reflect(-V, N);
-	float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
-	float dotNL = saturate(dot(N, L));
 	float dotNV = saturate(dot(N, V));
+	float dotNL = saturate(dot(N, L));
 	float dotNH = saturate(dot(N, H));
 	float dotVH = saturate(dot(V, H));
 	float dotLH = saturate(dot(L, H));
@@ -104,30 +127,48 @@ float4 PSMain(PSInput input) : SV_Target{
 	//return float4(irradistance,1);
 
 	//Direct Diffuse & Specular
-	float3 directDiffuse = irradistance * DisneyDiffuseBRDF(dotNV, dotNL, dotLH, roughness) * DiffuseBRDF(diffuseColor);
-	float3 directSpecular = irradistance * FrostbiteSupecularBRDF(dotNH, dotNL, dotNV, dotLH, specularColor, roughness);
+	float3 directDiffuse = DisneyDiffuseBRDF(dotNV, dotNL, dotLH, roughness) * diffuseColor;
+	float3 directSpecular = FrostbiteSupecularBRDF(dotNH, dotNL, dotNV, dotLH, specularColor, roughness);
+	float3 directionalResult = (directDiffuse + directSpecular) * irradistance;
+
+	float3 posToLightP = pointLight.position.xyz - input.worldPosition;
+	float3 Lp = normalize(posToLightP);
+	float3 Hp = normalize(Lp + V);
+	float dotNLp = saturate(dot(N, Lp));
+	float dotNHp = saturate(dot(N, Hp));
+	float dotVHp = saturate(dot(V, Hp));
+	float dotLHp = saturate(dot(Lp, Hp));
+	float pointLightAttr = getDistanceAttenuation(posToLightP, pointLight.attenuation.x, pointLight.attenuation.y);
+	float3 pointIrradistance = pointLight.color.rgb * pointLight.color.a * pointLightAttr;// *computePreExposedIntensity(pointLight.attenuation.y, pointLight.attenuation.z);
+	float3 pointDirectDiffuse =  DisneyDiffuseBRDF(dotNV, dotNLp, dotLHp, roughness) * diffuseColor;
+	float3 pointDirectSpecular = FrostbiteSupecularBRDF(dotNHp, dotNLp, dotNV, dotLHp, specularColor, roughness);
+	float3 pointLightResult = (pointDirectDiffuse + pointDirectSpecular) * pointIrradistance;
+	//return float4(pointLightResult, 1);
 
 	int maxMipLevels, width, height;
 	prefilterMap.GetDimensions(0, width, height, maxMipLevels);
 
-	float3 F = FresnelSchlickRoughness(dotNV, F0, roughness);
+	float3 F = FresnelSchlickRoughness(dotNV, specularColor, roughness);
+	//return float4(F, 1);
 	float3 kS = F;
 	float3 kD = float3(1.0, 1.0, 1.0) - kS;
 	kD *= 1.0 - metallic;
 
 	//IBL Diffuse
-	float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels).rgb;
+	float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels - 1).rgb;
 	float3 envDiffuse = irradiance * albedo;
 
 	//IBL Specular
 	float3 prefilteredEnvColor = prefilterMap.SampleLevel(t_sampler, R, roughness * maxMipLevels).rgb;
 	float2 envBRDF = brdfLUT.Sample(t_sampler, float2(dotNV, roughness)).rg;
 	float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y);
+	//return float4(envSpecular, 1);
 
 	float3 ambient = (kD * envDiffuse + envSpecular) * ao;
-	ambient = ambient + directDiffuse + directSpecular;
+	//return float4(ambient, 1);
+	ambient += directionalResult + pointLightResult;
 
-	float3 color = lerp(ambient, ambient, 0.001);
+	float3 color = lerp(ambient, ambient, 0.0);
 	color = SimpleToneMapping(color);
 	color = ToGamma(color);
 	return float4(color.rgb, 1.0);

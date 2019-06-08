@@ -176,7 +176,7 @@ void GraphicsCore::onUpdate() {
 	static float pitchL = 1.0f;
 	static float yawL = 0.2f;
 	static float rollL = 0;
-	static Vector3 color = Vector3::one;
+	static Vector3 color(255 / 255.0f, 244 / 255.0f, 214 / 255.0f);
 	static float intensity = 1.0f;
 
 	ImGui::Begin("DirectionalLight");
@@ -187,15 +187,26 @@ void GraphicsCore::onUpdate() {
 	ImGui::ColorEdit3("Color", (float*)& color);
 	ImGui::End();
 
+	static Vector3 positionP(-1, 6, -5);
+	static Vector3 atteration(0.00f, 1, 1);
+	static Color colorP(1, 1, 1, 5);
+
+	ImGui::Begin("PointLight");
+	ImGui::DragFloat3("Position", (float*)& positionP, 0.05f);
+	ImGui::SliderFloat("Intensity", &colorP.a, 0, 30);
+	ImGui::ColorEdit3("Color", (float*)& colorP);
+	ImGui::DragFloat3("Atteration", (float*)& atteration, 0.01f);
+	ImGui::End();
+
 	DirectionalLightConstantBuffer directionalLight;
 	directionalLight.color = Color(color.x, color.y, color.z, 1);
 	directionalLight.intensity = intensity;
 	directionalLight.direction = Quaternion::rotVector(Quaternion::euler({ pitchL, yawL, rollL }, true), Vector3::forward);
 
 	PointLightConstantBuffer pointLight;
-	pointLight.position = Vector3::zero;
-	pointLight.color = Color::green;
-	pointLight.attenuation = Vector3::zero;
+	pointLight.position = positionP;
+	pointLight.color = colorP;
+	pointLight.attenuation = atteration;
 
 	_directionalLightBuffer.writeBufferData(&directionalLight, sizeof(directionalLight));
 	_directionalLightBuffer.flashBufferData(_frameIndex);

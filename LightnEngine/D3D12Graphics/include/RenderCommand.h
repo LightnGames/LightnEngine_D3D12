@@ -36,6 +36,7 @@ struct InstacingVertexData {
 };
 
 struct TextureIndex {
+	TextureIndex() :t1(0), t2(0), t3(0), t4(0) {}
 	uint32 t1;
 	uint32 t2;
 	uint32 t3;

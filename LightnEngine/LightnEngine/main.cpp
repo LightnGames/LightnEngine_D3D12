@@ -612,8 +612,10 @@ public:
 			meshData.matrices.resize(instanceCount);
 			meshData.textureIndices.resize(subMeshCount);
 
+			//テクスチャ３枚読み込み
 			for (uint32 j = 0; j < subMeshCount; ++j) {
-				fin.read(reinterpret_cast<char*>(&meshData.textureIndices[j]), 16);
+				fin.read(reinterpret_cast<char*>(&meshData.textureIndices[j]), 12);
+				//fin.read(reinterpret_cast<char*>(&meshData.textureIndices[j]), 16);
 			}
 
 			for (uint32 j = 0; j < instanceCount; ++j) {
