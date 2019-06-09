@@ -619,7 +619,7 @@ void StaticMultiMesh::setupDepthPassCommand(RenderSettings& settings){
 	RefPtr<ID3D12GraphicsCommandList> commandList = settings.commandList;
 	uint32 frameIndex = settings.frameIndex;
 
-	static Vector3 positionV = -Vector3::forward * 23 + Vector3::up * 5;
+	static Vector3 positionV = -Vector3::forward * 40 + Vector3::up * 5;
 	static float pitchV = 0;
 	static float yawV = 0;
 	static float rollV = 0;
