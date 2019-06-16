@@ -95,7 +95,6 @@ float4 PSMain(PSInput input) : SV_Target{
 	//metallic = 1;
 	//roughness = 0;
 
-
 	//return float4(normalMap,1, 1);
 	//return float4(ao, 0, 0, 1);
 
@@ -123,7 +122,7 @@ float4 PSMain(PSInput input) : SV_Target{
 	float dotNH = saturate(dot(N, H));
 	float dotVH = saturate(dot(V, H));
 	float dotLH = saturate(dot(L, H));
-	float3 irradistance = dotNL * directionalLight.color.xyz * directionalLight.intensity;
+	float3 irradistance = dotNL * directionalLight.color.rgb * directionalLight.intensity;
 	//return float4(irradistance,1);
 
 	//Direct Diffuse & Specular
@@ -157,7 +156,7 @@ float4 PSMain(PSInput input) : SV_Target{
 	kD *= 1.0 - metallic;
 
 	//IBL Diffuse
-	float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels - 1).rgb;
+	float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels).rgb;
 	irradiance = ToLiner(irradiance);
 	float3 envDiffuse = irradiance * diffuseColor;
 
