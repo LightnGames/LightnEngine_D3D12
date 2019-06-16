@@ -7,7 +7,7 @@
 #include "AABB.h"
 #include "Camera.h"
 
-#define ENABLE_AABB_DEBUG_DRAW
+//#define ENABLE_AABB_DEBUG_DRAW
 
 class StaticSingleMesh {
 public:

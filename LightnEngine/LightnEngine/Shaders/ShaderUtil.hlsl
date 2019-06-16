@@ -22,7 +22,7 @@ struct PointLight {
 //0~1のノーマルマップを-1~1の範囲にする
 float3 DecodeNormalMapRG(in float2 normal) {
 	float2 flipGNormal = normal;
-	//flipGNormal.g = 1.0 - normal.g;
+	flipGNormal.g = 1.0 - normal.g;
 
 	// Expand the range of the normal value from (0, +1) to (-1, +1).
 	float3 normalMap = float3(flipGNormal, 1.0);

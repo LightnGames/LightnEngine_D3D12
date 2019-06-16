@@ -88,7 +88,7 @@ float4 PSMain(PSInput input) : SV_Target{
 	float2 normalMap = textures[input.textureIndices.y].Sample(t_sampler, input.uv).rg;
 	float3 arm = textures[input.textureIndices.z].Sample(t_sampler, input.uv).rgb;
 
-	//float2 normal = float2(0.5,0.5);
+	//normalMap = float2(0.5,0.5);
 	float metallic = arm.b;
 	float roughness = arm.g;
 	float ao = arm.r;
@@ -106,7 +106,7 @@ float4 PSMain(PSInput input) : SV_Target{
 	//ノーマルマップを反映
 	float3 N = (bumpMap.x * input.tangent) + (bumpMap.y * input.binormal) + (bumpMap.z * input.normal);
 	N = normalize(N);
-	//return float4(N, 1);
+	//return float4(N / 2 + 0.5, 1);
 
 	//PBRベースカラーを算出
 	float3 diffuseColor = lerp(albedo, float3(0.04, 0.04, 0.04), metallic);
@@ -139,11 +139,13 @@ float4 PSMain(PSInput input) : SV_Target{
 	float dotVHp = saturate(dot(V, Hp));
 	float dotLHp = saturate(dot(Lp, Hp));
 	float pointLightAttr = getDistanceAttenuation(posToLightP, pointLight.attenuation.x, pointLight.attenuation.y);
-	float3 pointIrradistance = pointLight.color.rgb * pointLight.color.a * pointLightAttr;// *computePreExposedIntensity(pointLight.attenuation.y, pointLight.attenuation.z);
-	float3 pointDirectDiffuse =  DisneyDiffuseBRDF(dotNV, dotNLp, dotLHp, roughness) * diffuseColor;
+	float3 pointIrradistance = pointLight.color.rgb * pointLight.color.a * dotNLp * pointLightAttr;// *computePreExposedIntensity(pointLight.attenuation.y, pointLight.attenuation.z);
+	float3 pointDirectDiffuse = DisneyDiffuseBRDF(dotNV, dotNLp, dotLHp, roughness) * diffuseColor;
 	float3 pointDirectSpecular = FrostbiteSupecularBRDF(dotNHp, dotNLp, dotNV, dotLHp, specularColor, roughness);
-	float3 pointLightResult = (pointDirectDiffuse + pointDirectSpecular) * pointIrradistance;
-	//return float4(pointLightResult, 1);
+	float3 pointLightResult = (pointDirectDiffuse + pointDirectSpecular)* pointIrradistance;
+	//float db = dotNLp * pointLightAttr;
+	//return float4(db, db, db, 1);
+	//return float4(pointIrradistance, 1);
 
 	int maxMipLevels, width, height;
 	prefilterMap.GetDimensions(0, width, height, maxMipLevels);
@@ -156,12 +158,14 @@ float4 PSMain(PSInput input) : SV_Target{
 
 	//IBL Diffuse
 	float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels - 1).rgb;
+	irradiance = ToLiner(irradiance);
 	float3 envDiffuse = irradiance * albedo;
 
 	//IBL Specular
 	float3 prefilteredEnvColor = prefilterMap.SampleLevel(t_sampler, R, roughness * maxMipLevels).rgb;
+	prefilteredEnvColor = ToLiner(prefilteredEnvColor);
 	float2 envBRDF = brdfLUT.Sample(t_sampler, float2(dotNV, roughness)).rg;
-	float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y);
+	float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y)* 0.5;//HDRだとスペキュラが明るすぎる？
 	//return float4(envSpecular, 1);
 
 	float3 ambient = (kD * envDiffuse + envSpecular) * ao;
