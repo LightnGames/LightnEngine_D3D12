@@ -88,12 +88,12 @@ float4 PSMain(PSInput input) : SV_Target{
 	float2 normalMap = textures[input.textureIndices.y].Sample(t_sampler, input.uv).rg;
 	float3 arm = textures[input.textureIndices.z].Sample(t_sampler, input.uv).rgb;
 
-	//normalMap = float2(0.5,0.5);
 	float metallic = arm.b;
 	float roughness = arm.g;
 	float ao = arm.r;
-	//float metallic = 1;
-	//float roughness = 0;
+	//normalMap = float2(0.5,0.5);
+	//metallic = 1;
+	//roughness = 0;
 
 
 	//return float4(normalMap,1, 1);
@@ -159,17 +159,17 @@ float4 PSMain(PSInput input) : SV_Target{
 	//IBL Diffuse
 	float3 irradiance = irradianceMap.SampleLevel(t_sampler, N, maxMipLevels - 1).rgb;
 	irradiance = ToLiner(irradiance);
-	float3 envDiffuse = irradiance * albedo;
+	float3 envDiffuse = irradiance * diffuseColor;
 
 	//IBL Specular
 	float3 prefilteredEnvColor = prefilterMap.SampleLevel(t_sampler, R, roughness * maxMipLevels).rgb;
 	prefilteredEnvColor = ToLiner(prefilteredEnvColor);
 	float2 envBRDF = brdfLUT.Sample(t_sampler, float2(dotNV, roughness)).rg;
-	float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y)* 0.5;//HDRだとスペキュラが明るすぎる？
+	float3 envSpecular = prefilteredEnvColor * (F * envBRDF.x + envBRDF.y)*0.2;//HDRだとスペキュラが明るすぎる？
 	//return float4(envSpecular, 1);
 
 	float3 ambient = (kD * envDiffuse + envSpecular) * ao;
-	//return float4(ambient, 1);
+	//return float4(ToGamma(ambient), 1);
 	ambient += directionalResult + pointLightResult;
 
 	float3 color = lerp(ambient, ambient, 0.0);
